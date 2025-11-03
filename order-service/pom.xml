@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<!-- 继承父工程（核心！） -->
+	<parent>
+		<groupId>org.rail</groupId>
+		<artifactId>railtick-system</artifactId>
+		<version>0.0.1-SNAPSHOT</version>
+		<relativePath>../pom.xml</relativePath> <!-- 父工程pom的相对路径 -->
+	</parent>
+	<!-- 子模块自身信息（无需重复groupId和version，继承父工程） -->
+	<artifactId>order-service</artifactId>
+	<name>order-service</name>
+	<description>订单服务子模块</description>
+
+	<!-- 依赖：直接引用父工程已管理的依赖，无需写version -->
+	<dependencies>
+		<!-- Web依赖（继承父工程版本） -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-web</artifactId>
+		</dependency>
+		<!-- 测试依赖 -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<!-- 如需Lombok，直接引用 -->
+		<dependency>
+			<groupId>org.projectlombok</groupId>
+			<artifactId>lombok</artifactId>
+			<optional>true</optional>
+		</dependency>
+	</dependencies>
+
+	<!-- 无需重复配置插件，继承父工程的插件 -->
+</project>
