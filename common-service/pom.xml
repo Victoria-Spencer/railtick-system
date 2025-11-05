@@ -10,9 +10,9 @@
         <relativePath>../pom.xml</relativePath> <!-- 父工程pom的相对路径 -->
     </parent>
     <!-- 子模块自身信息（无需重复groupId和version，继承父工程） -->
-    <artifactId>aggregation-service</artifactId>
-    <name>aggregation-service</name>
-    <description>聚合服务子模块</description>
+    <artifactId>common-service</artifactId>
+    <name>common-service</name>
+    <description>公共服务子模块</description>
 
     <!-- 依赖：直接引用父工程已管理的依赖，无需写version -->
     <dependencies>

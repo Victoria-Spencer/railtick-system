@@ -21,7 +21,7 @@
 
     <!-- 声明所有子模块（核心！Maven通过这里识别子模块） -->
     <modules>
-        <module>aggregation-service</module>
+        <module>common-service</module>
         <module>gateway-service</module>
         <module>order-service</module>
         <module>pay-service</module>

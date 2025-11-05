@@ -1,10 +1,10 @@
-package org.rail.aggregationservice;
+package org.rail.commonservice;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
-class AggregationServiceApplicationTests {
+class CommonServiceApplicationTests {
 
     @Test
     void contextLoads() {
