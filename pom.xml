@@ -51,13 +51,6 @@
                 <version>${spring-boot.version}</version>
                 <scope>test</scope>
             </dependency>
-            <!-- Lombok（父工程已声明，子模块可直接使用） -->
-            <dependency>
-                <groupId>org.projectlombok</groupId>
-                <artifactId>lombok</artifactId>
-                <version>1.18.30</version> <!-- 可根据需要指定版本 -->
-                <optional>true</optional>
-            </dependency>
         </dependencies>
     </dependencyManagement>
 
@@ -68,7 +61,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.11.0</version>
+                <version>3.14.1</version>
                 <configuration>
                     <source>${java.version}</source>
                     <target>${java.version}</target>

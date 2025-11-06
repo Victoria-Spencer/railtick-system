@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- namespace 必须与 Mapper 接口的全类名一致 -->
+<mapper namespace="org.rail.userservice.mapper.UserMapper">
+
+    <!-- 查询用户：根据用户名/邮箱/手机号查询 -->
+    <select id="findByUsernameOrMailOrPhone" resultType="org.rail.userservice.pojo.entity.User">
+        SELECT * FROM `user`
+        WHERE username = #{usernameOrMailOrPhone}
+            OR email = #{usernameOrMailOrPhone}
+            OR phone = #{usernameOrMailOrPhone}
+
+    </select>
+</mapper>
