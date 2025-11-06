@@ -14,7 +14,7 @@ public class Result<T> implements Serializable {
     private String code; // 业务状态码  "0"-成功  "1"-失败
     private String message; // 提示信息
     private T data; // 响应数据
-    private String requestID; // 请求id
+    private String requestId; // 请求id
     private boolean success; // 是否成功
 
     //快速返回操作成功响应结果
@@ -23,7 +23,7 @@ public class Result<T> implements Serializable {
         result.code = "0";
         result.message = "success";
         result.data = null;
-        result.requestID = null;
+        result.requestId = null;
         result.success = true;
         return result;
     }
@@ -34,7 +34,7 @@ public class Result<T> implements Serializable {
         result.code = "0";
         result.message = "success";
         result.data = data;
-        result.requestID = null;
+        result.requestId = null;
         result.success = true;
         return result;
     }
@@ -44,18 +44,18 @@ public class Result<T> implements Serializable {
         result.code = "1";
         result.message = message;
         result.data = null;
-        result.requestID = null;
+        result.requestId = null;
         result.success = false;
         return result;
     }
 
     // 支持传入requestID的错误响应
-    public static <T> Result<T> error(String message, String requestID) {
+    public static <T> Result<T> error(String message, String requestId) {
         Result<T> result = new Result<>();
         result.setCode("1");
         result.setMessage(message);
         result.setData(null);
-        result.setRequestID(requestID);
+        result.setRequestId(requestId);
         result.setSuccess(false);
         return result;
     }

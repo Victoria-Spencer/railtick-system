@@ -5,13 +5,21 @@
 
 <!-- namespace 必须与 Mapper 接口的全类名一致 -->
 <mapper namespace="org.rail.userservice.mapper.UserMapper">
-
     <!-- 查询用户：根据用户名/邮箱/手机号查询 -->
     <select id="findByUsernameOrMailOrPhone" resultType="org.rail.userservice.pojo.entity.User">
         SELECT * FROM `user`
         WHERE username = #{usernameOrMailOrPhone}
             OR email = #{usernameOrMailOrPhone}
             OR phone = #{usernameOrMailOrPhone}
-
     </select>
+    <update id="update">
+        UPDATE `user`
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="email != null">email = #{email},</if>
+            <if test="userType != null">user_type = #{userType},</if>
+            <if test="postCode != null">post_code = #{postCode},</if>
+            <if test="address != null">address = #{address},</if>
+        </trim>
+        WHERE id = #{id}
+    </update>
 </mapper>

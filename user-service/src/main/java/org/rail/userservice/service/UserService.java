@@ -1,7 +1,11 @@
 package org.rail.userservice.service;
 
+import org.rail.commonservice.result.Result;
 import org.rail.userservice.pojo.dto.UserLoginDTO;
-import org.rail.userservice.pojo.vo.UserLoginVO;
+import org.rail.userservice.pojo.dto.UserRegisterDTO;
+import org.rail.userservice.pojo.dto.UserUpdateInfoDTO;
+import org.rail.userservice.pojo.entity.User;
+import org.rail.userservice.pojo.vo.UserVO;
 
 public interface UserService {
 
@@ -10,5 +14,31 @@ public interface UserService {
      * @param userLoginDTO
      * @return
      */
-    UserLoginVO login(UserLoginDTO userLoginDTO);
+    UserVO login(UserLoginDTO userLoginDTO);
+
+    /**
+     * 退出登录
+     */
+    void logout();
+
+    /**
+     * 注册
+     * @param userRegisterDTO
+     * @return
+     */
+    UserVO register(UserRegisterDTO userRegisterDTO);
+
+    /**
+     * 更新用户信息
+     * @param userUpdateInfoDTO
+     * @return
+     */
+    UserVO update(UserUpdateInfoDTO userUpdateInfoDTO);
+
+    /**
+     *
+     * @param username
+     * @return
+     */
+    User findByUsername(String username);
 }

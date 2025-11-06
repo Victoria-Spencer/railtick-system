@@ -7,9 +7,10 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class UserLoginVO {
+public class UserVO {
 
     private String username;
     private String realName;
+    private String phone;
     private String accessToken;
 }
