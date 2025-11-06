@@ -1,13 +1,13 @@
 server:
   port: 8081
-
 spring:
+  profiles:
+    active: dev  # 激活生产环境配置
   datasource:
     url: jdbc:mysql://localhost:3306/railtick_system
     username: root
     password: root
     driver-class-name: com.mysql.cj.jdbc.Driver
-
 # MyBatis 配置
 mybatis:
   mapper-locations: classpath:mapper/*.xml  # 扫描 resources/mapper 目录下的所有 XML 文件

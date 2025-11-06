@@ -1,0 +1,3 @@
+logging:
+  level:
+    org.rail.userservice.mapper.UserMapper: DEBUG # sql语句打印

@@ -18,7 +18,7 @@ public class UserController {
     @Autowired
     private UserService userService;
 
-    @PostMapping("/v1/login")  // TODO 参数校验抛异常，全局异常处理
+    @PostMapping("/v1/login")
     public Result<UserLoginVO> login(@Validated @RequestBody UserLoginDTO userLoginDTO) {
         UserLoginVO userLoginVO = userService.login(userLoginDTO);
         return Result.success(userLoginVO);

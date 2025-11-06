@@ -48,4 +48,15 @@ public class Result<T> implements Serializable {
         result.success = false;
         return result;
     }
+
+    // 支持传入requestID的错误响应
+    public static <T> Result<T> error(String message, String requestID) {
+        Result<T> result = new Result<>();
+        result.setCode("1");
+        result.setMessage(message);
+        result.setData(null);
+        result.setRequestID(requestID);
+        result.setSuccess(false);
+        return result;
+    }
 }
