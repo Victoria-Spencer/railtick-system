@@ -43,8 +43,8 @@ public class UserController {
     }
 
     @GetMapping("/query")
-    public Result<User> query(@RequestParam String username) {
-        return Result.success(userService.findByUsername(username));
+    public Result<User> query(@RequestParam Long id) {
+        return Result.success(userService.getById(id));
     }
 
     @PostMapping("/deletion") // TODO 账号注销

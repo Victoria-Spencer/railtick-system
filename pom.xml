@@ -3,7 +3,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <!-- 父工程继承Spring Boot的父依赖（间接让子模块继承） -->
+    <!-- 继承Spring Boot父依赖 -->
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
@@ -15,11 +15,11 @@
     <groupId>org.rail</groupId>
     <artifactId>railtick-system</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <packaging>pom</packaging> <!-- 父工程必须为pom -->
+    <packaging>pom</packaging>
     <name>railtick-system</name>
     <description>父工程：管理所有子模块</description>
 
-    <!-- 声明所有子模块（核心！Maven通过这里识别子模块） -->
+    <!-- 声明子模块 -->
     <modules>
         <module>common-service</module>
         <module>gateway-service</module>
@@ -29,22 +29,33 @@
         <module>user-service</module>
     </modules>
 
-    <!-- 统一管理依赖版本和配置（子模块可直接继承） -->
+    <!-- 统一管理版本（核心：子模块直接引用属性） -->
     <properties>
-        <java.version>21</java.version> <!-- 统一Java版本（子模块原版本为21，这里保持一致） -->
+        <java.version>21</java.version>
         <spring-boot.version>3.5.7</spring-boot.version>
+        <!-- spring-cloud-starter-alibaba-nacos-discovery 版本（与Spring Boot 3.7.x兼容） -->
+        <spring-cloud-starter-alibaba.version>2025.0.0.0</spring-cloud-starter-alibaba.version>
+        <!-- 第三方依赖版本 -->
+        <mysql.version>8.0.30</mysql.version>
+        <lombok.version>1.18.42</lombok.version>
+        <mybatis-spring-boot.version>3.0.3</mybatis-spring-boot.version>
+        <hutool.version>5.8.12</hutool.version>
     </properties>
 
     <!-- 依赖管理：子模块引用时无需写version -->
     <dependencyManagement>
         <dependencies>
-            <!-- Spring Boot Web依赖 -->
+            <!-- Spring Boot 核心依赖 -->
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter</artifactId>
+                <version>${spring-boot.version}</version>
+            </dependency>
             <dependency>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-starter-web</artifactId>
                 <version>${spring-boot.version}</version>
             </dependency>
-            <!-- 测试依赖 -->
             <dependency>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-starter-test</artifactId>
@@ -53,12 +64,49 @@
             </dependency>
             <dependency>
                 <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-validation</artifactId>
+                <version>${spring-boot.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-starter-logging</artifactId>
+                <version>${spring-boot.version}</version>
+            </dependency>
+
+            <!-- Spring Cloud Alibaba 依赖（Nacos） -->
+            <dependency>
+                <groupId>com.alibaba.cloud</groupId>
+                <artifactId>spring-cloud-alibaba-dependencies</artifactId>
+                <version>${spring-cloud-starter-alibaba.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <!-- 第三方依赖 -->
+            <dependency>
+                <groupId>mysql</groupId>
+                <artifactId>mysql-connector-java</artifactId>
+                <version>${mysql.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.projectlombok</groupId>
+                <artifactId>lombok</artifactId>
+                <version>${lombok.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.mybatis.spring.boot</groupId>
+                <artifactId>mybatis-spring-boot-starter</artifactId>
+                <version>${mybatis-spring-boot.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>cn.hutool</groupId>
+                <artifactId>hutool-all</artifactId>
+                <version>${hutool.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
 
-    <!-- 统一插件配置（子模块继承） -->
+    <!-- 统一插件配置 -->
     <build>
         <plugins>
             <!-- Maven编译插件 -->
@@ -73,6 +121,7 @@
                         <path>
                             <groupId>org.projectlombok</groupId>
                             <artifactId>lombok</artifactId>
+                            <version>${lombok.version}</version> <!-- 使用父工程管理的lombok版本 -->
                         </path>
                     </annotationProcessorPaths>
                 </configuration>

@@ -36,9 +36,9 @@ public interface UserService {
     UserVO update(UserUpdateInfoDTO userUpdateInfoDTO);
 
     /**
-     *
-     * @param username
+     * 更加用户id查询用户信息
+     * @param id
      * @return
      */
-    User findByUsername(String username);
+    User getById(Long id);
 }

@@ -1,3 +1,8 @@
+spring:
+  db:
+    host: 192.168.43.143
+    username: root
+    password: root
 logging:
   level:
     org.rail.userservice.mapper.UserMapper: DEBUG # sql语句打印

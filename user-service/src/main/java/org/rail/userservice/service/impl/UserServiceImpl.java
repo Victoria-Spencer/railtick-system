@@ -9,6 +9,7 @@ import org.rail.userservice.pojo.dto.UserUpdateInfoDTO;
 import org.rail.userservice.pojo.entity.User;
 import org.rail.userservice.pojo.vo.UserVO;
 import org.rail.userservice.service.UserService;
+import org.rail.userservice.utils.JwtTokenUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -42,8 +43,9 @@ public class UserServiceImpl implements UserService {
         // 封装返回用户信息
         UserVO userVO = BeanUtils.copyProperties(user, UserVO.class);
 
-        // TODO 令牌校验
-        userVO.setAccessToken("1");
+        // 生成令牌
+        String token = JwtTokenUtil.createToken(user.getId());
+        userVO.setAccessToken(token);
 
         return userVO;
     }
@@ -93,11 +95,9 @@ public class UserServiceImpl implements UserService {
     }
 
     /**
-     * 根据用户名查询用户信息
-     * @param username
-     * @return
+     * 根据用户id查询用户信息
      */
-    public User findByUsername(String username) {
-        return userMapper.findByUsernameOrMailOrPhone(username);
+    public User getById(Long userId) {
+        return userMapper.getById(userId);
     }
 }

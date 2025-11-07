@@ -3,6 +3,7 @@ package org.rail.userservice.mapper;
 
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Select;
 import org.rail.userservice.pojo.entity.User;
 import org.rail.userservice.pojo.vo.UserVO;
 
@@ -33,4 +34,7 @@ public interface UserMapper {
      * @param user
      */
     void update(User user);
+
+    @Select("select * from `user` where id = #{userId}")
+    User getById(long userId);
 }
