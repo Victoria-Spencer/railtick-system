@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- namespace 必须与 Mapper 接口的全类名一致 -->
+<mapper namespace="org.rail.userservice.mapper.PassengerMapper">
+
+    <select id="query" resultType="org.rail.userservice.pojo.entity.Passenger">
+        SELECT id, real_name, id_type, id_card,
+               discount_type, phone, verify_status, create_time
+        FROM passenger
+        <where>
+            <if test="userId != null">AND user_id = #{userId}</if>
+            <if test="realName != null">AND real_name LIKE CONCAT('%', #{realName}, '%')</if>
+            <if test="verifyStatus != null">AND verify_status = #{verifyStatus}</if>
+        </where>
+        <if test="sortField != null">
+            ORDER BY ${sortField}
+            <if test="sortOrder != null">
+                <choose>
+                    <when test="sortOrder == 0">ASC</when>
+                    <when test="sortOrder == 1">DESC</when>
+                    <otherwise>ASC</otherwise> <!-- 默认升序 -->
+                </choose>
+            </if>
+            <if test="sortOrder == null">ASC</if> <!-- 未指定排序方式时默认升序 -->
+        </if>
+    </select>
+    <delete id="batchDelete">
+        DELETE FROM passenger
+        WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+</mapper>

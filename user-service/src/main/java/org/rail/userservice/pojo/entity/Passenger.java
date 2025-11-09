@@ -4,7 +4,7 @@ package org.rail.userservice.pojo.entity;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.rail.userservice.enums.VerifyStatus;
+import org.rail.userservice.constant.VerifyStatus;
 
 import java.time.LocalDateTime;
 
@@ -17,10 +17,7 @@ public class Passenger {
     private Long id;
 
     // 所属用户（逻辑外键）
-    private String userId;
-
-    // 用户名
-    private String username;
+    private Long userId;
 
     // 真实姓名
     private String realName;
@@ -38,7 +35,7 @@ public class Passenger {
     private String phone;
 
     // 审核状态
-    private VerifyStatus verifyStatus;
+    private Integer verifyStatus;
 
     // 创建时间
     private LocalDateTime createTime;

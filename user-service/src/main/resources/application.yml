@@ -10,6 +10,7 @@ spring:
         server-addr: 192.168.43.143:8848
         namespace: 1
         group: DEFAULT_GROUP
+        graceful-shutdown: false
   profiles:
     active: dev  # 激活生产环境配置
   datasource:

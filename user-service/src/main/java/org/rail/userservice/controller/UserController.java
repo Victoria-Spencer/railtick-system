@@ -36,7 +36,7 @@ public class UserController {
         return Result.success(userVO);
     }
 
-    @PostMapping("/update")
+    @PutMapping("/update")
     public Result<UserVO> update(@Validated @RequestBody UserUpdateInfoDTO userUpdateInfoDTO) {
         UserVO userVO = userService.update(userUpdateInfoDTO);
         return Result.success(userVO);

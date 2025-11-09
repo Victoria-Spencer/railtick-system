@@ -19,6 +19,7 @@
             <if test="userType != null">user_type = #{userType},</if>
             <if test="postCode != null">post_code = #{postCode},</if>
             <if test="address != null">address = #{address},</if>
+            <if test="updateTime != null">update_time = #{updateTime}</if>
         </trim>
         WHERE id = #{id}
     </update>

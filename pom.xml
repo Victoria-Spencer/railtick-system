@@ -34,12 +34,15 @@
         <java.version>21</java.version>
         <spring-boot.version>3.5.7</spring-boot.version>
         <!-- spring-cloud-starter-alibaba-nacos-discovery 版本（与Spring Boot 3.7.x兼容） -->
+<!--        <spring-cloud-starter-alibaba.version>2025.0.0.0</spring-cloud-starter-alibaba.version>-->
+        <nacos-client.version>3.1.0</nacos-client.version>
         <spring-cloud-starter-alibaba.version>2025.0.0.0</spring-cloud-starter-alibaba.version>
         <!-- 第三方依赖版本 -->
         <mysql.version>8.0.30</mysql.version>
         <lombok.version>1.18.42</lombok.version>
         <mybatis-spring-boot.version>3.0.3</mybatis-spring-boot.version>
         <hutool.version>5.8.12</hutool.version>
+        <pagehelper-spring-boot-starter.version>1.4.7</pagehelper-spring-boot-starter.version>
     </properties>
 
     <!-- 依赖管理：子模块引用时无需写version -->
@@ -73,6 +76,11 @@
                 <version>${spring-boot.version}</version>
             </dependency>
 
+            <dependency>
+                <groupId>com.alibaba.nacos</groupId>
+                <artifactId>nacos-client</artifactId>
+                <version>${nacos-client.version}</version>
+            </dependency>
             <!-- Spring Cloud Alibaba 依赖（Nacos） -->
             <dependency>
                 <groupId>com.alibaba.cloud</groupId>
@@ -102,6 +110,12 @@
                 <groupId>cn.hutool</groupId>
                 <artifactId>hutool-all</artifactId>
                 <version>${hutool.version}</version>
+            </dependency>
+            <!-- PageHelper 核心依赖 -->
+            <dependency>
+                <groupId>com.github.pagehelper</groupId>
+                <artifactId>pagehelper-spring-boot-starter</artifactId>
+                <version>${pagehelper-spring-boot-starter.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

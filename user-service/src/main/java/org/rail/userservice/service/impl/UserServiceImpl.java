@@ -10,6 +10,7 @@ import org.rail.userservice.pojo.entity.User;
 import org.rail.userservice.pojo.vo.UserVO;
 import org.rail.userservice.service.UserService;
 import org.rail.userservice.utils.JwtTokenUtil;
+import org.rail.userservice.utils.MD5Util;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -35,8 +36,13 @@ public class UserServiceImpl implements UserService {
             throw new BusinessException("用户不存在");
         }
 
+
+        // md5加密
+        String password = userLoginDTO.getPassword();
+        password = MD5Util.encrypt(password);
+
         // 校验密码
-        if(!user.getPassword().equals(userLoginDTO.getPassword())) {
+        if(!user.getPassword().equals(password)) {
             throw new BusinessException("密码错误");
         }
 
@@ -74,6 +80,10 @@ public class UserServiceImpl implements UserService {
         BeanUtils.copyProperties(userRegisterDTO, user);
         user.setCreateTime(LocalDateTime.now());
         user.setUpdateTime(LocalDateTime.now());
+
+        // md5加密
+        String password = user.getPassword();
+        user.setPassword(MD5Util.encrypt(password));
 
         // 添加到数据库
         userMapper.insert(user);
