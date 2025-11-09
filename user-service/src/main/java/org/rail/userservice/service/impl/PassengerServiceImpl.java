@@ -2,7 +2,9 @@ package org.rail.userservice.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import com.github.pagehelper.PageHelper;
+import lombok.val;
 import org.rail.commonservice.result.PageResult;
+import org.rail.commonservice.utils.ThreadLocalUtils;
 import org.rail.userservice.constant.VerifyStatus;
 import org.rail.userservice.mapper.PassengerMapper;
 import org.rail.userservice.pojo.dto.PsgrPageQueryDTO;
@@ -53,8 +55,9 @@ public class PassengerServiceImpl implements PassengerService {
      * @param passenger
      */
     public void save(Passenger passenger) {
-        // TODO 从线程中获取乘车人对应的用户id
-        passenger.setUserId(1L);
+        // 从线程中获取乘车人对应的用户标识
+        Long userId = Long.valueOf(ThreadLocalUtils.get());
+        passenger.setUserId(userId);
 
         // 设置审核状态
         passenger.setVerifyStatus(VerifyStatus.UNREVIEWED);
