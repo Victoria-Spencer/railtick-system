@@ -18,12 +18,9 @@ public class Station {
     // 名称（城市、站点、以及拼音）
     private String name;
 
-    // 编码
+    // 站点编码（唯一标识）
     private String code;
 
-    // 拼音
+    // 站点名称拼音
     private String spell;
-
-    // 站名
-    private String departure;
 }

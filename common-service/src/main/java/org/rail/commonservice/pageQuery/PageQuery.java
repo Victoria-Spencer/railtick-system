@@ -9,10 +9,8 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class PageQuery {
 
-    // 用户id
-    private Long userId;
-    // 真实姓名
-    private String realName;
-    private Integer page;
-    private Integer size;
+    // 页码
+    private Integer pageNumber = 1;
+    // 每页记录数
+    private Integer pageSize = 10;
 }

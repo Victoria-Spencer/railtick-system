@@ -8,4 +8,4 @@ spring:
     password: root
 logging:
   level:
-    org.rail.userservice.mapper.UserMapper: DEBUG # sql语句打印
+    org.rail.ticketservice.mapper.StationMapper: DEBUG # sql语句打印

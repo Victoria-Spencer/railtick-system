@@ -30,7 +30,7 @@ public class PassengerServiceImpl implements PassengerService {
      */
     public PageResult<Passenger> pageQuery(PsgrPageQueryDTO psgrPageQueryDTO) {
         // 1. 开启分页（pageNum：页码，pageSize：每页条数）
-        PageHelper.startPage(psgrPageQueryDTO.getPage(), psgrPageQueryDTO.getSize());
+        PageHelper.startPage(psgrPageQueryDTO.getPageNumber(), psgrPageQueryDTO.getPageSize());
 
         // 2. 执行查询（PageHelper会自动拦截该查询，拼接LIMIT分页）
         List<Passenger> userList = passengerMapper.query(psgrPageQueryDTO);

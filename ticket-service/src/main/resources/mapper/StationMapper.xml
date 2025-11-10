@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="org.rail.ticketservice.mapper.StationMapper">
+
+    <select id="pageQuery" resultType="org.rail.ticketservice.pojo.vo.StationPageQueryVO"
+            parameterType="org.rail.ticketservice.pojo.dto.StationPageQueryDTO">
+        SELECT name, code, spell
+        FROM station
+        <where>
+            <if test="queryType != null">AND query_type = #{queryType}</if>
+            <if test="keyword != null">AND (
+                `name` LIKE CONCAT('%', #{keyword}, '%')
+                OR spell LIKE CONCAT('%', #{keyword}, '%')
+                )
+            </if>
+        </where>
+    </select>
+</mapper>
