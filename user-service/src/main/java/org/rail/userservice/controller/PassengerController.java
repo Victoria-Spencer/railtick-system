@@ -24,8 +24,14 @@ public class PassengerController {
         return Result.success(pageResult);
     }
 
-    @GetMapping("/id/{id}")
-    public Result<Passenger> list(@PathVariable Long id) {
+    @GetMapping("/user/{id}")
+    public Result<List<Passenger>> list(@PathVariable Long id) {
+        List<Passenger> passengers = passengerService.getByUserId(id);
+        return Result.success(passengers);
+    }
+
+    @GetMapping("/{id}")
+    public Result<Passenger> passengerInfo(@PathVariable Long id) {
         Passenger passenger = passengerService.getById(id);
         return Result.success(passenger);
     }

@@ -42,6 +42,15 @@ public class PassengerServiceImpl implements PassengerService {
     }
 
     /**
+     * 根据用户id查询所有乘车人信息
+     * @param userId
+     * @return
+     */
+    public List<Passenger> getByUserId(Long userId) {
+        return passengerMapper.getByUserId(userId);
+    }
+
+    /**
      * 根据乘车人id查询乘车人信息
      * @param id
      * @return

@@ -17,6 +17,13 @@ public interface PassengerService {
     PageResult<Passenger> pageQuery(PsgrPageQueryDTO psgrPageQueryDTO);
 
     /**
+     * 根据用户id查询所有乘车人信息
+     * @param userId
+     * @return
+     */
+    List<Passenger> getByUserId(Long userId);
+
+    /**
      * 根据乘车人id查询乘车人信息
      * @param id
      * @return

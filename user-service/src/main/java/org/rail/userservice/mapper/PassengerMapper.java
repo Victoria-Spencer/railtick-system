@@ -20,6 +20,17 @@ public interface PassengerMapper {
     List<Passenger> query(PsgrPageQueryDTO psgrPageQueryDTO);
 
     /**
+     * 根据用户id查询所有乘车人信息
+     * @param userId
+     * @return
+     */
+    @Select("SELECT id, real_name, id_type, id_card," +
+            " discount_type, phone, verify_status, create_time " +
+            "FROM passenger " +
+            "WHERE user_id = #{userId}")
+    List<Passenger> getByUserId(Long userId);
+
+    /**
      *
      * @param id
      * @return
