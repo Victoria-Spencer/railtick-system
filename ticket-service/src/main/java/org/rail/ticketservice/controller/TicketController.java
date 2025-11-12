@@ -21,12 +21,13 @@ public class TicketController {
     private TicketService ticketService;
 
     /**
-     * 检索满足筛选条件的车票信息
+     * 查询购票列表
      * @param ticketQueryDTO
      * @return
      */
     @GetMapping("/query")
     public Result<List<TicketQueryVO>> queryTicket(@RequestBody TicketQueryDTO ticketQueryDTO) {
+        // TODO train字段没有返回值
         List<TicketQueryVO> ticketQueryVOList = ticketService.queryTicket(ticketQueryDTO);
         return Result.success(ticketQueryVOList);
     }

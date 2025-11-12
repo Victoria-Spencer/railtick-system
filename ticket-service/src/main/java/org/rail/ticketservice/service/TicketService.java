@@ -9,7 +9,7 @@ import java.util.List;
 public interface TicketService {
 
     /**
-     * 检索满足筛选条件的车票信息
+     * 查询购票列表
      * @param ticketQueryDTO
      * @return
      */

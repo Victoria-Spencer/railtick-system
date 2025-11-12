@@ -13,6 +13,8 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 public class TicketQueryDTO {
 
+    // 列车id（查询特定列车）
+    private Long trainId;
     // 出发地
     private String fromStation;
     // 目的地

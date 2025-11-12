@@ -91,8 +91,11 @@
             <if test="toStation != null and toStation != '' ">
                 AND s_end.`name` LIKE CONCAT('%', #{toStation}, '%')
             </if>
-            <if test="arrival != null and arrival!= '' ">
-            AND s_end.`name` = #{arrival}
+            <if test="arrival != null and arrival != '' ">
+                AND s_end.`name` = #{arrival}
+            </if>
+            <if test="trainId != null">
+                AND tss_a.train_id = #{trainId}
             </if>
         </where>
     </select>
