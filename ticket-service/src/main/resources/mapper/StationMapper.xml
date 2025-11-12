@@ -18,4 +18,82 @@
             </if>
         </where>
     </select>
+
+    <select id="batchQueryByTrainId" resultType="org.rail.ticketservice.pojo.vo.TrainStopStationVO"
+            parameterType="java.lang.Long">
+        SELECT tss.sequence AS sequence,
+               tss.arrival_time AS arrivalTime,
+               tss.departure_time AS departure_time,
+               s.name AS stationName
+        FROM train_stop_station tss
+                 INNER JOIN station s
+                            ON tss.station_id = s.id
+        WHERE
+            tss.train_id = #{trainId}
+    </select>
+
+    <!--<select id="getStartStationIdByDTO" resultType="java.lang.Integer"
+            parameterType="org.rail.ticketservice.pojo.dto.TicketQueryDTO">
+        SELECT id FROM station s
+        INNER JOIN train_stop_station tss
+            ON s.id = tss.station_id
+        <where>
+            <if test="fromStation != null and fromStation != '' ">
+                AND s.`name` LIKE CONCAT('%', #{fromStation}, '%')
+            </if>
+            <if test="departure != null and departure!= '' ">
+                AND s.`name` = #{departure}
+            </if>
+            <if test="departureDate != null">
+                &#45;&#45; 提取 departure_time 的日期部分（如 2025-11-11），与 LocalDate 参数比较
+                AND DATE(tss.departure_time) = #{departureDate}
+            </if>
+        </where>
+    </select>
+    <select id="getEndStationIdByDTO" resultType="java.lang.Integer"
+            parameterType="org.rail.ticketservice.pojo.dto.TicketQueryDTO">
+        SELECT id FROM station
+        <where>
+            <if test="toStation != null and toStation != '' ">
+                AND s.`name` LIKE CONCAT('%', #{toStation}, '%')
+            </if>
+            <if test="departure != null and departure!= '' ">
+                AND s.`name` = #{arrival}
+            </if>
+        </where>
+    </select>-->
+    <select id="getTrainDetailsByDTO" resultType="org.rail.ticketservice.pojo.vo.TrainDetailVO"
+            parameterType="org.rail.ticketservice.pojo.dto.TicketQueryDTO">
+        SELECT
+            s_start.id AS departureStationId,  -- 出发站ID
+            s_end.id AS arrivalStationId,      -- 到达站ID
+            tss_a.train_id AS trainId,     -- 列车ID
+            tss_a.departure_time AS departureTime,  -- 出发时间
+            tss_b.arrival_time AS arrivalTime,       -- 到达时间
+            tss_a.sequence AS startSequence,    -- 出发站站序
+            tss_b.sequence AS endSequence      -- 到达站站序
+        FROM
+        train_stop_station tss_a  -- 先取出发站经停记录
+        INNER JOIN train_stop_station tss_b ON tss_a.train_id = tss_b.train_id AND tss_a.sequence &lt; tss_b.sequence  -- 先关联同一列车的到达站经停记录
+        INNER JOIN station s_start ON tss_a.station_id = s_start.id  -- 再关联出发站信息
+        INNER JOIN station s_end ON tss_b.station_id = s_end.id  -- 最后关联到达站信息
+        <where>
+            <if test="fromStation != null and fromStation != '' ">
+                AND s_start.`name` LIKE CONCAT('%', #{fromStation}, '%')
+            </if>
+            <if test="departure != null and departure!= '' ">
+                AND s_start.`name` = #{departure}
+            </if>
+            <if test="departureDate != null">
+                -- 提取 departure_time 的日期部分（如 2025-11-11），与 LocalDate 参数比较
+                AND DATE(tss_a.departure_time) = #{departureDate}
+            </if>
+            <if test="toStation != null and toStation != '' ">
+                AND s_end.`name` LIKE CONCAT('%', #{toStation}, '%')
+            </if>
+            <if test="arrival != null and arrival!= '' ">
+            AND s_end.`name` = #{arrival}
+            </if>
+        </where>
+    </select>
 </mapper>

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="org.rail.ticketservice.mapper.TrainSeatMapper">
+
+    <select id="countAvailSeatsByClassId" resultType="java.lang.Integer">
+        -- 根据trainSeatClassId,出发站序及到达站序，统计可用座位数
+        SELECT COUNT(DISTINCT ts.id)  -- 用DISTINCT避免同一座位被多次占用时重复统计
+        FROM train_seat ts
+        -- 用LEFT JOIN保留“无占用记录”的座位（这些座位是可用的）
+        LEFT JOIN seat_interval_occupy sio ON ts.id = sio.seat_id
+        WHERE
+            ts.train_seat_class_id = #{trainSeatClassId}
+            -- 核心：筛选“无占用记录”或“占用区间与查询区间不重叠”的座位
+            AND (
+                -- 条件1：该座位没有任何占用记录（sio.id为null）
+                sio.id IS NULL
+                -- 条件2：有占用记录，但占用区间与查询区间不重叠
+                OR (
+                    sio.start_sequence &gt;= #{endSequence}  -- 占用区间在查询区间之后
+                    OR sio.end_sequence &lt;= #{startSequence}  -- 占用区间在查询区间之前
+                )
+            )
+    </select>
+</mapper>

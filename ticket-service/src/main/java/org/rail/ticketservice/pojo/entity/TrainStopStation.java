@@ -14,8 +14,12 @@ import java.time.LocalTime;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class TrainStopStationInfo {
+public class TrainStopStation {
 
+    // id
+    private Long id;
+    // 列车id
+    private Long trainId;
     // 站点id
     private Long stationId;
     // 站序
@@ -27,5 +31,5 @@ public class TrainStopStationInfo {
     // 出发时间
     private LocalDateTime departureTime;
     // 停留时间
-    private Integer stopoverTime;
+    private Long stopoverTime;
 }

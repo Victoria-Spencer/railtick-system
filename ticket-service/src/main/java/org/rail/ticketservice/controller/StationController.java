@@ -3,8 +3,8 @@ package org.rail.ticketservice.controller;
 import org.rail.commonservice.result.PageResult;
 import org.rail.commonservice.result.Result;
 import org.rail.ticketservice.pojo.dto.StationPageQueryDTO;
-import org.rail.ticketservice.pojo.entity.TrainStopStationInfo;
 import org.rail.ticketservice.pojo.vo.StationPageQueryVO;
+import org.rail.ticketservice.pojo.vo.TrainStopStationVO;
 import org.rail.ticketservice.service.StationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -29,8 +29,8 @@ public class StationController {
     }
 
     @GetMapping("train/{trainId}/stops")
-    public Result<List<TrainStopStationInfo>> getStops(@PathVariable("trainId") Integer trainId) {
-        List<TrainStopStationInfo> infoList = stationService.getStopsByTrainId(trainId);
+    public Result<List<TrainStopStationVO>> getStops(@PathVariable("trainId") Long trainId) {
+        List<TrainStopStationVO> infoList = stationService.getStopsByTrainId(trainId);
         return Result.success(infoList);
     }
 }

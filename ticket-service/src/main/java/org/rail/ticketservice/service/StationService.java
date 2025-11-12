@@ -3,8 +3,8 @@ package org.rail.ticketservice.service;
 
 import org.rail.commonservice.result.PageResult;
 import org.rail.ticketservice.pojo.dto.StationPageQueryDTO;
-import org.rail.ticketservice.pojo.entity.TrainStopStationInfo;
 import org.rail.ticketservice.pojo.vo.StationPageQueryVO;
+import org.rail.ticketservice.pojo.vo.TrainStopStationVO;
 
 import java.util.List;
 
@@ -21,5 +21,5 @@ public interface StationService {
      * 根据列车id查询列车经停站信息
      * @return
      */
-    List<TrainStopStationInfo> getStopsByTrainId(Integer trainId);
+    List<TrainStopStationVO> getStopsByTrainId(Long trainId);
 }

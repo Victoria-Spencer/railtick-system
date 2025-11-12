@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="org.rail.ticketservice.mapper.TrainStopStationMapper">
+
+<!--    <select id="getTrainsByStations" resultType="org.rail.ticketservice.pojo.dto.TrainTimeDTO">-->
+<!--        SELECT-->
+<!--            a.train_id AS trainId,-->
+<!--            a.departure_time AS departureTime,-->
+<!--            b.arrival_time AS arrivalTime-->
+<!--        FROM train_stop_station a-->
+<!--        INNER JOIN train_stop_station b-->
+<!--            ON a.train_id = b.train_id  &#45;&#45; 关联同一列车-->
+<!--        WHERE-->
+<!--            a.station_id = #{startStationId}  &#45;&#45; a表是出发站-->
+<!--            AND b.station_id = #{endStationId}  &#45;&#45; b表是到达站-->
+<!--            AND a.sequence < b.sequence  &#45;&#45; 出发站顺序在到达站之前-->
+<!--    </select>-->
+</mapper>
