@@ -1,6 +1,25 @@
+server:
+  port: 8084
 spring:
+  application:
+    name: order-service
+  cloud:
+    # nacos注册中心配置
+    nacos:
+      discovery:
+        server-addr: ${spring.nacos.host}:${spring.nacos.port}
+        namespace: 1
+        group: DEFAULT_GROUP
+        graceful-shutdown: false
+  profiles:
+    active: dev  # 激活生产环境配置
   datasource:
-    url: jdbc:mysql://localhost:3306/railtick_system
-    username: root
-    password: root
+    url: jdbc:mysql://${spring.db.host}/rs-ticket
+    username: ${spring.db.username}
+    password: ${spring.db.password}
     driver-class-name: com.mysql.cj.jdbc.Driver
+# MyBatis 配置
+mybatis:
+  mapper-locations: classpath:mapper/*.xml  # 扫描 resources/mapper 目录下的所有 XML 文件
+  configuration:
+    map-underscore-to-camel-case: true  # 开启下划线转驼峰

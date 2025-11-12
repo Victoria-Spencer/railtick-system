@@ -26,6 +26,11 @@ spring:
               uri: lb://ticket-service # 目标服务名（lb表示负载均衡）
               predicates:
                 - Path=/api/ticket-service/** # 路由断言：匹配路径
+            # 路由3：转发订单服务请求
+            - id: order-service-route # 路由唯一ID
+              uri: lb://order-service # 目标服务名（lb表示负载均衡）
+              predicates:
+                - Path=/api/order-service/** # 路由断言：匹配路径
 # 网关认证相关配置
 gateway:
   auth:

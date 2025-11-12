@@ -27,7 +27,6 @@ public class TicketController {
      */
     @GetMapping("/query")
     public Result<List<TicketQueryVO>> queryTicket(@RequestBody TicketQueryDTO ticketQueryDTO) {
-        // TODO train字段没有返回值
         List<TicketQueryVO> ticketQueryVOList = ticketService.queryTicket(ticketQueryDTO);
         return Result.success(ticketQueryVOList);
     }

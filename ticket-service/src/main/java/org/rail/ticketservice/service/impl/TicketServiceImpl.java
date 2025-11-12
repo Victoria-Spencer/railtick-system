@@ -1,6 +1,5 @@
 package org.rail.ticketservice.service.impl;
 
-import lombok.val;
 import org.rail.commonservice.utils.BeanUtils;
 import org.rail.ticketservice.mapper.*;
 import org.rail.ticketservice.pojo.dto.PlannedTicketQueryDTO;
