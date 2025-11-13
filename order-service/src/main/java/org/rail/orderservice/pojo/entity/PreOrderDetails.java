@@ -22,6 +22,8 @@ public class PreOrderDetails {
     private Integer ticketType;
     // 席别类型
     private Integer seatType;
+    // 临时座位号
+    private String tempSeatNo;
     // 总金额
-    private Integer amount;
+    private Double amount;
 }

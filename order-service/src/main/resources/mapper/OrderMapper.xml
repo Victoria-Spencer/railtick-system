@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="org.rail.orderservice.mapper.OrderMapper">
+
+    <insert id="insertPreOrder" parameterType="org.rail.orderservice.pojo.entity.PreOrder"
+            useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO pre_order(pre_order_sn, user_id, train_id, total_amount, expire_time, create_time)
+            VALUES(#{preOrderSn}, #{userId}, #{trainId}, #{totalAmount}, #{expireTime}, #{createTime})
+    </insert>
+    <insert id="batchInsertPreOrderDetails"
+            parameterType="java.util.List">
+        INSERT INTO pre_order_details(
+            pre_order_id,       -- 外键：关联预订单ID
+            real_name,          -- 乘客姓名
+            id_type,            -- 证件号
+            id_card,            -- 座位号
+            ticket_type,        -- 金额
+            seat_type,          -- 证件类型（示例字段，根据实际表结构补充）
+            temp_seat_no,       -- 票种（示例字段，根据实际表结构补充）
+            amount              -- 席别类型（示例字段，根据实际表结构补充）
+        )
+        VALUES
+        <!-- 遍历List集合：collection="list"（默认值，因参数是List且无@Param） -->
+        <foreach collection="preOrderDetailsList" item="detail" separator=",">
+            (
+                #{detail.preOrderId},
+                #{detail.realName},
+                #{detail.idType},
+                #{detail.idCard},
+                #{detail.ticketType},
+                #{detail.seatType},
+                #{detail.tempSeatNo},
+                #{detail.amount}
+            )
+        </foreach>
+    </insert>
+
+</mapper>

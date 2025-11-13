@@ -1,5 +1,11 @@
 package org.rail.orderservice.controller;
 
+import org.rail.commonservice.result.Result;
+import org.rail.orderservice.orderservice.OrderService;
+import org.rail.orderservice.pojo.dto.CreatePreOrderDTO;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -7,5 +13,13 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/order-service")
 public class OrderController {
 
+    @Autowired
+    private OrderService orderService;
 
+    @PostMapping("/pre-order/ticket/create")
+    public Result<String> createPreOrder(@RequestBody CreatePreOrderDTO createPreOrderDTO) {
+        // 返回预订单号
+        String preOrderSn = orderService.createPreOrder(createPreOrderDTO);
+        return Result.success(preOrderSn);
+    }
 }

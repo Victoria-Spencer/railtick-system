@@ -44,7 +44,7 @@ public class OrderDetails {
     // 车票类型（学生票、成人票等）
     private TicketType ticketType;
     // 订单金额
-    private Integer amount;
+    private Double amount;
     // 退票状态
     private Integer refundStatus;
 }
