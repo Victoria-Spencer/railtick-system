@@ -37,5 +37,35 @@
             )
         </foreach>
     </insert>
+    <update id="updatePreOrder" parameterType="java.util.List">
+        UPDATE pre_order
+        <set>
+            <if test="preOrderSn!=null and preOrderSn !='' ">pre_order_sn = #{preOrderSn},</if>
+            <if test="userId!=null">user_id = #{userId},</if>
+            <if test="trainId!=null">train_id = #{trainId},</if>
+            <if test="totalAmount!=null">total_amount = #{totalAmount},</if>
+            <if test="expireTime!=null">expire_time = #{expireTime},</if>
+            <if test="status!=null">status = #{status},</if>
+            <if test="createTime!=null">create_time = #{createTime},</if>
+        </set>
+        where id = #{id}
+    </update>
+    <update id="updatePreOrderDetailsList">
+        UPDATE pre_order_details
+        <set>
+            <!-- 更新临时座位号 temp_seat_no -->
+            temp_seat_no = CASE id
+            <foreach collection="list" item="detail">
+                WHEN #{detail.id} THEN #{detail.tempSeatNo}
+            </foreach>
+            ELSE temp_seat_no  <!-- 不匹配的记录保持原值 -->
+            END
+        </set>
+        <!-- 只更新list中包含的id，避免全表扫描 -->
+        WHERE id IN
+        <foreach collection="list" item="detail" open="(" separator="," close=")">
+            #{detail.id}
+        </foreach>
+    </update>
 
 </mapper>

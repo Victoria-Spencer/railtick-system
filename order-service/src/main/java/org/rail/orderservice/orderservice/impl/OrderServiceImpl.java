@@ -27,11 +27,60 @@ public class OrderServiceImpl implements OrderService {
     @Value("${order.pre.expire-minutes}")
     private Integer preOrderExpireMinutes;
     /**
-     * 创建预订单，临时锁定座位
+     * 1.创建预订单，临时锁定座位
+     * 2.避免造成长期锁座现象
+     * （
+     *      2.1.同一用户 + 同一车次的预订单 “覆盖机制”
+     *      2.2.TODO 退出选座界面：立即释放座位
+     *      2.3.TODO 定时任务清理过期预订单
+     *  ）
      * @param createPreOrderDTO
      * @return
      */
     public String createPreOrder(CreatePreOrderDTO createPreOrderDTO) {
+        // 1.根据用户ID和列车ID，查询是否已存在预订单
+        PreOrder preOrder = orderMapper.getByPreOrderUserIdAndTrainId(createPreOrderDTO.getUserId(), createPreOrderDTO.getTrainId());
+        // 2.若已经存在，则直接修改
+        if(preOrder != null){
+            // 重新生成过期时间和预订单状态
+            preOrder.setExpireTime(calculateExpireTime());
+            preOrder.setStatus(0);
+            preOrder.setCreateTime(LocalDateTime.now());
+            orderMapper.updatePreOrder(preOrder);
+
+            // 修改临时座位信息
+            Long preOrderId = preOrder.getId();
+            List<PreOrderDetails> PreOrderDetailsList = orderMapper.getIdAndTempSeatNoByPreOrderId(preOrderId);
+            List<String> chooseSeats = createPreOrderDTO.getChooseSeats();
+
+            // 两个列表长度必须一致（否则可能出现索引越界或数据不匹配）
+            if (PreOrderDetailsList == null || chooseSeats == null) {
+                throw new IllegalArgumentException("预订单详情列表或座位列表不能为空");
+            }
+            if (PreOrderDetailsList.size() != chooseSeats.size()) {
+                throw new IllegalArgumentException("预订单详情列表与座位数量不匹配");
+            }
+
+            for (int i = 0; i < PreOrderDetailsList.size(); i++) {
+                PreOrderDetails preOrderDetails = PreOrderDetailsList.get(i);
+                preOrderDetails.setTempSeatNo(chooseSeats.get(i));
+            }
+            orderMapper.updatePreOrderDetailsList(PreOrderDetailsList);
+
+            return preOrder.getPreOrderSn();
+        }
+
+        // 3.未存在，则重新生成
+        String preOrderSn = creatNewPreOrder(createPreOrderDTO);
+        return preOrderSn;
+    }
+
+    /**
+     * 重新生成新的预订单
+     * @param createPreOrderDTO
+     * @return
+     */
+    private String creatNewPreOrder(CreatePreOrderDTO createPreOrderDTO) {
         // 1.生成预订单对象
         PreOrder preOrder = BeanUtil.copyProperties(createPreOrderDTO, PreOrder.class);
         // 用雪花算法生成预订单号
