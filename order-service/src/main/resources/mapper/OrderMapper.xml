@@ -53,6 +53,13 @@
     <update id="updatePreOrderDetailsList">
         UPDATE pre_order_details
         <set>
+            <!-- 更新车厢号 carriage_number -->
+            carriage_number = CASE id
+            <foreach collection="list" item="detail">
+                WHEN #{detail.id} THEN #{detail.carriageNumber}
+            </foreach>
+            ELSE carriage_number  <!-- 不匹配的记录保持原值 -->
+            END,
             <!-- 更新临时座位号 temp_seat_no -->
             temp_seat_no = CASE id
             <foreach collection="list" item="detail">
@@ -67,5 +74,30 @@
             #{detail.id}
         </foreach>
     </update>
+    <insert id="insertOrder" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO
+            `order`(user_id, train_id, order_sn, pre_order_sn,
+                    total_amount, create_time, update_time)
+            VALUES (#{userId}, #{trainId}, #{orderSn},
+                    #{preOrderSn}, #{totalAmount}, #{createTime}, #{updateTime})
+    </insert>
+    <insert id="batchInsertOrderDetails"
+            parameterType="java.util.List">
+        INSERT INTO
+            order_details(order_id, pre_order_detail_id, departure, arrival,
+                            riding_date, train_number, departure_time, arrival_time,
+                            seat_type, carriage_number, seat_no, real_name, id_type,
+                            id_card, ticket_type, amount)
+            VALUES
+                <foreach collection="list" item="detail" separator=",">
+                    (
+                        #{detail.orderId}, #{detail.preOrderDetailId}, #{detail.departure},
+                        #{detail.arrival}, #{detail.ridingDate},#{detail.trainNumber},
+                        #{detail.departureTime}, #{detail.arrivalTime}, #{detail.seatType},
+                        #{detail.carriageNumber},#{detail.seatNo}, #{detail.realName},
+                        #{detail.idType}, #{detail.idCard}, #{detail.ticketType}, #{detail.amount}
+                    )
+                </foreach>
+    </insert>
 
 </mapper>

@@ -24,6 +24,8 @@ public class Order {
     private Integer status;
     // 总金额
     private Double totalAmount;
+    // 支付时间
+    private LocalDateTime payTime;
     // 创建时间
     private LocalDateTime createTime;
     // 更新时间

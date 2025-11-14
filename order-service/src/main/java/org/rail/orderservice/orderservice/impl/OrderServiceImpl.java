@@ -1,21 +1,34 @@
 package org.rail.orderservice.orderservice.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.bean.copier.CopyOptions;
+import org.rail.commonservice.exception.OrderNotFoundException;
+import org.rail.commonservice.utils.BeanUtils;
+import org.rail.orderservice.constant.PreOrderStatus;
 import org.rail.orderservice.mapper.OrderMapper;
 import org.rail.orderservice.orderservice.OrderService;
+import org.rail.orderservice.pojo.dto.ChooseSeatDTO;
+import org.rail.orderservice.pojo.dto.CreateOrderDTO;
 import org.rail.orderservice.pojo.dto.CreatePreOrderDTO;
 import org.rail.orderservice.pojo.dto.PassengerOrderDetailDTO;
+import org.rail.orderservice.pojo.entity.Order;
+import org.rail.orderservice.pojo.entity.OrderDetails;
 import org.rail.orderservice.pojo.entity.PreOrder;
 import org.rail.orderservice.pojo.entity.PreOrderDetails;
+import org.rail.orderservice.pojo.vo.CreateOrderDetailsVO;
+import org.rail.orderservice.pojo.vo.CreateOrderVO;
 import org.rail.orderservice.utils.SnowflakeIdGenerator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cglib.core.Local;
+import org.springframework.context.annotation.Bean;
 import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
 @Service
@@ -37,6 +50,7 @@ public class OrderServiceImpl implements OrderService {
      * @param createPreOrderDTO
      * @return
      */
+    @Transactional
     public String createPreOrder(CreatePreOrderDTO createPreOrderDTO) {
         // 1.根据用户ID和列车ID，查询是否已存在预订单
         PreOrder preOrder = orderMapper.getByPreOrderUserIdAndTrainId(createPreOrderDTO.getUserId(), createPreOrderDTO.getTrainId());
@@ -44,14 +58,14 @@ public class OrderServiceImpl implements OrderService {
         if(preOrder != null){
             // 重新生成过期时间和预订单状态
             preOrder.setExpireTime(calculateExpireTime());
-            preOrder.setStatus(0);
+            preOrder.setStatus(PreOrderStatus.VALID);
             preOrder.setCreateTime(LocalDateTime.now());
             orderMapper.updatePreOrder(preOrder);
 
             // 修改临时座位信息
             Long preOrderId = preOrder.getId();
             List<PreOrderDetails> PreOrderDetailsList = orderMapper.getIdAndTempSeatNoByPreOrderId(preOrderId);
-            List<String> chooseSeats = createPreOrderDTO.getChooseSeats();
+            List<ChooseSeatDTO> chooseSeats = createPreOrderDTO.getChooseSeats();
 
             // 两个列表长度必须一致（否则可能出现索引越界或数据不匹配）
             if (PreOrderDetailsList == null || chooseSeats == null) {
@@ -63,7 +77,8 @@ public class OrderServiceImpl implements OrderService {
 
             for (int i = 0; i < PreOrderDetailsList.size(); i++) {
                 PreOrderDetails preOrderDetails = PreOrderDetailsList.get(i);
-                preOrderDetails.setTempSeatNo(chooseSeats.get(i));
+                preOrderDetails.setCarriageNumber(chooseSeats.get(i).getCarriageNumber());
+                preOrderDetails.setTempSeatNo(chooseSeats.get(i).getTempSeatNo());
             }
             orderMapper.updatePreOrderDetailsList(PreOrderDetailsList);
 
@@ -73,6 +88,87 @@ public class OrderServiceImpl implements OrderService {
         // 3.未存在，则重新生成
         String preOrderSn = creatNewPreOrder(createPreOrderDTO);
         return preOrderSn;
+    }
+
+    /**
+     * 创建订单，并返回订单数据
+     * @param createOrderDTO
+     * @return
+     */
+    @Transactional
+    public CreateOrderVO createOrder(CreateOrderDTO createOrderDTO) {
+        /**       插入订单数据        **/
+        // 1. 查询预订单数据
+        String preOrderSn = createOrderDTO.getPreOrderSn();
+        PreOrder preOrder = orderMapper.getByPreOrderSn(preOrderSn);
+        if(preOrder == null){
+            throw new OrderNotFoundException("预订单不存在！");
+        }
+        // 2.预订单数据拷贝
+        Order order = BeanUtil.copyProperties(preOrder, Order.class);
+        // 3.orderSn（雪花算法随机生成）
+        order.setOrderSn(SnowflakeIdGenerator.generateOrderSn());
+        // 4.createTime, updateTime
+        order.setCreateTime(LocalDateTime.now());
+        order.setUpdateTime(LocalDateTime.now());
+        orderMapper.insertOrder(order);
+
+
+        /**       插入订单明细数据        **/
+        // 1.获取预订单明细数据
+        Long preOrderId = preOrder.getId();
+        List<PreOrderDetails> preOrderDetailsList = orderMapper.getDetailsByPreOrderId(preOrderId);
+
+        // 2.预订单数据拷贝
+        List<OrderDetails> orderDetailsList = BeanUtil.copyToList(
+                preOrderDetailsList,
+                OrderDetails.class,
+                CopyOptions.create()
+                        .setFieldMapping(new HashMap<String, String>(){{
+                            put("id", "preOrderDetailId");
+                            put("tempSeatNo", "seatNo");
+                        }})
+                );
+
+        // 3.遍历orderDetails,拷贝属性
+        for (OrderDetails orderDetails : orderDetailsList) {
+            // 设置外键
+            orderDetails.setOrderId(order.getId());
+            // 判断座位是否为空，若为空，则随机分配
+            String seatNo = orderDetails.getSeatNo();
+            if (seatNo == null) {
+                // TODO 远程调用，判断是否还有空座位（车厢号，座位号）
+                orderDetails.setSeatNo("1A");
+            }
+            // 拷贝其它属性
+            BeanUtil.copyProperties(createOrderDTO, orderDetails);
+        }
+        orderMapper.batchInsertOrderDetails(orderDetailsList);
+
+        // 标记预订单为已转为正式订单
+        markPreOrderStatus2(preOrderId);
+
+        /**        封装数据,返回        **/
+        CreateOrderVO createOrderVO = BeanUtil.copyProperties(createOrderDTO, CreateOrderVO.class);
+        // 设置订单号
+        createOrderVO.setOrderSn(preOrder.getPreOrderSn());
+        List<CreateOrderDetailsVO> createOrderDetailsVOS = BeanUtil.copyToList(orderDetailsList, CreateOrderDetailsVO.class);
+        // 设置订单明细数据
+        createOrderVO.setCreateOrderDetailsVOList(createOrderDetailsVOS);
+
+        return createOrderVO;
+    }
+
+    /**
+     * 标记预订单为已转为正式订单
+     * @param preOrderId
+     */
+    private void markPreOrderStatus2(Long preOrderId) {
+        /**        标记预订单为已转为正式订单        **/
+        PreOrder newPreOrder = new PreOrder();
+        newPreOrder.setId(preOrderId);
+        newPreOrder.setStatus(PreOrderStatus.CONVERTED_TO_ORDER);
+        orderMapper.updatePreOrder(newPreOrder);
     }
 
     /**
@@ -105,7 +201,7 @@ public class OrderServiceImpl implements OrderService {
         // 3.生成预订单明细对象列表
         List<PreOrderDetails> preOrderDetailsList = new ArrayList<>();
         List<PassengerOrderDetailDTO> passengerOrderDetailDTOList = createPreOrderDTO.getPassengerOrderDetailDTOList();
-        List<String> chooseSeats = createPreOrderDTO.getChooseSeats();
+        List<ChooseSeatDTO> chooseSeats = createPreOrderDTO.getChooseSeats();
 
         // 两个列表长度必须一致（否则可能出现索引越界或数据不匹配）
         if (passengerOrderDetailDTOList == null || chooseSeats == null) {
@@ -118,14 +214,16 @@ public class OrderServiceImpl implements OrderService {
         // 通过索引遍历两个列表，一一对应
         for (int i = 0; i < passengerOrderDetailDTOList.size(); i++) {
             PassengerOrderDetailDTO passengerDTO = passengerOrderDetailDTOList.get(i); // 第i个乘客
-            String tempSeatNo = chooseSeats.get(i); // 第i个座位号（与乘客一一对应）
+            String carriageNumber = chooseSeats.get(i).getCarriageNumber();
+            String tempSeatNo = chooseSeats.get(i).getTempSeatNo(); // 第i个座位号（与乘客一一对应）
 
             // 拷贝乘客基本信息到预订单明细
             PreOrderDetails preOrderDetails = BeanUtil.copyProperties(passengerDTO, PreOrderDetails.class);
 
-            // 设置外键和座位号
+            // 设置外键，车厢号和座位号
             preOrderDetails.setPreOrderId(preOrderId);
-            preOrderDetails.setTempSeatNo(tempSeatNo); // 假设PreOrderDetails有seatNo字段存储座位号
+            preOrderDetails.setCarriageNumber(carriageNumber); // 存储车厢号
+            preOrderDetails.setTempSeatNo(tempSeatNo); // 存储座位号
 
             preOrderDetailsList.add(preOrderDetails);
         }

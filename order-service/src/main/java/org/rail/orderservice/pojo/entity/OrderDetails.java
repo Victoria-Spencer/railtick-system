@@ -42,7 +42,7 @@ public class OrderDetails {
     // 证件号码
     private String idCard;
     // 车票类型（学生票、成人票等）
-    private TicketType ticketType;
+    private Integer ticketType;
     // 订单金额
     private Double amount;
     // 退票状态

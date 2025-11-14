@@ -1,6 +1,7 @@
 package org.rail.orderservice.pojo.entity;
 
 import lombok.Data;
+import org.rail.orderservice.constant.TicketType;
 
 /**
  * 预订单明细
@@ -22,6 +23,8 @@ public class PreOrderDetails {
     private Integer ticketType;
     // 席别类型
     private Integer seatType;
+    // 车厢号
+    private String carriageNumber;
     // 临时座位号
     private String tempSeatNo;
     // 总金额

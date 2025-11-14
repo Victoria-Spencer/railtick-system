@@ -3,6 +3,8 @@ package org.rail.orderservice.mapper;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.rail.orderservice.pojo.entity.Order;
+import org.rail.orderservice.pojo.entity.OrderDetails;
 import org.rail.orderservice.pojo.entity.PreOrder;
 import org.rail.orderservice.pojo.entity.PreOrderDetails;
 
@@ -30,7 +32,7 @@ public interface OrderMapper {
      */
     @Select("select id, pre_order_sn, user_id, train_id, total_amount, expire_time, status, create_time " +
             "from pre_order " +
-            "where user_id = #{userId} AND train_id = #{trainId}")
+            "where user_id = #{userId} AND train_id = #{trainId} AND status = 0")
     PreOrder getByPreOrderUserIdAndTrainId(Long userId, Long trainId);
 
     /**
@@ -52,4 +54,36 @@ public interface OrderMapper {
      * @param preOrderDetailsList
      */
     void updatePreOrderDetailsList(List<PreOrderDetails> preOrderDetailsList);
+
+    /**
+     * 查询预订单数据
+     * @param preOrderSn
+     * @return
+     */
+    @Select("select id, pre_order_sn, user_id, train_id, total_amount, expire_time, status, create_time " +
+            "from pre_order " +
+            "where pre_order_sn = #{preOrderSn} AND status = 0")
+    PreOrder getByPreOrderSn(String preOrderSn);
+
+    /**
+     * 插入订单数据
+     * @param order
+     */
+    void insertOrder(Order order);
+
+    /**
+     * 根据预订单id查询预订单明细数据
+     * @param preOrderId
+     * @return
+     */
+    @Select("select id, real_name, id_type, id_card, ticket_type, seat_type, carriage_number, temp_seat_no, amount " +
+            "from pre_order_details " +
+            "where pre_order_id = #{preOrderId}")
+    List<PreOrderDetails> getDetailsByPreOrderId(Long preOrderId);
+
+    /**
+     * 批量插入订单明细数据
+     * @param orderDetailsList
+     */
+    void batchInsertOrderDetails(List<OrderDetails> orderDetailsList);
 }

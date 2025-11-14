@@ -13,6 +13,6 @@ public class CreatePreOrderDTO {
     private Long userId;
     // 乘车人集合
     List<PassengerOrderDetailDTO> passengerOrderDetailDTOList;
-    // 选择座位集合 (tempSeatNo)
-    List<String> chooseSeats;
+    // 选择座位集合
+    List<ChooseSeatDTO> chooseSeats;
 }

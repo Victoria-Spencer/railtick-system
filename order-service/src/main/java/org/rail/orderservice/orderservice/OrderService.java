@@ -1,6 +1,9 @@
 package org.rail.orderservice.orderservice;
 
+import org.rail.orderservice.pojo.dto.CreateOrderDTO;
 import org.rail.orderservice.pojo.dto.CreatePreOrderDTO;
+import org.rail.orderservice.pojo.vo.CreateOrderDetailsVO;
+import org.rail.orderservice.pojo.vo.CreateOrderVO;
 
 public interface OrderService {
 
@@ -10,4 +13,11 @@ public interface OrderService {
      * @return
      */
     String createPreOrder(CreatePreOrderDTO createPreOrderDTO);
+
+    /**
+     * 创建订单，并返回订单数据
+     * @param createOrderDTO
+     * @return
+     */
+    CreateOrderVO createOrder(CreateOrderDTO createOrderDTO);
 }
