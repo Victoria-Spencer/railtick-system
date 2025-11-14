@@ -4,7 +4,6 @@ import org.rail.commonservice.result.Result;
 import org.rail.orderservice.orderservice.OrderService;
 import org.rail.orderservice.pojo.dto.CreateOrderDTO;
 import org.rail.orderservice.pojo.dto.CreatePreOrderDTO;
-import org.rail.orderservice.pojo.vo.CreateOrderDetailsVO;
 import org.rail.orderservice.pojo.vo.CreateOrderVO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -31,4 +30,6 @@ public class OrderController {
         CreateOrderVO createOrderVO = orderService.createOrder(createOrderDTO);
         return Result.success(createOrderVO);
     }
+
+
 }

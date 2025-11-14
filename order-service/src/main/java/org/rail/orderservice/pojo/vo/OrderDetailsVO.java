@@ -3,7 +3,7 @@ package org.rail.orderservice.pojo.vo;
 import lombok.Data;
 
 @Data
-public class CreateOrderDetailsVO {
+public class OrderDetailsVO {
 
     // 席别类型
     private Integer seatType;
@@ -21,4 +21,6 @@ public class CreateOrderDetailsVO {
     private Integer ticketType;
     // 票价
     private Double amount;
+    // 退票状态
+    private Boolean refundStatus;
 }

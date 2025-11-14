@@ -15,8 +15,8 @@ import org.rail.orderservice.pojo.entity.Order;
 import org.rail.orderservice.pojo.entity.OrderDetails;
 import org.rail.orderservice.pojo.entity.PreOrder;
 import org.rail.orderservice.pojo.entity.PreOrderDetails;
-import org.rail.orderservice.pojo.vo.CreateOrderDetailsVO;
 import org.rail.orderservice.pojo.vo.CreateOrderVO;
+import org.rail.orderservice.pojo.vo.OrderDetailsVO;
 import org.rail.orderservice.utils.SnowflakeIdGenerator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -152,7 +152,7 @@ public class OrderServiceImpl implements OrderService {
         CreateOrderVO createOrderVO = BeanUtil.copyProperties(createOrderDTO, CreateOrderVO.class);
         // 设置订单号
         createOrderVO.setOrderSn(preOrder.getPreOrderSn());
-        List<CreateOrderDetailsVO> createOrderDetailsVOS = BeanUtil.copyToList(orderDetailsList, CreateOrderDetailsVO.class);
+        List<OrderDetailsVO> createOrderDetailsVOS = BeanUtil.copyToList(orderDetailsList, OrderDetailsVO.class);
         // 设置订单明细数据
         createOrderVO.setCreateOrderDetailsVOList(createOrderDetailsVOS);
 

@@ -5,6 +5,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.io.Serializable;
 import java.util.List;
 
 /**
@@ -13,7 +14,7 @@ import java.util.List;
  */
 @Data
 @NoArgsConstructor
-public class PageResult<T> {
+public class PageResult<T> implements Serializable {
 
     /**
      * 总条数
@@ -23,7 +24,7 @@ public class PageResult<T> {
     /**
      * 分页数据列表
      */
-    private List<T> list;
+    private List<T> records;
 
     /**
      * 总页数
@@ -37,7 +38,7 @@ public class PageResult<T> {
         if(list instanceof Page) {
             Page<T> page = (Page<T>) list;
             this.total = page.getTotal(); // 总条数
-            this.list = page; // 当前页数据
+            this.records = page; // 当前页数据
             this.pages = page.getPages(); // 总页数
         }
     }

@@ -2,7 +2,6 @@ package org.rail.orderservice.orderservice;
 
 import org.rail.orderservice.pojo.dto.CreateOrderDTO;
 import org.rail.orderservice.pojo.dto.CreatePreOrderDTO;
-import org.rail.orderservice.pojo.vo.CreateOrderDetailsVO;
 import org.rail.orderservice.pojo.vo.CreateOrderVO;
 
 public interface OrderService {

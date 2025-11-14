@@ -19,6 +19,7 @@
             id_card,            -- 座位号
             ticket_type,        -- 金额
             seat_type,          -- 证件类型（示例字段，根据实际表结构补充）
+            carriage_number,    -- 车厢号
             temp_seat_no,       -- 票种（示例字段，根据实际表结构补充）
             amount              -- 席别类型（示例字段，根据实际表结构补充）
         )
@@ -32,6 +33,7 @@
                 #{detail.idCard},
                 #{detail.ticketType},
                 #{detail.seatType},
+                #{detail.carriageNumber},
                 #{detail.tempSeatNo},
                 #{detail.amount}
             )

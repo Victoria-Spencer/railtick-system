@@ -12,7 +12,7 @@ public class CreateOrderVO {
     // 订单号
     private String orderSn;
     // 订单详情
-    private List<CreateOrderDetailsVO> createOrderDetailsVOList;
+    private List<OrderDetailsVO> createOrderDetailsVOList;
     // 乘车日期
     private LocalDate ridingDate;
     // 列车车次
