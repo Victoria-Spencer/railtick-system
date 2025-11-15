@@ -3,6 +3,7 @@ package org.rail.orderservice.mapper;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 import org.rail.orderservice.pojo.dto.OrderPageQueryDTO;
 import org.rail.orderservice.pojo.dto.SelfTicketPageDTO;
 import org.rail.orderservice.pojo.entity.Order;
@@ -104,4 +105,11 @@ public interface OrderMapper {
      * @return
      */
     List<SelfTicketPageVO> getSeltTicketPageByQueryDTO(SelfTicketPageDTO selfTicketPageDTO);
+
+    /**
+     * 更新订单状态为已经取消
+     * @param orderSn
+     */
+    @Update("update `order` set status = 2 where order_sn = #{orderSn}")
+    void updateOrderByOrderSn(String orderSn);
 }

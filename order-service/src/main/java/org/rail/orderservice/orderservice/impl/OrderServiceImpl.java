@@ -186,6 +186,14 @@ public class OrderServiceImpl implements OrderService {
     }
 
     /**
+     * 取消车票订单
+     * @param orderSn
+     */
+    public void cancelOrder(String orderSn) {
+        orderMapper.updateOrderByOrderSn(orderSn);
+    }
+
+    /**
      * 标记预订单为已转为正式订单
      * @param preOrderId
      */

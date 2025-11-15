@@ -20,20 +20,20 @@ public class OrderController {
     @Autowired
     private OrderService orderService;
 
-    @PostMapping("/pre-order/ticket/create")
+    @PostMapping("/pre-order/create")
     public Result<String> createPreOrder(@RequestBody CreatePreOrderDTO createPreOrderDTO) {
         // 返回预订单号
         String preOrderSn = orderService.createPreOrder(createPreOrderDTO);
         return Result.success(preOrderSn);
     }
 
-    @PostMapping("/order/ticket/create")
+    @PostMapping("/order/create")
     public Result<CreateOrderVO> createOrder(@RequestBody CreateOrderDTO createOrderDTO) {
         CreateOrderVO createOrderVO = orderService.createOrder(createOrderDTO);
         return Result.success(createOrderVO);
     }
 
-    @GetMapping("/order/ticket/page")
+    @GetMapping("/order/page")
     public Result<PageResult<OrderPageQueryVO>> orderPageQuery(@RequestBody OrderPageQueryDTO orderPageQueryDTO) {
         PageResult<OrderPageQueryVO> pageResult = orderService.orderPageQuery(orderPageQueryDTO);
         return Result.success(pageResult);
@@ -45,5 +45,9 @@ public class OrderController {
         return Result.success(pageResult);
     }
 
-
+    @DeleteMapping("/order/cancel")
+    public Result cancel(@RequestParam String orderSn) {
+        orderService.cancelOrder(orderSn);
+        return Result.success();
+    }
 }

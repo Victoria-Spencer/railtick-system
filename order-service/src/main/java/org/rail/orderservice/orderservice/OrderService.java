@@ -38,4 +38,10 @@ public interface OrderService {
      * @return
      */
     PageResult<SelfTicketPageVO> selfTicketPageQuery(SelfTicketPageDTO selfTicketPageDTO);
+
+    /**
+     * 取消车票订单
+     * @param orderSn
+     */
+    void cancelOrder(String orderSn);
 }
