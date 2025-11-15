@@ -17,6 +17,7 @@ import org.rail.orderservice.pojo.entity.PreOrderDetails;
 import org.rail.orderservice.pojo.vo.CreateOrderVO;
 import org.rail.orderservice.pojo.vo.OrderDetailsVO;
 import org.rail.orderservice.pojo.vo.OrderPageQueryVO;
+import org.rail.orderservice.pojo.vo.SelfTicketPageVO;
 import org.rail.orderservice.utils.SnowflakeIdGenerator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -170,6 +171,18 @@ public class OrderServiceImpl implements OrderService {
         List<OrderPageQueryVO> orderPageQueryVOList = orderMapper.getOrderPageByQueryDTO(orderPageQueryDTO);
 
         return new PageResult<>(orderPageQueryVOList);
+    }
+
+    /**
+     * 分页查询本人车票
+     * @param selfTicketPageDTO
+     * @return
+     */
+    public PageResult<SelfTicketPageVO> selfTicketPageQuery(SelfTicketPageDTO selfTicketPageDTO) {
+        // 分页查询
+        PageHelper.startPage(selfTicketPageDTO.getPageNumber(), selfTicketPageDTO.getPageSize());
+        List<SelfTicketPageVO> SelfTicketPageVOList = orderMapper.getSeltTicketPageByQueryDTO(selfTicketPageDTO);
+        return new PageResult<>(SelfTicketPageVOList);
     }
 
     /**

@@ -6,8 +6,10 @@ import org.rail.orderservice.orderservice.OrderService;
 import org.rail.orderservice.pojo.dto.CreateOrderDTO;
 import org.rail.orderservice.pojo.dto.CreatePreOrderDTO;
 import org.rail.orderservice.pojo.dto.OrderPageQueryDTO;
+import org.rail.orderservice.pojo.dto.SelfTicketPageDTO;
 import org.rail.orderservice.pojo.vo.CreateOrderVO;
 import org.rail.orderservice.pojo.vo.OrderPageQueryVO;
+import org.rail.orderservice.pojo.vo.SelfTicketPageVO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -34,6 +36,12 @@ public class OrderController {
     @GetMapping("/order/ticket/page")
     public Result<PageResult<OrderPageQueryVO>> orderPageQuery(@RequestBody OrderPageQueryDTO orderPageQueryDTO) {
         PageResult<OrderPageQueryVO> pageResult = orderService.orderPageQuery(orderPageQueryDTO);
+        return Result.success(pageResult);
+    }
+
+    @GetMapping("/order/ticket/self/page")
+    public Result<PageResult<SelfTicketPageVO>> selfTicketPageQuery(@RequestBody SelfTicketPageDTO selfTicketPageDTO) {
+        PageResult<SelfTicketPageVO> pageResult = orderService.selfTicketPageQuery(selfTicketPageDTO);
         return Result.success(pageResult);
     }
 }

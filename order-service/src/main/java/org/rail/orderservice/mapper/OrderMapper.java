@@ -4,11 +4,13 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.rail.orderservice.pojo.dto.OrderPageQueryDTO;
+import org.rail.orderservice.pojo.dto.SelfTicketPageDTO;
 import org.rail.orderservice.pojo.entity.Order;
 import org.rail.orderservice.pojo.entity.OrderDetails;
 import org.rail.orderservice.pojo.entity.PreOrder;
 import org.rail.orderservice.pojo.entity.PreOrderDetails;
 import org.rail.orderservice.pojo.vo.OrderPageQueryVO;
+import org.rail.orderservice.pojo.vo.SelfTicketPageVO;
 
 import java.util.List;
 
@@ -95,4 +97,11 @@ public interface OrderMapper {
      * @return
      */
     List<OrderPageQueryVO> getOrderPageByQueryDTO(@Param("queryDTO") OrderPageQueryDTO orderPageQueryDTO);
+
+    /**
+     * 分页本人订单明细和关联的订单信息
+     * @param selfTicketPageDTO
+     * @return
+     */
+    List<SelfTicketPageVO> getSeltTicketPageByQueryDTO(SelfTicketPageDTO selfTicketPageDTO);
 }

@@ -240,4 +240,53 @@
             </otherwise>
         </choose>
     </select>
+
+
+    <select id="getSeltTicketPageByQueryDTO" resultType="org.rail.orderservice.pojo.vo.SelfTicketPageVO">
+        SELECT
+            d.departure,
+            d.arrival,
+            DATE(d.riding_date) AS ridingDate,
+            d.train_number,
+            d.departure_time,
+            d.arrival_time,
+            d.seat_type,
+            d.carriage_number,
+            d.seat_no,
+            d.real_name,
+            d.id_type,
+            d.id_card,
+            d.ticket_type,
+            d.amount,
+            d.refund_status
+        FROM order_details d
+        INNER JOIN `order` o ON d.order_id = o.id
+        <where>
+            <if test="userId!=null">
+                AND o.user_id = #{userId}
+            </if>
+            <if test="realName!=null and realName!=''">
+                AND d.real_name = #{realName}
+            </if>
+            <if test="ticketStatus!=null">
+                AND (o.status = 1 OR o.status = 3 OR o.status = 4)<!-- 订单状态是1：已支付状态 或 3：退票 或 4：部分退票状态 -->
+                <if test="ticketStatus == 0">  <!-- 未出行 -->
+                    AND d.departure_time &gt; CURRENT_TIMESTAMP
+                </if>
+                <if test="ticketStatus == 1">  <!-- 已出行 -->
+                    AND d.departure_time &lt; CURRENT_TIMESTAMP
+                </if>
+            </if>
+            <if test="startDate != null">
+                AND DATE(d.riding_date) &gt;= #{startDate}
+            </if>
+            <if test="endDate != null">
+                AND DATE(d.riding_date) &lt;= #{endDate}
+            </if>
+            <if test="trainNumber != null and trainNumber != ''">
+                AND d.train_number = #{trainNumber}
+            </if>
+        </where>
+    </select>
+    
 </mapper>

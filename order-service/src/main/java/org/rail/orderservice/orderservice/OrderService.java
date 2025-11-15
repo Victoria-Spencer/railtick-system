@@ -4,8 +4,10 @@ import org.rail.commonservice.result.PageResult;
 import org.rail.orderservice.pojo.dto.CreateOrderDTO;
 import org.rail.orderservice.pojo.dto.CreatePreOrderDTO;
 import org.rail.orderservice.pojo.dto.OrderPageQueryDTO;
+import org.rail.orderservice.pojo.dto.SelfTicketPageDTO;
 import org.rail.orderservice.pojo.vo.CreateOrderVO;
 import org.rail.orderservice.pojo.vo.OrderPageQueryVO;
+import org.rail.orderservice.pojo.vo.SelfTicketPageVO;
 
 public interface OrderService {
 
@@ -29,4 +31,11 @@ public interface OrderService {
      * @return
      */
     PageResult<OrderPageQueryVO> orderPageQuery(OrderPageQueryDTO orderPageQueryDTO);
+
+    /**
+     * 分页查询本人车票
+     * @param selfTicketPageDTO
+     * @return
+     */
+    PageResult<SelfTicketPageVO> selfTicketPageQuery(SelfTicketPageDTO selfTicketPageDTO);
 }
