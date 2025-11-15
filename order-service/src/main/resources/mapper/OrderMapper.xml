@@ -118,6 +118,7 @@
     <resultMap id="OrderPageQueryVOResultMap" type="org.rail.orderservice.pojo.vo.OrderPageQueryVO">
         <!-- 订单主表字段映射（来自order表） -->
         <result column="status" property="status"/> <!-- 订单状态 -->
+        <result column="order_sn" property="orderSn"/> <!-- 订单号 -->
         <result column="order_date" property="orderDate"/> <!-- 订票日期（主表创建时间的日期） -->
 
         <!-- 订单明细表字段映射（来自order_details表） -->
@@ -138,6 +139,7 @@
     </resultMap>
     <!-- 订单明细表子查询映射 -->
     <resultMap id="OrderDetailsVOResultMap" type="org.rail.orderservice.pojo.vo.OrderDetailsVO">
+        <result column="id" property="id"/>
         <result column="seat_type" property="seatType"/>
         <result column="carriage_number" property="carriageNumber"/>
         <result column="seat_no" property="seatNo"/>
@@ -151,7 +153,7 @@
     <!-- 子查询：通过订单id查询明细 -->
     <select id="getOrderDetailsByOrderId" resultMap="OrderDetailsVOResultMap">
         SELECT
-            seat_type, carriage_number, seat_no, real_name,
+            id, seat_type, carriage_number, seat_no, real_name,
             id_type, id_card, ticket_type, amount, refund_status
         FROM order_details
         WHERE order_id = #{orderId}
@@ -160,6 +162,7 @@
     <select id="getOrderPageByQueryDTO" resultMap="OrderPageQueryVOResultMap">
         SELECT
         ANY_VALUE(o.id) AS order_id,      <!-- 订单id，外键关联订单明细 -->
+        ANY_VALUE(o.order_sn) AS order_sn,
         ANY_VALUE(o.status) AS status,         <!-- 订单状态 -->
         ANY_VALUE(DATE(o.create_time)) AS order_date,  <!-- 订票日期（主表创建时间） -->
         -- 以下字段来自订单明细表（同一订单的所有明细这些字段相同，取任意一条即可）
@@ -244,6 +247,7 @@
 
     <select id="getSeltTicketPageByQueryDTO" resultType="org.rail.orderservice.pojo.vo.SelfTicketPageVO">
         SELECT
+            d.id,
             d.departure,
             d.arrival,
             DATE(d.riding_date) AS ridingDate,

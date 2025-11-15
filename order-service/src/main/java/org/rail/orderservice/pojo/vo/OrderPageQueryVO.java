@@ -9,6 +9,8 @@ import java.util.List;
 @Data
 public class OrderPageQueryVO {
 
+    // 订单号
+    private String orderSn;
     // 出发站点
     private String departure;
     // 到达站点

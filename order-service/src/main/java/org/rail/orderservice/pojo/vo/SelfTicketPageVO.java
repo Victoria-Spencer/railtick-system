@@ -8,6 +8,8 @@ import java.time.LocalDateTime;
 @Data
 public class SelfTicketPageVO {
 
+    // 订单明细ID
+    private Integer id;
     // 出发站点
     private String departure;
     // 到达站点

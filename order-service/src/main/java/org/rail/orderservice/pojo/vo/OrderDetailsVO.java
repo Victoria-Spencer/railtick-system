@@ -5,6 +5,8 @@ import lombok.Data;
 @Data
 public class OrderDetailsVO {
 
+    // 订单明细ID
+    private Integer id;
     // 席别类型
     private Integer seatType;
     // 车厢号
