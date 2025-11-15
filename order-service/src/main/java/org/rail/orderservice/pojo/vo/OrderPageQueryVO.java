@@ -4,6 +4,7 @@ import lombok.Data;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 public class OrderPageQueryVO {
@@ -24,6 +25,6 @@ public class OrderPageQueryVO {
     private Integer status;
     // 订票日期
     private LocalDate orderDate;
-    // 乘车人订单详情
-    private OrderDetailsVO orderDetailsVO;
+    // 乘车人订单详情列表
+    private List<OrderDetailsVO> orderDetailsVOList;
 }

@@ -3,10 +3,12 @@ package org.rail.orderservice.mapper;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.rail.orderservice.pojo.dto.OrderPageQueryDTO;
 import org.rail.orderservice.pojo.entity.Order;
 import org.rail.orderservice.pojo.entity.OrderDetails;
 import org.rail.orderservice.pojo.entity.PreOrder;
 import org.rail.orderservice.pojo.entity.PreOrderDetails;
+import org.rail.orderservice.pojo.vo.OrderPageQueryVO;
 
 import java.util.List;
 
@@ -86,4 +88,11 @@ public interface OrderMapper {
      * @param orderDetailsList
      */
     void batchInsertOrderDetails(List<OrderDetails> orderDetailsList);
+
+    /**
+     * 分页查询订单及关联的订单明细
+     * @param orderPageQueryDTO
+     * @return
+     */
+    List<OrderPageQueryVO> getOrderPageByQueryDTO(@Param("queryDTO") OrderPageQueryDTO orderPageQueryDTO);
 }

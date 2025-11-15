@@ -2,21 +2,21 @@ package org.rail.orderservice.orderservice.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.bean.copier.CopyOptions;
+import com.github.pagehelper.PageHelper;
 import org.rail.commonservice.exception.OrderNotFoundException;
+import org.rail.commonservice.result.PageResult;
 import org.rail.commonservice.utils.BeanUtils;
 import org.rail.orderservice.constant.PreOrderStatus;
 import org.rail.orderservice.mapper.OrderMapper;
 import org.rail.orderservice.orderservice.OrderService;
-import org.rail.orderservice.pojo.dto.ChooseSeatDTO;
-import org.rail.orderservice.pojo.dto.CreateOrderDTO;
-import org.rail.orderservice.pojo.dto.CreatePreOrderDTO;
-import org.rail.orderservice.pojo.dto.PassengerOrderDetailDTO;
+import org.rail.orderservice.pojo.dto.*;
 import org.rail.orderservice.pojo.entity.Order;
 import org.rail.orderservice.pojo.entity.OrderDetails;
 import org.rail.orderservice.pojo.entity.PreOrder;
 import org.rail.orderservice.pojo.entity.PreOrderDetails;
 import org.rail.orderservice.pojo.vo.CreateOrderVO;
 import org.rail.orderservice.pojo.vo.OrderDetailsVO;
+import org.rail.orderservice.pojo.vo.OrderPageQueryVO;
 import org.rail.orderservice.utils.SnowflakeIdGenerator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -157,6 +157,19 @@ public class OrderServiceImpl implements OrderService {
         createOrderVO.setCreateOrderDetailsVOList(createOrderDetailsVOS);
 
         return createOrderVO;
+    }
+
+    /**
+     * 分页查询订单
+     * @param orderPageQueryDTO
+     * @return
+     */
+    public PageResult<OrderPageQueryVO> orderPageQuery(OrderPageQueryDTO orderPageQueryDTO) {
+        // 分页查询
+        PageHelper.startPage(orderPageQueryDTO.getPageNumber(), orderPageQueryDTO.getPageSize());
+        List<OrderPageQueryVO> orderPageQueryVOList = orderMapper.getOrderPageByQueryDTO(orderPageQueryDTO);
+
+        return new PageResult<>(orderPageQueryVOList);
     }
 
     /**

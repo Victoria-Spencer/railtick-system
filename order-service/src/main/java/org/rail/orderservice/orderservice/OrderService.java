@@ -1,8 +1,11 @@
 package org.rail.orderservice.orderservice;
 
+import org.rail.commonservice.result.PageResult;
 import org.rail.orderservice.pojo.dto.CreateOrderDTO;
 import org.rail.orderservice.pojo.dto.CreatePreOrderDTO;
+import org.rail.orderservice.pojo.dto.OrderPageQueryDTO;
 import org.rail.orderservice.pojo.vo.CreateOrderVO;
+import org.rail.orderservice.pojo.vo.OrderPageQueryVO;
 
 public interface OrderService {
 
@@ -19,4 +22,11 @@ public interface OrderService {
      * @return
      */
     CreateOrderVO createOrder(CreateOrderDTO createOrderDTO);
+
+    /**
+     * 分页查询订单
+     * @param orderPageQueryDTO
+     * @return
+     */
+    PageResult<OrderPageQueryVO> orderPageQuery(OrderPageQueryDTO orderPageQueryDTO);
 }

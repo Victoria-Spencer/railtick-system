@@ -10,6 +10,7 @@
         INSERT INTO pre_order(pre_order_sn, user_id, train_id, total_amount, expire_time, create_time)
             VALUES(#{preOrderSn}, #{userId}, #{trainId}, #{totalAmount}, #{expireTime}, #{createTime})
     </insert>
+
     <insert id="batchInsertPreOrderDetails"
             parameterType="java.util.List">
         INSERT INTO pre_order_details(
@@ -39,6 +40,7 @@
             )
         </foreach>
     </insert>
+
     <update id="updatePreOrder" parameterType="java.util.List">
         UPDATE pre_order
         <set>
@@ -52,6 +54,7 @@
         </set>
         where id = #{id}
     </update>
+
     <update id="updatePreOrderDetailsList">
         UPDATE pre_order_details
         <set>
@@ -76,6 +79,7 @@
             #{detail.id}
         </foreach>
     </update>
+
     <insert id="insertOrder" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
         INSERT INTO
             `order`(user_id, train_id, order_sn, pre_order_sn,
@@ -83,6 +87,7 @@
             VALUES (#{userId}, #{trainId}, #{orderSn},
                     #{preOrderSn}, #{totalAmount}, #{createTime}, #{updateTime})
     </insert>
+
     <insert id="batchInsertOrderDetails"
             parameterType="java.util.List">
         INSERT INTO
@@ -102,4 +107,137 @@
                 </foreach>
     </insert>
 
+
+    <!--
+        功能：订单分页多表联查（订单表 + 订单明细表）
+        场景：查询用户的订单列表，包含订单基本信息、关联的订单项列表
+        参数： OrderPageQueryDTO
+        返回：分页的OrderVO列表，包含订单和订单明细集合
+    -->
+    <!-- 订单分页查询结果映射 -->
+    <resultMap id="OrderPageQueryVOResultMap" type="org.rail.orderservice.pojo.vo.OrderPageQueryVO">
+        <!-- 订单主表字段映射（来自order表） -->
+        <result column="status" property="status"/> <!-- 订单状态 -->
+        <result column="order_date" property="orderDate"/> <!-- 订票日期（主表创建时间的日期） -->
+
+        <!-- 订单明细表字段映射（来自order_details表） -->
+        <result column="departure" property="departure"/> <!-- 出发站点 -->
+        <result column="arrival" property="arrival"/> <!-- 到达站点 -->
+        <result column="riding_date" property="ridingDate"/> <!-- 乘车日期 -->
+        <result column="train_number" property="trainNumber"/> <!-- 列车车次 -->
+        <result column="departure_time" property="departureTime"/> <!-- 出发时间 -->
+        <result column="arrival_time" property="arrivalTime"/> <!-- 到达时间 -->
+
+        <!-- 关联订单明细表（一对多）：查询当前订单的所有乘车人明细 -->
+        <collection
+                property="orderDetailsVOList"
+                ofType="org.rail.orderservice.pojo.vo.OrderDetailsVO"
+                column="order_id"
+                select="getOrderDetailsByOrderId"
+        />
+    </resultMap>
+    <!-- 订单明细表子查询映射 -->
+    <resultMap id="OrderDetailsVOResultMap" type="org.rail.orderservice.pojo.vo.OrderDetailsVO">
+        <result column="seat_type" property="seatType"/>
+        <result column="carriage_number" property="carriageNumber"/>
+        <result column="seat_no" property="seatNo"/>
+        <result column="real_name" property="realName"/>
+        <result column="id_type" property="idType"/>
+        <result column="id_card" property="idCard"/>
+        <result column="ticket_type" property="ticketType"/>
+        <result column="amount" property="amount"/>
+        <result column="refund_status" property="refundStatus"/>
+    </resultMap>
+    <!-- 子查询：通过订单id查询明细 -->
+    <select id="getOrderDetailsByOrderId" resultMap="OrderDetailsVOResultMap">
+        SELECT
+            seat_type, carriage_number, seat_no, real_name,
+            id_type, id_card, ticket_type, amount, refund_status
+        FROM order_details
+        WHERE order_id = #{orderId}
+    </select>
+    <!-- 主查询：关联order和order_details，从明细表获取departure等字段 -->
+    <select id="getOrderPageByQueryDTO" resultMap="OrderPageQueryVOResultMap">
+        SELECT
+        ANY_VALUE(o.id) AS order_id,      <!-- 订单id，外键关联订单明细 -->
+        ANY_VALUE(o.status) AS status,         <!-- 订单状态 -->
+        ANY_VALUE(DATE(o.create_time)) AS order_date,  <!-- 订票日期（主表创建时间） -->
+        -- 以下字段来自订单明细表（同一订单的所有明细这些字段相同，取任意一条即可）
+        ANY_VALUE(d.departure) AS departure,
+        ANY_VALUE(d.arrival) AS arrival,
+        ANY_VALUE(d.riding_date) AS riding_date,
+        ANY_VALUE(d.train_number) AS train_number,
+        ANY_VALUE(d.departure_time) AS departure_time,
+        ANY_VALUE(d.arrival_time) AS arrival_time
+        FROM `order` o
+        -- 关联明细表（获取departure等字段）
+        INNER JOIN order_details d ON o.id = d.order_id
+        <where>
+            <!-- 主表条件-->
+            <if test="queryDTO.userId != null">
+                AND o.user_id = #{queryDTO.userId}
+            </if>
+            <!-- 主表条件：订单状态（0：未完成，1：未出行，2：历史订单 -->
+            <if test="queryDTO.orderStatus != null">
+                <if test="queryDTO.orderStatus == 0">
+                    AND o.status = 0
+                </if>
+                <if test="queryDTO.orderStatus == 1">
+                    AND (o.status = 1 OR o.status = 3)    <!-- 订单是已支付状态或部分退票状态 -->
+                    AND d.departure_time &gt; CURRENT_TIMESTAMP
+                </if>
+                <!-- 历史订单不做筛选 -->
+            </if>
+            <if test="queryDTO.orderSn != null and queryDTO.orderSn != ''">
+                AND o.order_sn = #{queryDTO.orderSn}
+            </if>
+            <!-- 根据orderType动态选择时间字段 -->
+            <if test="queryDTO.orderType != null">
+                <!-- 情况1：orderType=0 → 按订票日期（主表create_time）查询 -->
+                <if test="queryDTO.orderType == 0">
+                    <if test="queryDTO.startDate != null">
+                        AND DATE(o.create_time) &gt;= #{queryDTO.startDate}
+                    </if>
+                    <if test="queryDTO.endDate != null">
+                        AND DATE(o.create_time) &lt;= #{queryDTO.endDate}
+                    </if>
+                </if>
+
+                <!-- 情况2：orderType=1 → 按出行时间（明细表riding_date）查询 -->
+                <if test="queryDTO.orderType == 1">
+                    <if test="queryDTO.startDate != null">
+                        AND DATE(d.riding_date) &gt;= #{queryDTO.startDate}
+                    </if>
+                    <if test="queryDTO.endDate != null">
+                        AND DATE(d.riding_date) &lt;= #{queryDTO.endDate}
+                    </if>
+                </if>
+            </if>
+            <!-- 明细表条件 -->
+            <if test="queryDTO.trainNumber != null and queryDTO.trainNumber != ''">
+                AND d.train_number = #{queryDTO.trainNumber}
+            </if>
+            <if test="queryDTO.realName != null and queryDTO.realName != ''">
+                AND d.real_name = #{queryDTO.realName}
+            </if>
+        </where>
+        <!-- 按订单ID分组：避免同一订单因多条明细导致重复 -->
+        GROUP BY o.id
+        <!-- 动态排序 -->
+        ORDER BY
+        <choose>
+            <!-- 情况1：orderType=0 → 按订票时间（create_time）排序 -->
+            <when test="queryDTO.orderType == 0">
+                o.create_time DESC  <!-- 降序：最新订票在前 -->
+            </when>
+            <!-- 情况2：orderType=1 → 按出行时间（riding_date）排序 -->
+            <when test="queryDTO.orderType == 1">
+                d.riding_date DESC  <!-- 降序：最近出行在前 -->
+            </when>
+            <!-- 默认：未指定orderType时，按订票时间排序 -->
+            <otherwise>
+                o.create_time DESC
+            </otherwise>
+        </choose>
+    </select>
 </mapper>

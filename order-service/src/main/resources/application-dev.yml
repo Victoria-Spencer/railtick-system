@@ -8,7 +8,7 @@ spring:
     password: root
 logging:
   level:
-    org.rail.orderservice.mapper.OrderMapper: DEBUG # sql语句打印
+    org.rail.orderservice.mapper: DEBUG # sql语句打印
 order:
   pre:
     expire-minutes: 15  # 预订单有效期（分钟）
