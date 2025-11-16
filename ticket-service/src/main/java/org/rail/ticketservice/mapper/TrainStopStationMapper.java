@@ -2,6 +2,7 @@ package org.rail.ticketservice.mapper;
 
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Select;
+import org.rail.ticketservice.pojo.dto.StopSequenceDTO;
 
 import java.util.List;
 
@@ -35,4 +36,13 @@ public interface TrainStopStationMapper {
             "  AND a.sequence = (SELECT MAX(sequence) FROM train_stop_station WHERE train_id = #{trainId}) " +
             "  AND a.departure_time IS NULL")
     boolean isTerminalStation(Long trainId, Integer stationId);
+
+    /**
+     * 查询出发站点和到达站点
+     * @param trainId
+     * @param departure
+     * @param arrival
+     * @return
+     */
+    StopSequenceDTO getStopSequence(Long trainId, String departure, String arrival);
 }

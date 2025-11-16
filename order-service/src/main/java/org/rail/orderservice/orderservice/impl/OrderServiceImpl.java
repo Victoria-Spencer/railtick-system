@@ -138,16 +138,22 @@ public class OrderServiceImpl implements OrderService {
                         }})
                 );
 
-        // 3.遍历orderDetails,拷贝属性
+        // 3.判断座位是否为空，若为空，则随机分配
+        String seatNo = orderDetailsList.get(0).getSeatNo();
+        if (seatNo == null) {
+            // TODO 远程调用，判断是否还有空座位（车厢号，座位号）
+            // 列车ID, 席别类型
+
+        }
+
+        // 4.遍历orderDetails,拷贝属性
         for (OrderDetails orderDetails : orderDetailsList) {
             // 设置外键
             orderDetails.setOrderId(order.getId());
-            // 判断座位是否为空，若为空，则随机分配
-            String seatNo = orderDetails.getSeatNo();
-            if (seatNo == null) {
-                // TODO 远程调用，判断是否还有空座位（车厢号，座位号）
-                orderDetails.setSeatNo("1A");
-            }
+
+            // 分配座位
+            orderDetails.setSeatNo(orderDetails.getSeatNo());
+
             // 拷贝其它属性
             BeanUtil.copyProperties(createOrderDTO, orderDetails);
         }

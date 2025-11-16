@@ -53,9 +53,7 @@ public class UserController {
         return null;
     }
 
-    /**
-     * 远程调用接口，查询用户的证件类型和证件号码
-     */
+
     @GetMapping("/user/{id}")
     public Result<UserIdCardDTO> getIdCardInfo(@PathVariable Long id) {
         UserIdCardDTO userIdCardDTO = userService.getIdCardInfoById(id);

@@ -18,4 +18,14 @@
 <!--            AND b.station_id = #{endStationId}  &#45;&#45; b表是到达站-->
 <!--            AND a.sequence < b.sequence  &#45;&#45; 出发站顺序在到达站之前-->
 <!--    </select>-->
+    <select id="getStopSequence" resultType="org.rail.ticketservice.pojo.dto.StopSequenceDTO">
+        SELECT
+            ts_d.sequence AS departure_sequence,  -- 出发站序
+            ts_a.sequence AS arrival_sequence   -- 到达站序
+        FROM train_stop_station ts_d
+        JOIN train_stop_station ts_a ON ts_d.train_id = ts_a.train_id
+        JOIN station s_d ON ts_d.station_id = s_d.id AND s_d.name = #{departure}
+        JOIN station s_a ON ts_a.station_id = s_a.id AND s_a.name = #{arrival}
+        WHERE ts_d.train_id = #{trainId} AND ts_d.sequence &lt; ts_a.sequence;
+    </select>
 </mapper>

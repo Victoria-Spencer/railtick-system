@@ -1,11 +1,11 @@
 package org.rail.ticketservice.service.impl;
 
+import cn.hutool.core.bean.BeanUtil;
+import org.rail.commonapi.dto.AvailableSeatDTO;
+import org.rail.commonapi.dto.SeatQueryDTO;
 import org.rail.commonservice.utils.BeanUtils;
 import org.rail.ticketservice.mapper.*;
-import org.rail.ticketservice.pojo.dto.PlannedTicketQueryDTO;
-import org.rail.ticketservice.pojo.dto.SeatClassDTO;
-import org.rail.ticketservice.pojo.dto.SeatClassTotalDTO;
-import org.rail.ticketservice.pojo.dto.TicketQueryDTO;
+import org.rail.ticketservice.pojo.dto.*;
 import org.rail.ticketservice.pojo.entity.Train;
 import org.rail.ticketservice.pojo.vo.SeatClassVO;
 import org.rail.ticketservice.pojo.vo.TicketQueryVO;
@@ -57,6 +57,31 @@ public class TicketServiceImpl implements TicketService {
             return null;
         }
         return ticketQueryVOS.get(0);
+    }
+
+    /**
+     * 查询可用座位
+     * @param seatQueryDTO
+     * @return
+     */
+    public List<AvailableSeatDTO> getAvailableSeats(SeatQueryDTO seatQueryDTO) {
+        // HashMap
+        // TODO HashMap trainSeatMapper;
+        // 1.获取出发站和到达站的站序
+        Long trainId = seatQueryDTO.getTrainId();
+        String departure = seatQueryDTO.getDeparture();
+        String arrival = seatQueryDTO.getArrival();
+        StopSequenceDTO stopSequenceDTO = trainStopStationMapper.getStopSequence(trainId, departure, arrival);
+
+        // 2.构建查询条件
+        AvailableSeatQueryParamDTO availableSeatQueryParamDTO = BeanUtil.copyProperties(stopSequenceDTO, AvailableSeatQueryParamDTO.class);
+        availableSeatQueryParamDTO.setTrainId(trainId);
+        availableSeatQueryParamDTO.setSeatTypes(seatQueryDTO.getSeatTypes());
+
+        // 3.查询符合条件的空座位
+//        AvailableSeatDTO availableSeatDTO = SeatClassMapper.getAvailableSeats(availableSeatQueryParamDTO);
+
+        return List.of();
     }
 
 

@@ -28,6 +28,10 @@ public class TicketQueryVO {
     private String departure;
     // 到达站点
     private String arrival;
+    // 出发站编码
+    private String departureCode;
+    // 到达站编码
+    private String arrivalCode;
     // 始发站标识
     private boolean departureFlag;
     // 终点站标识
