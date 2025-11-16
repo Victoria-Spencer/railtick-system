@@ -2,6 +2,7 @@ package org.rail.commonservice.exceptionHandler;
 
 import lombok.extern.slf4j.Slf4j;
 import org.rail.commonservice.exception.BusinessException;
+import org.rail.commonservice.exception.OpenFeignException;
 import org.rail.commonservice.exception.OrderNotFoundException;
 import org.rail.commonservice.result.Result;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -21,6 +22,12 @@ public class GlobalExceptionHandler{
     @ExceptionHandler(value = OrderNotFoundException.class)
     public Result<Void> handleOrderNotFoundException(OrderNotFoundException e) {
         log.error("订单不存在异常：{}，", e.getMessage());
+        return Result.error(e.getMessage());
+    }
+
+    @ExceptionHandler(value = OpenFeignException.class)
+    public Result<Void> handleOpenFeignException(OpenFeignException e) {
+        log.error("远程调用失败异常：{}，", e.getMessage());
         return Result.error(e.getMessage());
     }
 

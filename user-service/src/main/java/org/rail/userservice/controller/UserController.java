@@ -1,5 +1,6 @@
 package org.rail.userservice.controller;
 
+import org.rail.commonapi.dto.UserIdCardDTO;
 import org.rail.commonservice.result.Result;
 import org.rail.userservice.pojo.dto.UserLoginDTO;
 import org.rail.userservice.pojo.dto.UserRegisterDTO;
@@ -50,5 +51,14 @@ public class UserController {
     @PostMapping("/deletion") // TODO 账号注销
     public Result delete(@RequestParam String username) {
         return null;
+    }
+
+    /**
+     * 远程调用接口，查询用户的证件类型和证件号码
+     */
+    @GetMapping("/user/{id}")
+    public Result<UserIdCardDTO> getIdCardInfo(@PathVariable Long id) {
+        UserIdCardDTO userIdCardDTO = userService.getIdCardInfoById(id);
+        return Result.success(userIdCardDTO);
     }
 }

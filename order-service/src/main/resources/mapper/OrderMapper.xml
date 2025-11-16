@@ -266,11 +266,9 @@
         FROM order_details d
         INNER JOIN `order` o ON d.order_id = o.id
         <where>
-            <if test="userId!=null">
-                AND o.user_id = #{userId}
-            </if>
-            <if test="realName!=null and realName!=''">
-                AND d.real_name = #{realName}
+            <if test="idType!=null and (idCard!=null and idCard!='')">
+                AND d.id_type = #{idType}
+                AND d.id_card = #{idCard}
             </if>
             <if test="ticketStatus!=null">
                 AND (o.status = 1 OR o.status = 3 OR o.status = 4)<!-- 订单状态是1：已支付状态 或 3：退票 或 4：部分退票状态 -->

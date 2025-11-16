@@ -1,5 +1,7 @@
 package org.rail.userservice.service.impl;
 
+import cn.hutool.core.bean.BeanUtil;
+import org.rail.commonapi.dto.UserIdCardDTO;
 import org.rail.commonservice.exception.BusinessException;
 import org.rail.commonservice.utils.BeanUtils;
 import org.rail.userservice.mapper.UserMapper;
@@ -109,5 +111,15 @@ public class UserServiceImpl implements UserService {
      */
     public User getById(Long userId) {
         return userMapper.getById(userId);
+    }
+
+    /**
+     * 查询证类型和证件件号
+     * @param id
+     * @return
+     */
+    public UserIdCardDTO getIdCardInfoById(Long id) {
+        User user = userMapper.getById(id);
+        return BeanUtil.copyProperties(user, UserIdCardDTO.class);
     }
 }

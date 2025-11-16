@@ -3,8 +3,12 @@ package org.rail.orderservice.orderservice.impl;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.bean.copier.CopyOptions;
 import com.github.pagehelper.PageHelper;
+import org.rail.commonapi.client.UserFeignClient;
+import org.rail.commonapi.dto.UserIdCardDTO;
+import org.rail.commonservice.exception.OpenFeignException;
 import org.rail.commonservice.exception.OrderNotFoundException;
 import org.rail.commonservice.result.PageResult;
+import org.rail.commonservice.result.Result;
 import org.rail.commonservice.utils.BeanUtils;
 import org.rail.orderservice.constant.PreOrderStatus;
 import org.rail.orderservice.mapper.OrderMapper;
@@ -40,6 +44,9 @@ public class OrderServiceImpl implements OrderService {
     // 从配置文件注入预订单有效期（分钟）
     @Value("${order.pre.expire-minutes}")
     private Integer preOrderExpireMinutes;
+    @Autowired
+    private UserFeignClient userFeignClient;
+
     /**
      * 1.创建预订单，临时锁定座位
      * 2.避免造成长期锁座现象
@@ -175,10 +182,22 @@ public class OrderServiceImpl implements OrderService {
 
     /**
      * 分页查询本人车票
-     * @param selfTicketPageDTO
+     * @param frontSelfTicketPageDTO
      * @return
      */
-    public PageResult<SelfTicketPageVO> selfTicketPageQuery(SelfTicketPageDTO selfTicketPageDTO) {
+    public PageResult<SelfTicketPageVO> selfTicketPageQuery(FrontSelfTicketPageDTO frontSelfTicketPageDTO) {
+        // 远程调用user-service，根据userId查询idType和idCard，UserIdCardDTO
+        Result<UserIdCardDTO> userIdCardDTOResult = userFeignClient.getIdCardInfo(frontSelfTicketPageDTO.getUserId());
+        if(!userIdCardDTOResult.isSuccess()){
+            throw new OpenFeignException(userIdCardDTOResult.getMessage());
+        }
+        UserIdCardDTO userIdCardDTO = userIdCardDTOResult.getData();
+
+        // 拷贝
+        SelfTicketPageDTO selfTicketPageDTO = BeanUtil.copyProperties(frontSelfTicketPageDTO, SelfTicketPageDTO.class);
+        selfTicketPageDTO.setIdType(userIdCardDTO.getIdType());
+        selfTicketPageDTO.setIdCard(userIdCardDTO.getIdCard());
+
         // 分页查询
         PageHelper.startPage(selfTicketPageDTO.getPageNumber(), selfTicketPageDTO.getPageSize());
         List<SelfTicketPageVO> SelfTicketPageVOList = orderMapper.getSeltTicketPageByQueryDTO(selfTicketPageDTO);

@@ -1,5 +1,6 @@
 package org.rail.userservice.service;
 
+import org.rail.commonapi.dto.UserIdCardDTO;
 import org.rail.commonservice.result.Result;
 import org.rail.userservice.pojo.dto.UserLoginDTO;
 import org.rail.userservice.pojo.dto.UserRegisterDTO;
@@ -41,4 +42,11 @@ public interface UserService {
      * @return
      */
     User getById(Long id);
+
+    /**
+     * 查询证件类型和证件号
+     * @param id
+     * @return
+     */
+    UserIdCardDTO getIdCardInfoById(Long id);
 }

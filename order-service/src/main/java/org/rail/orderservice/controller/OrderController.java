@@ -5,8 +5,8 @@ import org.rail.commonservice.result.Result;
 import org.rail.orderservice.orderservice.OrderService;
 import org.rail.orderservice.pojo.dto.CreateOrderDTO;
 import org.rail.orderservice.pojo.dto.CreatePreOrderDTO;
+import org.rail.orderservice.pojo.dto.FrontSelfTicketPageDTO;
 import org.rail.orderservice.pojo.dto.OrderPageQueryDTO;
-import org.rail.orderservice.pojo.dto.SelfTicketPageDTO;
 import org.rail.orderservice.pojo.vo.CreateOrderVO;
 import org.rail.orderservice.pojo.vo.OrderPageQueryVO;
 import org.rail.orderservice.pojo.vo.SelfTicketPageVO;
@@ -40,8 +40,8 @@ public class OrderController {
     }
 
     @GetMapping("/order/ticket/self/page")
-    public Result<PageResult<SelfTicketPageVO>> selfTicketPageQuery(@RequestBody SelfTicketPageDTO selfTicketPageDTO) {
-        PageResult<SelfTicketPageVO> pageResult = orderService.selfTicketPageQuery(selfTicketPageDTO);
+    public Result<PageResult<SelfTicketPageVO>> selfTicketPageQuery(@RequestBody FrontSelfTicketPageDTO frontSelfTicketPageDTO) {
+        PageResult<SelfTicketPageVO> pageResult = orderService.selfTicketPageQuery(frontSelfTicketPageDTO);
         return Result.success(pageResult);
     }
 
