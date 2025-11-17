@@ -28,8 +28,7 @@ public interface StationMapper {
     List<TrainStopStationVO> batchQueryByTrainId(Long trainId);
 
     /**
-     * 查询 trainId, departureTime, arrivalTime, departureStationId, arrivalStationId ,
-     * startSequence, endSequence 7个属性
+     * 查询列车详情
      * @param ticketQueryDTO
      * @return
      */

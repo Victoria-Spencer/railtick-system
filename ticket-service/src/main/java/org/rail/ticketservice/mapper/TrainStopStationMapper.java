@@ -2,7 +2,8 @@ package org.rail.ticketservice.mapper;
 
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Select;
-import org.rail.ticketservice.pojo.dto.StopSequenceDTO;
+import org.rail.ticketservice.pojo.dto.PlannedTicketQueryDTO;
+import org.rail.ticketservice.pojo.dto.StopInfoDTO;
 
 import java.util.List;
 
@@ -38,11 +39,9 @@ public interface TrainStopStationMapper {
     boolean isTerminalStation(Long trainId, Integer stationId);
 
     /**
-     * 查询出发站点和到达站点
-     * @param trainId
-     * @param departure
-     * @param arrival
+     * 查询站点信息
+     * @param plannedTicketQueryDTO
      * @return
      */
-    StopSequenceDTO getStopSequence(Long trainId, String departure, String arrival);
+    StopInfoDTO getStopInfoByQueryDTO(PlannedTicketQueryDTO plannedTicketQueryDTO);
 }

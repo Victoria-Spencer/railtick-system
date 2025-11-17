@@ -5,27 +5,29 @@
 
 <mapper namespace="org.rail.ticketservice.mapper.TrainStopStationMapper">
 
-<!--    <select id="getTrainsByStations" resultType="org.rail.ticketservice.pojo.dto.TrainTimeDTO">-->
-<!--        SELECT-->
-<!--            a.train_id AS trainId,-->
-<!--            a.departure_time AS departureTime,-->
-<!--            b.arrival_time AS arrivalTime-->
-<!--        FROM train_stop_station a-->
-<!--        INNER JOIN train_stop_station b-->
-<!--            ON a.train_id = b.train_id  &#45;&#45; 关联同一列车-->
-<!--        WHERE-->
-<!--            a.station_id = #{startStationId}  &#45;&#45; a表是出发站-->
-<!--            AND b.station_id = #{endStationId}  &#45;&#45; b表是到达站-->
-<!--            AND a.sequence < b.sequence  &#45;&#45; 出发站顺序在到达站之前-->
-<!--    </select>-->
-    <select id="getStopSequence" resultType="org.rail.ticketservice.pojo.dto.StopSequenceDTO">
+    <select id="getStopInfoByQueryDTO" resultType="org.rail.ticketservice.pojo.dto.StopInfoDTO"
+            parameterType="org.rail.ticketservice.pojo.dto.PlannedTicketQueryDTO">
         SELECT
-            ts_d.sequence AS departure_sequence,  -- 出发站序
-            ts_a.sequence AS arrival_sequence   -- 到达站序
-        FROM train_stop_station ts_d
-        JOIN train_stop_station ts_a ON ts_d.train_id = ts_a.train_id
-        JOIN station s_d ON ts_d.station_id = s_d.id AND s_d.name = #{departure}
-        JOIN station s_a ON ts_a.station_id = s_a.id AND s_a.name = #{arrival}
-        WHERE ts_d.train_id = #{trainId} AND ts_d.sequence &lt; ts_a.sequence;
+            s_start.name AS departure,
+            s_end.name AS arrival,
+            s_start.code AS departureCode,
+            s_end.code AS arrivalCode,
+            s_start.id AS departureStationId,
+            s_end.id AS arrivalStationId,
+            tss_a.departure_time AS departureTime,
+            tss_b.arrival_time AS arrivalTime,
+            tss_a.sequence AS departureSequence,
+            tss_b.sequence AS arrivalSequence
+        FROM train_stop_station tss_a
+        INNER JOIN train_stop_station tss_b
+            ON tss_a.train_id = tss_b.train_id AND tss_a.sequence &lt; tss_b.sequence
+        INNER JOIN station s_start
+            ON tss_a.station_id = s_start.id
+        INNER JOIN station s_end
+            ON tss_b.station_id = s_end.id
+        WHERE
+            tss_a.train_id = #{trainId}
+            AND s_start.code = #{departureCode}
+            AND s_end.code = #{arrivalCode}
     </select>
 </mapper>

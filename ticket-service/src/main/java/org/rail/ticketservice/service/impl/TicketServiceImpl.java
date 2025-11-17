@@ -32,6 +32,8 @@ public class TicketServiceImpl implements TicketService {
     private TrainStopStationMapper trainStopStationMapper;
     @Autowired
     private SeatClassMapper seatClassMapper;
+    @Autowired
+    private TrainMapper trainMapper;
 
     /**
      * 查询购票列表
@@ -81,7 +83,7 @@ public class TicketServiceImpl implements TicketService {
             BeanUtil.copyProperties(trainDetailVO, ticketQueryVO);
 
             // 3.4.计算历经时间
-            Integer duration = calculateDurationInMinutes(trainDetailVO.getDepartureTime(), ticketQueryVO.getArrivalTime());
+            Integer duration = calculateDurationInMinutes(ticketQueryVO.getDepartureTime(), ticketQueryVO.getArrivalTime());
             ticketQueryVO.setDuration(duration);
 
             // 3.5.始发站和终点站判断
@@ -104,13 +106,41 @@ public class TicketServiceImpl implements TicketService {
      * @return
      */
     public TicketQueryVO queryPlannedTicket(PlannedTicketQueryDTO plannedTicketQueryDTO) {
-        TicketQueryDTO ticketQueryDTO = BeanUtils.copyProperties(plannedTicketQueryDTO, TicketQueryDTO.class);
-        // 调用getTicketQueryVOS方法查询
-        List<TicketQueryVO> ticketQueryVOS = getTicketQueryVOS(ticketQueryDTO);
-        if(ticketQueryVOS.isEmpty()){
-            return null;
-        }
-        return ticketQueryVOS.get(0);
+        TicketQueryVO ticketQueryVO = new TicketQueryVO();
+
+        // 1.查询列车表属性
+        Long trainId = plannedTicketQueryDTO.getTrainId();
+        Train train = trainMapper.getById(trainId);
+        ticketQueryVO.setTrain(train);
+
+        // 2.查询经停站相关信息
+        StopInfoDTO stopInfoDTO = trainStopStationMapper.getStopInfoByQueryDTO(plannedTicketQueryDTO);
+        BeanUtils.copyProperties(stopInfoDTO, ticketQueryVO);
+
+        // 3.查询席别类型
+        List<SeatQueryDTO> seatQueryDTOList = new ArrayList<>();
+        SeatQueryDTO seatQueryDTO = new SeatQueryDTO();
+        seatQueryDTO.setTrainId(trainId);
+        seatQueryDTO.setStartSequence(stopInfoDTO.getDepartureSequence());
+        seatQueryDTO.setEndSequence(stopInfoDTO.getArrivalSequence());
+        seatQueryDTOList.add(seatQueryDTO);
+        List<SeatClassVO> seatClassVOList = querySeatClassData(seatQueryDTOList);
+        List<SeatClassFrontVO> frontVOs = BeanUtil.copyToList(seatClassVOList, SeatClassFrontVO.class);
+        ticketQueryVO.setSeatClassFrontVOList(frontVOs);
+
+        // 4.计算历经时间
+        Integer duration = calculateDurationInMinutes(stopInfoDTO.getDepartureTime(), stopInfoDTO.getArrivalTime());
+        ticketQueryVO.setDuration(duration);
+
+        // 5.始发站和终点站判断
+        Integer departureStationId = stopInfoDTO.getDepartureStationId();
+        boolean isDeparture = checkDepartureStation(trainId, departureStationId);
+        Integer arrivalStationId = stopInfoDTO.getArrivalStationId();
+        boolean isArrival = checkTerminalStation(trainId, arrivalStationId);
+        ticketQueryVO.setDepartureFlag(isDeparture);
+        ticketQueryVO.setArrivalFlag(isArrival);
+
+        return ticketQueryVO;
     }
 
     /**
@@ -137,66 +167,6 @@ public class TicketServiceImpl implements TicketService {
 
         return List.of();
     }*/
-
-
-    /**
-     * 检索满足筛选条件的车票信息
-     * @param ticketQueryDTO
-     * @return
-     */
-    private List<TicketQueryVO> getTicketQueryVOS(TicketQueryDTO ticketQueryDTO) {
-        /*// 查询列车ids
-        List<TrainDetailVO> trainDetailVOList = queryTrains(ticketQueryDTO);
-
-        *//**       循环        **//*
-        List<TicketQueryVO> resultList = new ArrayList<>();
-
-        for (TrainDetailVO trainDetailVO : trainDetailVOList) {
-            // 取出列车id
-            Long trainId = trainDetailVO.getTrainId();
-
-            TicketQueryVO ticketQueryVO = new TicketQueryVO();
-
-            // 拷贝出发时间和结束时间
-            BeanUtils.copyProperties(trainDetailVO, ticketQueryVO);
-
-            // 根据列车id，查询列车数据
-            Train train = ticketMapper.getTrainById(trainId);
-            // 拷贝列车属性
-            ticketQueryVO.setTrain(train);
-
-            // 根据列车id，查询席别数据（类型等）--- List
-
-            // 查询席别信息
-            Integer startSequence = trainDetailVO.getStartSequence();
-            Integer endSequence = trainDetailVO.getEndSequence();
-            List<SeatClassVO> seatClassList = querySeatClassData(trainId, startSequence, endSequence);
-            ticketQueryVO.setSeatClassList(seatClassList);
-
-
-            *//**    拷贝列车其它属性   **//*
-            boolean departureFlag = checkDepartureStation(trainId, trainDetailVO.getDepartureStationId());
-            ticketQueryVO.setDepartureFlag(departureFlag);
-            boolean arrivalFlag = checkTerminalStation(trainId, trainDetailVO.getArrivalStationId());
-            ticketQueryVO.setArrivalFlag(arrivalFlag);
-            // 设置历时
-            ticketQueryVO.setDuration(
-                    calculateDurationInMinutes(
-                            trainDetailVO.getArrivalTime(),
-                            trainDetailVO.getDepartureTime()
-                    )
-            );
-            // 设置出发站点，到达站点
-            ticketQueryVO.setDeparture(ticketQueryDTO.getDeparture());
-            ticketQueryVO.setArrival(ticketQueryDTO.getArrival());
-
-            resultList.add(ticketQueryVO);
-        }
-
-        // 封装返回
-        return resultList;*/
-        return null;
-    }
 
 
     /**
