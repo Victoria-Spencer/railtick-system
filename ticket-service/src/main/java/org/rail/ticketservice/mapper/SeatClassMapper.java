@@ -1,16 +1,18 @@
 package org.rail.ticketservice.mapper;
 
 import org.apache.ibatis.annotations.Mapper;
-import org.apache.ibatis.annotations.Select;
-import org.rail.ticketservice.pojo.dto.SeatClassDTO;
+import org.rail.ticketservice.pojo.dto.SeatQueryDTO;
+import org.rail.ticketservice.pojo.vo.SeatClassVO;
+
+import java.util.List;
 
 @Mapper
 public interface SeatClassMapper {
+
     /**
-     * 根据席别id，查询席别类型，名称以及价格
-     * @param seatClassId
+     * 批量查询席别信息
+     * @param seatQueryDTOList
      * @return
      */
-    @Select("select type, name, price from seat_class where id = #{seatClassId}")
-    SeatClassDTO getBySeatClassId(Long seatClassId);
+    List<SeatClassVO> batchQuerySeatInfoByDTOList(List<SeatQueryDTO> seatQueryDTOList);
 }

@@ -6,6 +6,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 
 @Data
@@ -13,16 +14,14 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 public class TicketQueryDTO {
 
-    // 列车id（查询特定列车）
-    private Long trainId;
-    // 出发地
-    private String fromStation;
-    // 目的地
-    private String toStation;
+    // 出发车站编码
+    private List<String> departureCodes;
+    // 到达车站编码
+    private List<String> arrivalCodes;
+    // 列车类型
+    private List<Integer> trainTypes;
+    // 席别类型
+    private List<Integer> seatTypes;
     // 出发日
     private LocalDate departureDate;
-    // 出发车站
-    private String departure;
-    // 到达车站
-    private String arrival;
 }

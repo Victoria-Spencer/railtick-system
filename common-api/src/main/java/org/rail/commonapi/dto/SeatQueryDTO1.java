@@ -5,7 +5,7 @@ import lombok.Data;
 import java.util.List;
 
 @Data
-public class SeatQueryDTO {
+public class SeatQueryDTO1 {
 
     // 列车ID
     private Long trainId;

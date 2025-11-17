@@ -67,35 +67,61 @@
         SELECT
             s_start.id AS departureStationId,  -- 出发站ID
             s_end.id AS arrivalStationId,      -- 到达站ID
-            tss_a.train_id AS trainId,     -- 列车ID
+            s_start.name AS departure,     -- 出发站名称
+            s_end.name AS arrival,      -- 到达站名称
+            s_start.code AS departureCode,     -- 出发站编码
+            s_end.code AS arrivalCode,         -- 到达站编码
             tss_a.departure_time AS departureTime,  -- 出发时间
             tss_b.arrival_time AS arrivalTime,       -- 到达时间
             tss_a.sequence AS startSequence,    -- 出发站站序
-            tss_b.sequence AS endSequence      -- 到达站站序
+            tss_b.sequence AS endSequence,      -- 到达站站序
+            t.id AS trainId,    -- 列车ID
+            t.train_type AS trainType,   -- 列车类型
+            t.train_number AS trainNumber,   -- 列车车次
+            t.days_arrived AS daysArrived,   -- 到达天数
+            t.sale_time AS saleTime,     -- 可售时间
+            t.sale_status AS saleStatus     -- 可售状态
         FROM
         train_stop_station tss_a  -- 先取出发站经停记录
         INNER JOIN train_stop_station tss_b ON tss_a.train_id = tss_b.train_id AND tss_a.sequence &lt; tss_b.sequence  -- 先关联同一列车的到达站经停记录
         INNER JOIN station s_start ON tss_a.station_id = s_start.id  -- 再关联出发站信息
         INNER JOIN station s_end ON tss_b.station_id = s_end.id  -- 最后关联到达站信息
+        INNER JOIN train t ON tss_a.train_id = t.id  -- 关联列车信息
+        <!-- 移除 train_seat_class 和 seat_class 的直接关联，避免笛卡尔积 -->
         <where>
-            <if test="fromStation != null and fromStation != '' ">
-                AND s_start.`name` LIKE CONCAT('%', #{fromStation}, '%')
+            <if test="departureCodes!=null">
+                AND s_start.code IN
+                <foreach collection="departureCodes" item="departureCode" open="(" close=")" separator=",">
+                    #{departureCode}
+                </foreach>
             </if>
-            <if test="departure != null and departure!= '' ">
-                AND s_start.`name` = #{departure}
+            <if test="arrivalCodes!=null">
+                AND s_end.code IN
+                <foreach collection="arrivalCodes" item="arrivalCode" open="(" close=")" separator=",">
+                    #{arrivalCode}
+                </foreach>
             </if>
-            <if test="departureDate != null">
-                -- 提取 departure_time 的日期部分（如 2025-11-11），与 LocalDate 参数比较
+            <if test="trainTypes!=null">
+                AND t.train_type IN
+                <foreach collection="trainTypes" item="trainType" open="(" close=")" separator=",">
+                    #{trainType}
+                </foreach>
+            </if>
+            <!-- 用 EXISTS 子查询替代关联，判断列车是否有符合条件的席别 -->
+            <if test="seatTypes!=null">
+                AND EXISTS (
+                    SELECT 1
+                    FROM train_seat_class tsc
+                    INNER JOIN seat_class sc ON tsc.seat_class_id = sc.id
+                    WHERE tsc.train_id = t.id  -- 关联当前列车
+                    AND sc.type IN
+                    <foreach collection="seatTypes" item="seatType" open="(" close=")" separator=",">
+                        #{seatType}
+                    </foreach>
+                )
+            </if>
+            <if test="departureDate!=null">
                 AND DATE(tss_a.departure_time) = #{departureDate}
-            </if>
-            <if test="toStation != null and toStation != '' ">
-                AND s_end.`name` LIKE CONCAT('%', #{toStation}, '%')
-            </if>
-            <if test="arrival != null and arrival != '' ">
-                AND s_end.`name` = #{arrival}
-            </if>
-            <if test="trainId != null">
-                AND tss_a.train_id = #{trainId}
             </if>
         </where>
     </select>

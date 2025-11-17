@@ -40,5 +40,5 @@ public class TicketQueryVO {
     /**
      * 席别信息
      */
-    private List<SeatClassVO> seatClassList;
+    private List<SeatClassFrontVO> seatClassFrontVOList;
 }

@@ -5,4 +5,58 @@
 
 <mapper namespace="org.rail.ticketservice.mapper.SeatClassMapper">
 
+
+    <select id="batchQuerySeatInfoByDTOList" resultType="org.rail.ticketservice.pojo.vo.SeatClassVO"
+            parameterType="java.util.List">
+        -- 1. 定义临时表：将List[DTO]转换为包含trainId、startSeq、endSeq的数据集
+        WITH query_params AS (
+        <foreach collection="list" item="dto" separator="UNION ALL">
+            SELECT
+            #{dto.trainId} AS train_id,
+            #{dto.startSequence} AS start_sequence,
+            #{dto.endSequence} AS end_sequence
+        </foreach>
+        )
+        -- 2. 主查询：关联临时表获取每个trainId对应的区间参数
+        SELECT
+            tsc.train_id AS trainId,  -- 列车ID
+            sc.id AS seatClassId,     -- 席别ID
+            ANY_VALUE(sc.type) AS seatType,      -- 席别类型
+            ANY_VALUE(sc.name) AS name,      -- 席别名称
+            ANY_VALUE(sc.price) AS price,    -- 席别价格
+            -- 总座位数：同一列车同一席别的所有车厢座位总和
+            SUM(tsc.total_seats) AS totalSeatNum,
+            -- 可用座位数 = 总座位数 - 已占用座位数（最小为0）
+            GREATEST(SUM(tsc.total_seats) - IFNULL(occupied.occupiedSeats, 0), 0) AS availableSeatNum,
+            -- 用计算可用座位数的原始表达式替代别名
+            IF(GREATEST(SUM(tsc.total_seats) - IFNULL(occupied.occupiedSeats, 0), 0) = 0, 1, 0) AS candidate
+        FROM train_seat_class tsc
+        -- 关联席别表获取席别信息
+        INNER JOIN seat_class sc ON tsc.seat_class_id = sc.id
+        -- 关键：关联临时表，筛选出输入List中的train_id（仅处理这些列车）
+        INNER JOIN query_params qp_main ON tsc.train_id = qp_main.train_id
+        -- 左连接子查询：计算每个列车+席别的已占用座位数
+        LEFT JOIN (
+            SELECT
+                tsc.train_id AS trainId,
+                tsc.seat_class_id AS seatClassId,
+                -- 统计去重后的已占用座位数（同一座位被多次占用仅算1次）
+                COUNT(DISTINCT ts.id) AS occupiedSeats
+            FROM train_seat_class tsc
+            -- 子查询关联临时表：获取当前train_id的区间参数
+            INNER JOIN query_params qp ON tsc.train_id = qp.train_id
+            INNER JOIN train_seat ts ON tsc.id = ts.train_seat_class_id
+            INNER JOIN seat_interval_occupy sio ON ts.id = sio.seat_id
+            WHERE
+                -- 仅统计有效占用（锁定中或已售出，排除已释放）
+                sio.status IN (1, 2)
+                -- 占用区间与查询区间重叠：占用的起点 &lt; 到达站序 且 占用的终点 &gt; 出发站序
+                -- 使用临时表中当前trainId对应的区间参数
+                AND sio.start_sequence &lt; qp.end_sequence
+                AND sio.end_sequence &gt; qp.start_sequence
+            GROUP BY tsc.train_id, tsc.seat_class_id
+        ) occupied ON tsc.train_id = occupied.trainId AND tsc.seat_class_id = occupied.seatClassId
+        -- 按列车和席别分组（确保每个列车+席别唯一）
+        GROUP BY tsc.train_id, tsc.seat_class_id
+    </select>
 </mapper>

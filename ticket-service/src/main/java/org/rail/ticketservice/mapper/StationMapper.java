@@ -27,20 +27,6 @@ public interface StationMapper {
      */
     List<TrainStopStationVO> batchQueryByTrainId(Long trainId);
 
-//    /**
-//     * 根据出发日和（出发地或出发车站）查询车站ID
-//     * @param  ticketQueryDTO 出发日和名称（地点或车站名称，如“北京、北京南”）
-//     * @return 车站IDs（List<station_id>）
-//     */
-//    List<Integer> getStartStationIdByDTO(TicketQueryDTO ticketQueryDTO);
-//
-//    /**
-//     * 根据（目的地或到达站）查询车站ID
-//     * @param  ticketQueryDTO 出发日和名称（地点或车站名称，如“北京、北京南”）
-//     * @return 车站IDs（List<station_id>）
-//     */
-//    List<Integer> getEndStationIdByDTO(TicketQueryDTO ticketQueryDTO);
-
     /**
      * 查询 trainId, departureTime, arrivalTime, departureStationId, arrivalStationId ,
      * startSequence, endSequence 7个属性

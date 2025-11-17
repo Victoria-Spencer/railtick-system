@@ -9,11 +9,11 @@ public interface TicketMapper {
     /**
      *  根据列车id查询列车信息
      * @param id
-     */
+     *//*
     @Select("select id, train_number, train_type, " +
             "  train_attributes, days_arrived," +
             "  sale_time, sale_status, train_tags " +
             "from train " +
             "where id = #{id}")
-    Train getTrainById(Long id);
+    Train getTrainById(Long id);*/
 }

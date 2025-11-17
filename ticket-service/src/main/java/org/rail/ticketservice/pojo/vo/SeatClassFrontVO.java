@@ -1,14 +1,10 @@
 package org.rail.ticketservice.pojo.vo;
 
-import lombok.AllArgsConstructor;
 import lombok.Data;
-import lombok.NoArgsConstructor;
 
 @Data
-public class SeatClassVO {
+public class SeatClassFrontVO {
 
-    // 列车ID
-    private Long trainId;
     // 席别类型
     private Long seatClassId;
     // 席别类型

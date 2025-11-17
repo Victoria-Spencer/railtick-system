@@ -1,7 +1,6 @@
 package org.rail.ticketservice.service;
 
 import org.rail.commonapi.dto.AvailableSeatDTO;
-import org.rail.commonapi.dto.SeatQueryDTO;
 import org.rail.ticketservice.pojo.dto.PlannedTicketQueryDTO;
 import org.rail.ticketservice.pojo.dto.TicketQueryDTO;
 import org.rail.ticketservice.pojo.vo.TicketQueryVO;
@@ -29,5 +28,5 @@ public interface TicketService {
      * @param seatQueryDTO
      * @return
      */
-    List<AvailableSeatDTO> getAvailableSeats(SeatQueryDTO seatQueryDTO);
+//    List<AvailableSeatDTO> getAvailableSeats(SeatQueryDTO seatQueryDTO);
 }
