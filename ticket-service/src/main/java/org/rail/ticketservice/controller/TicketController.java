@@ -33,6 +33,11 @@ public class TicketController {
         return Result.success(ticketQueryVOList);
     }
 
+    /**
+     * 查询拟购票信息
+     * @param plannedTicketQueryDTO
+     * @return
+     */
     @GetMapping("/planned-tickets/query")
     public Result<TicketQueryVO>  queryPlannedTicket(@RequestBody PlannedTicketQueryDTO plannedTicketQueryDTO) {
         TicketQueryVO ticketQueryVO = ticketService.queryPlannedTicket(plannedTicketQueryDTO);

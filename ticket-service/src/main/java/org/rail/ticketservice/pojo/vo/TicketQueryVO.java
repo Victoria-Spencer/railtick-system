@@ -41,4 +41,9 @@ public class TicketQueryVO {
      * 席别信息
      */
     private List<SeatClassFrontVO> seatClassFrontVOList;
+
+    /**
+     * 列车类型
+     */
+    private List<TrainTypeVO>  trainTypeVOList;
 }

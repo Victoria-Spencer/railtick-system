@@ -7,10 +7,7 @@ import org.rail.commonservice.utils.BeanUtils;
 import org.rail.ticketservice.mapper.*;
 import org.rail.ticketservice.pojo.dto.*;
 import org.rail.ticketservice.pojo.entity.Train;
-import org.rail.ticketservice.pojo.vo.SeatClassFrontVO;
-import org.rail.ticketservice.pojo.vo.SeatClassVO;
-import org.rail.ticketservice.pojo.vo.TicketQueryVO;
-import org.rail.ticketservice.pojo.vo.TrainDetailVO;
+import org.rail.ticketservice.pojo.vo.*;
 import org.rail.ticketservice.service.TicketService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -78,6 +75,10 @@ public class TicketServiceImpl implements TicketService {
             List<SeatClassVO> seatVOs = seatGroupByTrainId.getOrDefault(trainId, new ArrayList<>());
             List<SeatClassFrontVO> frontVOs = BeanUtil.copyToList(seatVOs, SeatClassFrontVO.class);
             ticketQueryVO.setSeatClassFrontVOList(frontVOs);
+
+            // 3.3.拷贝列车类型信息
+            List<TrainTypeVO> trainTypeVOList = trainDetailVO.getTrainTypeVOList();
+            ticketQueryVO.setTrainTypeVOList(trainTypeVOList);
 
             // 3.3.拷贝其它属性
             BeanUtil.copyProperties(trainDetailVO, ticketQueryVO);

@@ -14,9 +14,6 @@ public class Train {
     // 车次
     private String trainNumber;
 
-    // 列车类型
-    private Integer trainType;
-
 //    // 列车属性（highSpeedTrainAttribute，bulletTrainAttribute，regularTrainAttribute）
 //    private TrainAttributes  trainAttributes;
 
@@ -28,7 +25,4 @@ public class Train {
 
     // 可售状态
     private Integer saleStatus;
-
-//    // 列车标签集合（0：复兴号 1：智能动车组 2：静音车厢 3：支持选铺）
-//    private List<Integer> trainTags;
 }

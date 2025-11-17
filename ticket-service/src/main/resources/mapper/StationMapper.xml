@@ -32,37 +32,49 @@
             tss.train_id = #{trainId}
     </select>
 
-    <!--<select id="getStartStationIdByDTO" resultType="java.lang.Integer"
-            parameterType="org.rail.ticketservice.pojo.dto.TicketQueryDTO">
-        SELECT id FROM station s
-        INNER JOIN train_stop_station tss
-            ON s.id = tss.station_id
-        <where>
-            <if test="fromStation != null and fromStation != '' ">
-                AND s.`name` LIKE CONCAT('%', #{fromStation}, '%')
-            </if>
-            <if test="departure != null and departure!= '' ">
-                AND s.`name` = #{departure}
-            </if>
-            <if test="departureDate != null">
-                &#45;&#45; 提取 departure_time 的日期部分（如 2025-11-11），与 LocalDate 参数比较
-                AND DATE(tss.departure_time) = #{departureDate}
-            </if>
-        </where>
+
+
+
+
+    <!-- 定义TrainDetailVO的结果映射，包含嵌套的列车类型列表 -->
+    <resultMap id="TrainDetailVOResultMap" type="org.rail.ticketservice.pojo.vo.TrainDetailVO">
+        <!-- 映射列车基本信息字段 -->
+        <id column="trainId" property="trainId"/>
+        <result column="trainNumber" property="trainNumber"/>
+        <result column="departureTime" property="departureTime"/>
+        <result column="arrivalTime" property="arrivalTime"/>
+        <result column="departure" property="departure"/>
+        <result column="arrival" property="arrival"/>
+        <result column="departureCode" property="departureCode"/>
+        <result column="arrivalCode" property="arrivalCode"/>
+        <result column="daysArrived" property="daysArrived"/>
+        <result column="saleTime" property="saleTime"/>
+        <result column="saleStatus" property="saleStatus"/>
+        <result column="departureStationId" property="departureStationId"/>
+        <result column="arrivalStationId" property="arrivalStationId"/>
+        <result column="startSequence" property="startSequence"/>
+        <result column="endSequence" property="endSequence"/>
+
+        <!-- 嵌套映射列车类型列表：通过子查询获取当前列车的所有类型 -->
+        <collection
+            property="trainTypeVOList"
+            ofType="org.rail.ticketservice.pojo.vo.TrainTypeVO"
+            select="getTrainTypesByTrainId"
+            column="trainId"
+        />
+    </resultMap>
+
+    <!-- 子查询：根据列车ID查询所有关联的类型 -->
+    <select id="getTrainTypesByTrainId" resultType="org.rail.ticketservice.pojo.vo.TrainTypeVO">
+        SELECT
+        ttd.id AS typeId,
+        ttd.type_name AS typeName,
+        ttd.type_code AS typeCode
+        FROM train_train_type ttt
+        INNER JOIN train_type_dict ttd ON ttt.type_id = ttd.id
+        WHERE ttt.train_id = #{trainId}
     </select>
-    <select id="getEndStationIdByDTO" resultType="java.lang.Integer"
-            parameterType="org.rail.ticketservice.pojo.dto.TicketQueryDTO">
-        SELECT id FROM station
-        <where>
-            <if test="toStation != null and toStation != '' ">
-                AND s.`name` LIKE CONCAT('%', #{toStation}, '%')
-            </if>
-            <if test="departure != null and departure!= '' ">
-                AND s.`name` = #{arrival}
-            </if>
-        </where>
-    </select>-->
-    <select id="getTrainDetailsByDTO" resultType="org.rail.ticketservice.pojo.vo.TrainDetailVO"
+    <select id="getTrainDetailsByDTO" resultMap="TrainDetailVOResultMap"
             parameterType="org.rail.ticketservice.pojo.dto.TicketQueryDTO">
         SELECT
             s_start.id AS departureStationId,  -- 出发站ID
@@ -76,7 +88,6 @@
             tss_a.sequence AS startSequence,    -- 出发站站序
             tss_b.sequence AS endSequence,      -- 到达站站序
             t.id AS trainId,    -- 列车ID
-            t.train_type AS trainType,   -- 列车类型
             t.train_number AS trainNumber,   -- 列车车次
             t.days_arrived AS daysArrived,   -- 到达天数
             t.sale_time AS saleTime,     -- 可售时间
@@ -101,11 +112,17 @@
                     #{arrivalCode}
                 </foreach>
             </if>
-            <if test="trainTypes!=null">
-                AND t.train_type IN
-                <foreach collection="trainTypes" item="trainType" open="(" close=")" separator=",">
-                    #{trainType}
+            <!-- 列车类型筛选（关联中间表和字典表） -->
+            <if test="trainTypeIds!=null">
+                AND EXISTS (  <!-- 用EXISTS确保只筛选包含指定类型的列车，避免主查询结果重复 -->
+                SELECT 1
+                FROM train_train_type ttt  <!-- 中间表 -->
+                WHERE ttt.train_id = t.id  <!-- 关联当前列车 -->
+                AND ttt.type_id IN  <!-- 筛选指定的类型ID -->
+                <foreach collection="trainTypeIds" item="typeId" open="(" close=")" separator=",">
+                    #{typeId}
                 </foreach>
+                )
             </if>
             <!-- 用 EXISTS 子查询替代关联，判断列车是否有符合条件的席别 -->
             <if test="seatTypes!=null">

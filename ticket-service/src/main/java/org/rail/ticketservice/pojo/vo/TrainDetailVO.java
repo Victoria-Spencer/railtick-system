@@ -9,16 +9,13 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * 封装列车的 “经停时间列表” 及 “出发站id/到达站id（stationId)”
+ * 封装列车基本信息
  */
 @Data
-@AllArgsConstructor
-@NoArgsConstructor
 public class TrainDetailVO {
 
     private Long trainId;   // 列车ID
     private String trainNumber;   // 列车车次
-    private Integer trainType;  // 列车类型
     private LocalDateTime departureTime;  // 出发站出发时间
     private LocalDateTime arrivalTime;    // 到达站到达时间
     private String departure;   // 出发站名称
@@ -32,4 +29,5 @@ public class TrainDetailVO {
     private Integer arrivalStationId;   // 到达站id
     private Integer startSequence;  // 出发站站序
     private Integer endSequence;   // 到达站站序
+    private List<TrainTypeVO>  trainTypeVOList; // 列车类型
 }

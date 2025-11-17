@@ -19,7 +19,7 @@ public class TicketQueryDTO {
     // 到达车站编码
     private List<String> arrivalCodes;
     // 列车类型
-    private List<Integer> trainTypes;
+    private List<Integer> trainTypeIds;
     // 席别类型
     private List<Integer> seatTypes;
     // 出发日
