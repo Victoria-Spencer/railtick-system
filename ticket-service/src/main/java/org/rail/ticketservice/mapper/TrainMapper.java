@@ -7,7 +7,7 @@ import org.rail.ticketservice.pojo.entity.Train;
 @Mapper
 public interface TrainMapper {
 
-    @Select("select id, train_number, train_type, days_arrived, sale_time, sale_status " +
+    @Select("select id, train_number, days_arrived, sale_time, sale_status " +
             "from train " +
             "where id = #{trainId}")
     Train getById(Long trainId);

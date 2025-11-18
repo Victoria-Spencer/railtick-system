@@ -31,6 +31,8 @@ public class TicketServiceImpl implements TicketService {
     private SeatClassMapper seatClassMapper;
     @Autowired
     private TrainMapper trainMapper;
+    @Autowired
+    private TrainTypeDictMapper  trainTypeDictMapper;
 
     /**
      * 查询购票列表
@@ -129,11 +131,15 @@ public class TicketServiceImpl implements TicketService {
         List<SeatClassFrontVO> frontVOs = BeanUtil.copyToList(seatClassVOList, SeatClassFrontVO.class);
         ticketQueryVO.setSeatClassFrontVOList(frontVOs);
 
-        // 4.计算历经时间
+        // 4.查询列车类型信息
+        List<TrainTypeVO> trainTypeVOList = trainTypeDictMapper.getTrainTypeDictByTrainId(trainId);
+        ticketQueryVO.setTrainTypeVOList(trainTypeVOList);
+
+        // 5.计算历经时间
         Integer duration = calculateDurationInMinutes(stopInfoDTO.getDepartureTime(), stopInfoDTO.getArrivalTime());
         ticketQueryVO.setDuration(duration);
 
-        // 5.始发站和终点站判断
+        // 6.始发站和终点站判断
         Integer departureStationId = stopInfoDTO.getDepartureStationId();
         boolean isDeparture = checkDepartureStation(trainId, departureStationId);
         Integer arrivalStationId = stopInfoDTO.getArrivalStationId();
