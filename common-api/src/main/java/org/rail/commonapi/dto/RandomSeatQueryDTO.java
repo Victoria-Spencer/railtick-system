@@ -5,14 +5,14 @@ import lombok.Data;
 import java.util.List;
 
 @Data
-public class SeatQueryDTO1 {
+public class RandomSeatQueryDTO {
 
     // 列车ID
     private Long trainId;
     // 席别类型列表
     private List<Integer> seatTypes;
-    // 出发站
-    private String departure;
-    // 到达站
-    private String arrival;
+    // 出发站编码
+    private String departureCode;
+    // 到达站编码
+    private String arrivalCode;
 }

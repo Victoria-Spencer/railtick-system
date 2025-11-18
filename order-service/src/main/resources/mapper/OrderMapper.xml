@@ -92,17 +92,18 @@
             parameterType="java.util.List">
         INSERT INTO
             order_details(order_id, pre_order_detail_id, departure, arrival,
-                            riding_date, train_number, departure_time, arrival_time,
-                            seat_type, carriage_number, seat_no, real_name, id_type,
-                            id_card, ticket_type, amount)
+                            departure_code, arrival_code,riding_date, train_number,
+                            departure_time, arrival_time,seat_type, carriage_number,
+                            seat_no, real_name, id_type,id_card, ticket_type, amount)
             VALUES
                 <foreach collection="list" item="detail" separator=",">
                     (
                         #{detail.orderId}, #{detail.preOrderDetailId}, #{detail.departure},
-                        #{detail.arrival}, #{detail.ridingDate},#{detail.trainNumber},
-                        #{detail.departureTime}, #{detail.arrivalTime}, #{detail.seatType},
-                        #{detail.carriageNumber},#{detail.seatNo}, #{detail.realName},
-                        #{detail.idType}, #{detail.idCard}, #{detail.ticketType}, #{detail.amount}
+                        #{detail.arrival}, #{detail.departureCode}, #{detail.arrivalCode},
+                        #{detail.ridingDate},#{detail.trainNumber}, #{detail.departureTime},
+                        #{detail.arrivalTime}, #{detail.seatType}, #{detail.carriageNumber},
+                        #{detail.seatNo}, #{detail.realName}, #{detail.idType}, #{detail.idCard},
+                        #{detail.ticketType}, #{detail.amount}
                     )
                 </foreach>
     </insert>
@@ -124,6 +125,8 @@
         <!-- 订单明细表字段映射（来自order_details表） -->
         <result column="departure" property="departure"/> <!-- 出发站点 -->
         <result column="arrival" property="arrival"/> <!-- 到达站点 -->
+        <result column="departure_code" property="departureCode"/> <!-- 出发站编码 -->
+        <result column="arrival_code" property="arrivalCode"/> <!-- 到达站编码 -->
         <result column="riding_date" property="ridingDate"/> <!-- 乘车日期 -->
         <result column="train_number" property="trainNumber"/> <!-- 列车车次 -->
         <result column="departure_time" property="departureTime"/> <!-- 出发时间 -->
@@ -168,6 +171,8 @@
         -- 以下字段来自订单明细表（同一订单的所有明细这些字段相同，取任意一条即可）
         ANY_VALUE(d.departure) AS departure,
         ANY_VALUE(d.arrival) AS arrival,
+        ANY_VALUE(d.departure_code) AS departure_code,
+        ANY_VALUE(d.arrival_code) AS arrival_code,
         ANY_VALUE(d.riding_date) AS riding_date,
         ANY_VALUE(d.train_number) AS train_number,
         ANY_VALUE(d.departure_time) AS departure_time,
@@ -250,6 +255,8 @@
             d.id,
             d.departure,
             d.arrival,
+            d.departure_code,
+            d.arrival_code,
             DATE(d.riding_date) AS ridingDate,
             d.train_number,
             d.departure_time,

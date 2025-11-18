@@ -194,7 +194,7 @@ public class OrderServiceImpl implements OrderService {
     public PageResult<SelfTicketPageVO> selfTicketPageQuery(FrontSelfTicketPageDTO frontSelfTicketPageDTO) {
         // 远程调用user-service，根据userId查询idType和idCard，UserIdCardDTO
         Result<UserIdCardDTO> userIdCardDTOResult = userFeignClient.getIdCardInfo(frontSelfTicketPageDTO.getUserId());
-        if(!userIdCardDTOResult.isSuccess()){
+        if(!userIdCardDTOResult.isSuccess()) {
             throw new OpenFeignException(userIdCardDTOResult.getMessage());
         }
         UserIdCardDTO userIdCardDTO = userIdCardDTOResult.getData();

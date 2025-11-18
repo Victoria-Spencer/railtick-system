@@ -21,6 +21,10 @@ public class CreateOrderVO {
     private String departure;
     // 到达站点
     private String arrival;
+    // 出发站编码
+    private String departureCode;
+    // 到达站编码
+    private String arrivalCode;
     // 出发时间
     private LocalDateTime departureTime;
     // 到达时间
