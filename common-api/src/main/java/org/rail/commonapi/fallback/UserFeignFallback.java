@@ -14,12 +14,11 @@ import org.springframework.stereotype.Component;
 public class UserFeignFallback implements UserFeignClient {
 
     /**
-     * 查询用户的证件类型和证件号码，错误处理
+     * 查询用户的证件类型和证件号码，请求失败处理
      * @param id
      * @return
      */
     public Result<UserIdCardDTO> getIdCardInfo(Long id) {
-        // 服务故障时返回null;
         log.error("服务临时不可用，请稍后重试");
         return Result.error("服务临时不可用，请稍后重试");
     }

@@ -3,6 +3,9 @@ package org.rail.ticketservice.service.impl;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.bean.copier.CopyOptions;
 import org.rail.commonapi.dto.AvailableSeatDTO;
+import org.rail.commonapi.dto.RandomSeatQueryDTO;
+import org.rail.commonapi.dto.SeatTypeQueryDTO;
+import org.rail.commonservice.exception.BusinessException;
 import org.rail.commonservice.utils.BeanUtils;
 import org.rail.ticketservice.mapper.*;
 import org.rail.ticketservice.pojo.dto.*;
@@ -18,6 +21,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -152,28 +156,54 @@ public class TicketServiceImpl implements TicketService {
 
     /**
      * 查询可用座位
-     * @param seatQueryDTO
+     * @param randomSeatQueryDTO
      * @return
      */
-    /*public List<AvailableSeatDTO> getAvailableSeats(SeatQueryDTO seatQueryDTO) {
-        // HashMap
-        // TODO HashMap trainSeatMapper;
-        // 1.获取出发站和到达站的站序
-        Long trainId = seatQueryDTO.getTrainId();
-        String departure = seatQueryDTO.getDeparture();
-        String arrival = seatQueryDTO.getArrival();
-        StopSequenceDTO stopSequenceDTO = trainStopStationMapper.getStopSequence(trainId, departure, arrival);
+    public List<AvailableSeatDTO> getAvailableSeats(RandomSeatQueryDTO randomSeatQueryDTO) {
+        List<AvailableSeatDTO> availableSeatDTOList = new ArrayList<>();
 
-        // 2.构建查询条件
-        AvailableSeatQueryParamDTO availableSeatQueryParamDTO = BeanUtil.copyProperties(stopSequenceDTO, AvailableSeatQueryParamDTO.class);
-        availableSeatQueryParamDTO.setTrainId(trainId);
-        availableSeatQueryParamDTO.setSeatTypes(seatQueryDTO.getSeatTypes());
+        // 按seatType对seatTypes进行分类
+        List<Integer> seatTypes = randomSeatQueryDTO.getSeatTypes();
+        Map<Integer, Integer> countSeatTypes = countSeatTypes(seatTypes);
 
-        // 3.查询符合条件的空座位
-//        AvailableSeatDTO availableSeatDTO = SeatClassMapper.getAvailableSeats(availableSeatQueryParamDTO);
+        // 遍历查询可用的座位
+        for (Map.Entry<Integer, Integer> entry : countSeatTypes.entrySet()) {
+            Integer seatType = entry.getKey(); // 获取seatType（键）
+            Integer requiredCount = entry.getValue();  // 获取出现次数（值）
 
-        return List.of();
-    }*/
+            // 构建查询条件
+            SeatTypeQueryDTO seatTypeQueryDTO = BeanUtil.copyProperties(randomSeatQueryDTO, SeatTypeQueryDTO.class);
+            seatTypeQueryDTO.setSeatType(seatType);
+            seatTypeQueryDTO.setRequiredCount(requiredCount);
+            List<AvailableSeatDTO> availableSeatDTOs = seatClassMapper.getAvailableSeatsBySeatTypeQueryDTO(seatTypeQueryDTO);
+
+            // 判断取到的座位数量是否满足要求
+            if(availableSeatDTOs == null || availableSeatDTOs.size() < requiredCount) {
+                throw new BusinessException("空座位数量不足");
+            }
+
+            // 将availableSeatDTOs批量添加到availableSeatDTOList中
+            availableSeatDTOList.addAll(availableSeatDTOs);
+        }
+
+        return availableSeatDTOList;
+    }
+
+    /**
+     * 按seatType对seatTypes进行分类
+     * @param seatTypes
+     * @return
+     */
+    private Map<Integer, Integer> countSeatTypes(List<Integer> seatTypes) {
+        // 处理null列表（返回空Map），非空则统计
+        return seatTypes == null ? new HashMap<>() :
+                seatTypes.stream()
+                        .filter(seatType -> seatType != null) // 过滤null（可选）
+                        .collect(Collectors.groupingBy(
+                                Function.identity(), // key：seatType本身
+                                Collectors.summingInt(e -> 1) // value：出现次数（每次+1）
+                        ));
+    }
 
 
     /**

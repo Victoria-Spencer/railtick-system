@@ -2,9 +2,14 @@ package org.rail.orderservice.orderservice.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.bean.copier.CopyOptions;
+import cn.hutool.core.lang.Pair;
 import com.github.pagehelper.PageHelper;
+import org.rail.commonapi.client.TicketFeignClient;
 import org.rail.commonapi.client.UserFeignClient;
+import org.rail.commonapi.dto.AvailableSeatDTO;
+import org.rail.commonapi.dto.RandomSeatQueryDTO;
 import org.rail.commonapi.dto.UserIdCardDTO;
+import org.rail.commonservice.exception.BusinessException;
 import org.rail.commonservice.exception.OpenFeignException;
 import org.rail.commonservice.exception.OrderNotFoundException;
 import org.rail.commonservice.result.PageResult;
@@ -31,10 +36,13 @@ import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import javax.management.OperationsException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 public class OrderServiceImpl implements OrderService {
@@ -46,6 +54,8 @@ public class OrderServiceImpl implements OrderService {
     private Integer preOrderExpireMinutes;
     @Autowired
     private UserFeignClient userFeignClient;
+    @Autowired
+    private TicketFeignClient ticketFeignClient;
 
     /**
      * 1.创建预订单，临时锁定座位
@@ -72,30 +82,41 @@ public class OrderServiceImpl implements OrderService {
 
             // 修改临时座位信息
             Long preOrderId = preOrder.getId();
-            List<PreOrderDetails> PreOrderDetailsList = orderMapper.getIdAndTempSeatNoByPreOrderId(preOrderId);
+            List<PreOrderDetails> preOrderDetailsList = orderMapper.getIdAndTempSeatNoByPreOrderId(preOrderId);
             List<ChooseSeatDTO> chooseSeats = createPreOrderDTO.getChooseSeats();
 
-            // 两个列表长度必须一致（否则可能出现索引越界或数据不匹配）
-            if (PreOrderDetailsList == null || chooseSeats == null) {
-                throw new IllegalArgumentException("预订单详情列表或座位列表不能为空");
-            }
-            if (PreOrderDetailsList.size() != chooseSeats.size()) {
-                throw new IllegalArgumentException("预订单详情列表与座位数量不匹配");
+            // 校验预订单详情列表不为空（必须有乘客信息）
+            if (preOrderDetailsList == null || preOrderDetailsList.isEmpty()) {
+                throw new IllegalArgumentException("预订单详情列表不能为空");
             }
 
-            for (int i = 0; i < PreOrderDetailsList.size(); i++) {
-                PreOrderDetails preOrderDetails = PreOrderDetailsList.get(i);
-                preOrderDetails.setCarriageNumber(chooseSeats.get(i).getCarriageNumber());
-                preOrderDetails.setTempSeatNo(chooseSeats.get(i).getTempSeatNo());
+            // 处理“取消选座”场景（chooseSeats为空）
+            if (chooseSeats == null || chooseSeats.isEmpty()) {
+                // 清空所有座位信息
+                for (PreOrderDetails details : preOrderDetailsList) {
+                    details.setCarriageNumber(null);
+                    details.setTempSeatNo(null);
+                }
+            } else {
+                // 处理“选座”场景（校验数量匹配后更新）
+                if (preOrderDetailsList.size() != chooseSeats.size()) {
+                    throw new IllegalArgumentException("预订单详情列表与座位数量不匹配");
+                }
+                for (int i = 0; i < preOrderDetailsList.size(); i++) {
+                    PreOrderDetails details = preOrderDetailsList.get(i);
+                    ChooseSeatDTO seat = chooseSeats.get(i);
+                    details.setCarriageNumber(seat.getCarriageNumber());
+                    details.setTempSeatNo(seat.getTempSeatNo());
+                }
             }
-            orderMapper.updatePreOrderDetailsList(PreOrderDetailsList);
 
+            // 执行更新
+            orderMapper.updatePreOrderDetailsList(preOrderDetailsList);
             return preOrder.getPreOrderSn();
         }
 
         // 3.未存在，则重新生成
-        String preOrderSn = creatNewPreOrder(createPreOrderDTO);
-        return preOrderSn;
+        return creatNewPreOrder(createPreOrderDTO);
     }
 
     /**
@@ -127,7 +148,7 @@ public class OrderServiceImpl implements OrderService {
         Long preOrderId = preOrder.getId();
         List<PreOrderDetails> preOrderDetailsList = orderMapper.getDetailsByPreOrderId(preOrderId);
 
-        // 2.预订单数据拷贝
+        // 2.预订单明细数据拷贝
         List<OrderDetails> orderDetailsList = BeanUtil.copyToList(
                 preOrderDetailsList,
                 OrderDetails.class,
@@ -141,9 +162,18 @@ public class OrderServiceImpl implements OrderService {
         // 3.判断座位是否为空，若为空，则随机分配
         String seatNo = orderDetailsList.get(0).getSeatNo();
         if (seatNo == null) {
-            // TODO 远程调用，判断是否还有空座位（车厢号，座位号）
-            // 列车ID, 席别类型
+            Map<Integer, List<Pair<String, String>>> seatTypeToSeatsMap = getSeatTypeToSeatsMap(order, orderDetailsList);
 
+            // 遍历orderDetailsList，为每个乘客添加座位信息
+            for (OrderDetails orderDetails : orderDetailsList) {
+                List<Pair<String, String>> pairs = seatTypeToSeatsMap.get(orderDetails.getSeatType());
+                Pair<String, String> first = pairs.getFirst();
+                String carriageNumber = first.getKey();
+                String currentSeatNo = first.getValue();
+                orderDetails.setCarriageNumber(carriageNumber);
+                orderDetails.setSeatNo(currentSeatNo);
+                pairs.remove(first);
+            }
         }
 
         // 4.遍历orderDetails,拷贝属性
@@ -171,6 +201,47 @@ public class OrderServiceImpl implements OrderService {
         createOrderVO.setCreateOrderDetailsVOList(createOrderDetailsVOS);
 
         return createOrderVO;
+    }
+
+    private Map<Integer, List<Pair<String, String>>> getSeatTypeToSeatsMap(Order order, List<OrderDetails> orderDetailsList) {
+        // TODO 远程调用，判断是否还有空座位（车厢号，座位号），若有则返回
+        // 列车ID, 席别类型，出发站点编码，到达站点编码
+        RandomSeatQueryDTO randomSeatQueryDTO = new RandomSeatQueryDTO();
+        randomSeatQueryDTO.setTrainId(order.getTrainId());
+        // 提取每个乘客的席别类型
+        List<Integer> seatTypes = orderDetailsList.stream()
+                .map(OrderDetails::getSeatType)
+                .collect(Collectors.toList());
+        randomSeatQueryDTO.setSeatTypes(seatTypes);
+        randomSeatQueryDTO.setDepartureCode(orderDetailsList.get(0).getDepartureCode());
+        randomSeatQueryDTO.setArrivalCode(orderDetailsList.get(0).getArrivalCode());
+
+        // 远程调用
+        Result<List<AvailableSeatDTO>> feignResult = ticketFeignClient.getAvailableSeats(randomSeatQueryDTO);
+        if (!feignResult.isSuccess()) {
+            throw new OpenFeignException(feignResult.getMessage());
+        }
+
+        List<AvailableSeatDTO> availableSeatDTOList = feignResult.getData();
+        if (availableSeatDTOList == null || availableSeatDTOList.size() < seatTypes.size()) {
+            throw new BusinessException("可用座位数不足");
+        }
+
+        // 核心：构建席别类型与（车厢号，座位号）列表的映射Map
+        Map<Integer, List<Pair<String, String>>> seatTypeToSeatsMap = new HashMap<>();
+
+        for (AvailableSeatDTO seatDTO : availableSeatDTOList) {
+            // 从可用座位DTO中获取席别类型
+            Integer seatType = seatDTO.getSeatType();
+            // 获取车厢号和座位号
+            String carriageNumber = seatDTO.getCarriageNumber();
+            String currentSeatNo = seatDTO.getSeatNo();
+
+            // 为当前席别类型初始化列表（若不存在则创建），并添加座位信息
+            seatTypeToSeatsMap.computeIfAbsent(seatType, k -> new ArrayList<>())
+                    .add(new Pair<>(carriageNumber, currentSeatNo));
+        }
+        return seatTypeToSeatsMap;
     }
 
     /**
@@ -250,7 +321,6 @@ public class OrderServiceImpl implements OrderService {
             totalAmount += passengerOrderDetailDTO.getAmount();
         }
 
-
         // 2.插入预订单到数据库,并返回订单id
         preOrder.setTotalAmount(totalAmount);
         orderMapper.insertPreOrder(preOrder);
@@ -258,31 +328,35 @@ public class OrderServiceImpl implements OrderService {
 
 
         // 3.生成预订单明细对象列表
-        List<PreOrderDetails> preOrderDetailsList = new ArrayList<>();
         List<PassengerOrderDetailDTO> passengerOrderDetailDTOList = createPreOrderDTO.getPassengerOrderDetailDTOList();
+        // 校验预订单详情列表不为空（必须有乘客信息）
+        if (passengerOrderDetailDTOList == null || passengerOrderDetailDTOList.isEmpty()) {
+            throw new IllegalArgumentException("预订单详情列表不能为空");
+        }
+
+        List<PreOrderDetails> preOrderDetailsList = new ArrayList<>();
         List<ChooseSeatDTO> chooseSeats = createPreOrderDTO.getChooseSeats();
 
-        // 两个列表长度必须一致（否则可能出现索引越界或数据不匹配）
-        if (passengerOrderDetailDTOList == null || chooseSeats == null) {
-            throw new IllegalArgumentException("乘客信息列表或座位列表不能为空");
-        }
-        if (passengerOrderDetailDTOList.size() != chooseSeats.size()) {
-            throw new IllegalArgumentException("乘客数量与座位数量不匹配");
-        }
-
-        // 通过索引遍历两个列表，一一对应
         for (int i = 0; i < passengerOrderDetailDTOList.size(); i++) {
             PassengerOrderDetailDTO passengerDTO = passengerOrderDetailDTOList.get(i); // 第i个乘客
-            String carriageNumber = chooseSeats.get(i).getCarriageNumber();
-            String tempSeatNo = chooseSeats.get(i).getTempSeatNo(); // 第i个座位号（与乘客一一对应）
-
-            // 拷贝乘客基本信息到预订单明细
+            // 拷贝乘客基本信息到预订单明细（姓名、证件等）
             PreOrderDetails preOrderDetails = BeanUtil.copyProperties(passengerDTO, PreOrderDetails.class);
-
             // 设置外键，车厢号和座位号
             preOrderDetails.setPreOrderId(preOrderId);
-            preOrderDetails.setCarriageNumber(carriageNumber); // 存储车厢号
-            preOrderDetails.setTempSeatNo(tempSeatNo); // 存储座位号
+            // 初始化座位信息为null（默认不选座）
+            preOrderDetails.setCarriageNumber(null);
+            preOrderDetails.setTempSeatNo(null);
+
+            // 若选座且座位列表不为空，补充座位信息
+            if (chooseSeats != null && !chooseSeats.isEmpty()) {
+                // 校验座位数量与乘客数量匹配
+                if (i >= chooseSeats.size()) {
+                    throw new IllegalArgumentException("座位列表数量少于乘客数量");
+                }
+                ChooseSeatDTO seat = chooseSeats.get(i);
+                preOrderDetails.setCarriageNumber(seat.getCarriageNumber());
+                preOrderDetails.setTempSeatNo(seat.getTempSeatNo());
+            }
 
             preOrderDetailsList.add(preOrderDetails);
         }
