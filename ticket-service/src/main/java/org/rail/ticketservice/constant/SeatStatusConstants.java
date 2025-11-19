@@ -1,12 +1,9 @@
 package org.rail.ticketservice.constant;
 
-import lombok.Data;
-
 /**
  * 座位状态常量类
  * 统一管理座位的各类状态定义
  */
-@Data
 public final class SeatStatusConstants {
 
     /**

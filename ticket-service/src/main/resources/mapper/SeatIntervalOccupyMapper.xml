@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="org.rail.ticketservice.mapper.SeatIntervalOccupyMapper">
+
+    <resultMap id="IntervalOccupyDTOResultMap" type="org.rail.ticketservice.pojo.dto.IntervalOccupyDTO">
+        <!-- 基础字段映射 -->
+        <result property="seatType" column="seatType"/>
+        <result property="carriageNumber" column="carriageNumber"/>
+        <result property="seatNo" column="seatNo"/>
+
+        <!-- 嵌套映射区间列表：将同一座位的多个区间映射为List<Pair> -->
+        <collection property="intervalList"
+                    ofType="cn.hutool.core.lang.Pair"
+        resultMap="PairResultMap"
+        />
+    </resultMap>
+    <resultMap id="PairResultMap" type="cn.hutool.core.lang.Pair">
+        <result property="key" column="start_sequence"/>   <!-- 映射区间起点 -->
+        <result property="value" column="end_sequence"/>   <!-- 映射区间终点 -->
+    </resultMap>
+    <select id="getIntervalOccupy" resultMap="IntervalOccupyDTOResultMap"
+            parameterType="java.util.List">
+        SELECT
+            sc.type AS seatType,
+            tsc.carriage_number AS carriageNumber,
+            ts.seat_no AS seatNo,
+            sio.start_sequence,  <!-- 区间起点字段 -->
+            sio.end_sequence,     <!-- 区间终点字段 -->
+            CONCAT(tsc.train_id, '_', sc.type, '_', tsc.carriage_number, '_', ts.seat_no) AS unique_key
+        FROM seat_class sc
+        INNER JOIN train_seat_class tsc
+            ON sc.id = tsc.seat_class_id
+        INNER JOIN train_seat ts
+            ON tsc.id = ts.train_seat_class_id
+        LEFT JOIN seat_interval_occupy sio
+            ON ts.id = sio.seat_id
+            AND sio.status IN (1, 2)  -- 仅查有效占用区间（1=锁定中，2=已售出）
+        <where>
+            <if test="list != null and list.size() > 0">
+                (tsc.train_id, sc.type, tsc.carriage_number, ts.seat_no) IN
+                <foreach collection="list" item="item" open="("  separator="," close=")">
+                    (#{item.trainId}, #{item.seatType}, #{item.carriageNumber}, #{item.seatNo})
+                </foreach>
+            </if>
+        </where>
+        <!-- 按传入参数的唯一标识顺序排序 -->
+        <if test="list != null and list.size() > 0">
+            ORDER BY FIELD(
+            unique_key,
+            <foreach collection="list" item="item" separator=",">
+                CONCAT(#{item.trainId}, '_', #{item.seatType}, '_', #{item.carriageNumber}, '_', #{item.seatNo})
+            </foreach>
+            ), tsc.carriage_number, ts.seat_no, sio.start_sequence  <!-- 次级排序规则（兜底排序） -->
+        </if>
+        <if test="list == null or list.size() == 0">
+            ORDER BY tsc.carriage_number, ts.seat_no, sio.start_sequence
+        </if>
+    </select>
+</mapper>

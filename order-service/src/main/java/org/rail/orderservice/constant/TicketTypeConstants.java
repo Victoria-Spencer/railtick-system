@@ -5,6 +5,8 @@ package org.rail.orderservice.constant;
  */
 public final class TicketTypeConstants {
 
+    private TicketTypeConstants() {}
+
     // 0: 成人
     public static final Integer ADULT = 0;
     // 1: 儿童

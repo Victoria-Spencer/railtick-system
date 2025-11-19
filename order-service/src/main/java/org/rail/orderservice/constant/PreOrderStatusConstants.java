@@ -5,7 +5,7 @@ package org.rail.orderservice.constant;
  */
 public final class PreOrderStatusConstants {
 
-    private PreOrderStatus() {}
+    private PreOrderStatusConstants() {}
 
     // 有效
     public static final Integer VALID  = 0;

@@ -2,11 +2,14 @@ package org.rail.ticketservice.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.bean.copier.CopyOptions;
+import cn.hutool.core.lang.Pair;
 import org.rail.commonapi.dto.AvailableSeatDTO;
 import org.rail.commonapi.dto.RandomSeatQueryDTO;
 import org.rail.commonapi.dto.SeatTypeQueryDTO;
+import org.rail.commonapi.dto.UpdateSeatStatusDTO;
 import org.rail.commonservice.exception.BusinessException;
 import org.rail.commonservice.utils.BeanUtils;
+import org.rail.ticketservice.constant.SeatStatusConstants;
 import org.rail.ticketservice.mapper.*;
 import org.rail.ticketservice.pojo.dto.*;
 import org.rail.ticketservice.pojo.entity.Train;
@@ -23,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 @Service
 public class TicketServiceImpl implements TicketService {
@@ -37,6 +41,9 @@ public class TicketServiceImpl implements TicketService {
     private TrainMapper trainMapper;
     @Autowired
     private TrainTypeDictMapper  trainTypeDictMapper;
+    @Autowired
+    private TrainSeatMapper trainSeatMapper;
+    @Autowired SeatIntervalOccupyMapper seatIntervalOccupyMapper;
 
     /**
      * 查询购票列表
@@ -187,6 +194,86 @@ public class TicketServiceImpl implements TicketService {
         }
 
         return availableSeatDTOList;
+    }
+
+    /**
+     * 更新座位状态
+     * @param updateSeatStatusDTOList
+     */
+    public void updateSeatStatus(List<UpdateSeatStatusDTO> updateSeatStatusDTOList) {
+        // 获取座位状态集合
+        List<Integer> statusList = checkSeatIntervalOccupationStatus(updateSeatStatusDTOList);
+
+        // 封装查询条件
+        List<SeatStatusUpdateConditionDTO> conditionDTOList = BeanUtil.copyToList(updateSeatStatusDTOList, SeatStatusUpdateConditionDTO.class);
+        IntStream.range(0, statusList.size())
+                .forEach(i -> {
+                    conditionDTOList.get(i).setStatus(statusList.get(i));
+                });
+
+        // 批量更新座位状态
+        trainSeatMapper.batchUpdateSeatStatus(conditionDTOList);
+    }
+
+    /**
+     * 查看区间状态
+     * @param updateSeatStatusDTOList
+     * @return
+     */
+    private List<Integer> checkSeatIntervalOccupationStatus(List<UpdateSeatStatusDTO> updateSeatStatusDTOList) {
+        // TODO 查询列车下指定的席别类型下的指定座位的占用区间
+        List<IntervalOccupyDTO> intervalOccupyDTOList = seatIntervalOccupyMapper.getIntervalOccupy(updateSeatStatusDTOList);
+        // 合并区间，修改座位状态
+        if(intervalOccupyDTOList == null || intervalOccupyDTOList.isEmpty()) {
+            throw new BusinessException("占用区间列表为空");
+        }
+
+        // 返回的状态集合
+        List<Integer> statusList = new ArrayList<>();
+        Long trainId = updateSeatStatusDTOList.get(0).getTrainId();
+
+        for (IntervalOccupyDTO intervalOccupyDTO : intervalOccupyDTOList) {
+            List<Pair<Integer, Integer>> intervalList = intervalOccupyDTO.getIntervalList();
+
+            Integer seatStatus = getSeatStatus(intervalList, trainId);
+
+            statusList.add(seatStatus);
+        }
+        return statusList;
+    }
+
+    /**
+     * 判断座位状态
+     * @param intervalList
+     * @param trainId
+     * @return
+     */
+    private Integer getSeatStatus(List<Pair<Integer, Integer>> intervalList, Long trainId) {
+        // 无占用
+        if(intervalList == null || intervalList.isEmpty()) {
+            // 无占用
+            return SeatStatusConstants.AVAILABLE;
+        }
+
+        // 获取终点站站序
+        Integer beginSeq = 1;
+        Integer terminalSeq = trainStopStationMapper.getTerminalSequence(trainId);
+        // 开始站序不是起点站序或最后站序不是终点站序，则部分占用
+        if(intervalList.getFirst().getKey() != beginSeq || intervalList.getLast().getKey() != terminalSeq) {
+            return SeatStatusConstants.PARTIALLY_OCCUPIED;
+        }
+
+        // 其余为部分或全部占用
+        Integer preArrSeq = 1;
+        for (Pair<Integer, Integer> pair : intervalList) {
+            Integer depSeq = pair.getKey();
+            Integer arrSeq = pair.getValue();
+
+            if(arrSeq > preArrSeq) {
+                return SeatStatusConstants.PARTIALLY_OCCUPIED;
+            }
+        }
+        return SeatStatusConstants.FULLY_OCCUPIED;
     }
 
     /**

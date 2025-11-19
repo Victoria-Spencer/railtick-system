@@ -5,4 +5,30 @@
 
 <mapper namespace="org.rail.ticketservice.mapper.TrainSeatMapper">
 
+    <update id="batchUpdateSeatStatus"
+            parameterType="java.util.List">
+        UPDATE train_seat ts
+        INNER JOIN train_seat_class tsc
+            ON ts.train_seat_class_id = tsc.id
+        INNER JOIN seat_class sc
+            ON tsc.seat_class_id = sc.id
+        SET ts.status = CASE
+            <foreach collection="list" item="detail" separator="">
+                WHEN tsc.train_id = #{detail.trainId}
+                    AND sc.type = #{detail.seatType}
+                    AND tsc.carriage_number = #{detail.carriageNumber}
+                    AND ts.seat_no = #{detail.seatNo}
+                THEN #{detail.status}
+            </foreach>
+        ELSE ts.status  -- 不匹配条件的记录保持原状态
+        END
+        <where>
+            <if test="list != null and list.size() > 0">
+                (tsc.train_id, sc.type, tsc.carriage_number, ts.seat_no) IN
+                <foreach collection="list" item="detail" open="(" separator="," close=")">
+                    (#{detail.trainId}, #{detail.seatType}, #{detail.carriageNumber}, #{detail.seatNo})
+                </foreach>
+            </if>
+        </where>
+    </update>
 </mapper>

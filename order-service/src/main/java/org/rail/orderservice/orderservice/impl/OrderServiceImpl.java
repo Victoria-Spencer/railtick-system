@@ -14,8 +14,7 @@ import org.rail.commonservice.exception.OpenFeignException;
 import org.rail.commonservice.exception.OrderNotFoundException;
 import org.rail.commonservice.result.PageResult;
 import org.rail.commonservice.result.Result;
-import org.rail.commonservice.utils.BeanUtils;
-import org.rail.orderservice.constant.PreOrderStatus;
+import org.rail.orderservice.constant.PreOrderStatusConstants;
 import org.rail.orderservice.mapper.OrderMapper;
 import org.rail.orderservice.orderservice.OrderService;
 import org.rail.orderservice.pojo.dto.*;
@@ -30,13 +29,9 @@ import org.rail.orderservice.pojo.vo.SelfTicketPageVO;
 import org.rail.orderservice.utils.SnowflakeIdGenerator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.cglib.core.Local;
-import org.springframework.context.annotation.Bean;
-import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import javax.management.OperationsException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -76,7 +71,7 @@ public class OrderServiceImpl implements OrderService {
         if(preOrder != null){
             // 重新生成过期时间和预订单状态
             preOrder.setExpireTime(calculateExpireTime());
-            preOrder.setStatus(PreOrderStatus.VALID);
+            preOrder.setStatus(PreOrderStatusConstants.VALID);
             preOrder.setCreateTime(LocalDateTime.now());
             orderMapper.updatePreOrder(preOrder);
 
@@ -112,6 +107,7 @@ public class OrderServiceImpl implements OrderService {
 
             // 执行更新
             orderMapper.updatePreOrderDetailsList(preOrderDetailsList);
+            // TODO 远程调用，更新这个座位的状态（status）
             return preOrder.getPreOrderSn();
         }
 
@@ -207,7 +203,7 @@ public class OrderServiceImpl implements OrderService {
     }
 
     private Map<Integer, List<Pair<String, String>>> getSeatTypeToSeatsMap(Order order, List<OrderDetails> orderDetailsList) {
-        // TODO 远程调用，判断是否还有空座位（车厢号，座位号），若有则返回
+        // 远程调用，判断是否还有空座位（车厢号，座位号），若有则返回
         // 列车ID, 席别类型，出发站点编码，到达站点编码
         RandomSeatQueryDTO randomSeatQueryDTO = new RandomSeatQueryDTO();
         randomSeatQueryDTO.setTrainId(order.getTrainId());
@@ -300,7 +296,7 @@ public class OrderServiceImpl implements OrderService {
         /**        标记预订单为已转为正式订单        **/
         PreOrder newPreOrder = new PreOrder();
         newPreOrder.setId(preOrderId);
-        newPreOrder.setStatus(PreOrderStatus.CONVERTED_TO_ORDER);
+        newPreOrder.setStatus(PreOrderStatusConstants.CONVERTED_TO_ORDER);
         orderMapper.updatePreOrder(newPreOrder);
     }
 

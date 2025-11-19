@@ -1,6 +1,5 @@
 package org.rail.ticketservice.constant;
 
-import lombok.Data;
 
 /**
  * 站点类型

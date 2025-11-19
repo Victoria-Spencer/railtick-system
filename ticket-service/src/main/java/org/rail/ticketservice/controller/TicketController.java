@@ -3,6 +3,7 @@ package org.rail.ticketservice.controller;
 import lombok.extern.slf4j.Slf4j;
 import org.rail.commonapi.dto.AvailableSeatDTO;
 import org.rail.commonapi.dto.RandomSeatQueryDTO;
+import org.rail.commonapi.dto.UpdateSeatStatusDTO;
 import org.rail.commonservice.result.Result;
 import org.rail.ticketservice.pojo.dto.PlannedTicketQueryDTO;
 import org.rail.ticketservice.pojo.dto.TicketQueryDTO;
@@ -48,5 +49,11 @@ public class TicketController {
     public Result<List<AvailableSeatDTO>> getAvailableSeats(@RequestBody RandomSeatQueryDTO randomSeatQueryDTO) {
         List<AvailableSeatDTO> availableSeatDTOList = ticketService.getAvailableSeats(randomSeatQueryDTO);
         return Result.success(availableSeatDTOList);
+    }
+
+    @PutMapping("/seat-status/update")
+    public Result updateSeatStatus(@RequestBody List<UpdateSeatStatusDTO> updateSeatStatusDTOList) {
+        ticketService.updateSeatStatus(updateSeatStatusDTOList);
+        return Result.success();
     }
 }

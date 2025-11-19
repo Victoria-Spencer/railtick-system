@@ -3,7 +3,9 @@ package org.rail.orderservice.constant;
 /**
  * 订单支付状态
  */
-public class OrderPaymentStatusConstants {
+public final class OrderPaymentStatusConstants {
+
+    private OrderPaymentStatusConstants() {}
 
     /**
      * 待支付：订单已创建但尚未完成支付

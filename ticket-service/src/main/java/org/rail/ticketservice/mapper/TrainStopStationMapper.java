@@ -44,4 +44,12 @@ public interface TrainStopStationMapper {
      * @return
      */
     StopInfoDTO getStopInfoByQueryDTO(PlannedTicketQueryDTO plannedTicketQueryDTO);
+
+    /**
+     * 查询终点站站序
+     * @param trainId
+     * @return
+     */
+    @Select("select max(sequence) from train_stop_station where train_id = #{trainId}")
+    Integer getTerminalSequence(Long trainId);
 }
