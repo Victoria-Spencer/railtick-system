@@ -202,17 +202,13 @@ public class TicketServiceImpl implements TicketService {
      */
     public void updateSeatStatus(List<UpdateSeatStatusDTO> updateSeatStatusDTOList) {
         // 获取座位状态集合
-        List<Integer> statusList = checkSeatIntervalOccupationStatus(updateSeatStatusDTOList);
-
-        // 封装查询条件
-        List<SeatStatusUpdateConditionDTO> conditionDTOList = BeanUtil.copyToList(updateSeatStatusDTOList, SeatStatusUpdateConditionDTO.class);
-        IntStream.range(0, statusList.size())
-                .forEach(i -> {
-                    conditionDTOList.get(i).setStatus(statusList.get(i));
-                });
-
+        List<SeatStatusUpdateConditionDTO> seatStatusUpdateDTOList = checkSeatIntervalOccupationStatus(updateSeatStatusDTOList);
         // 批量更新座位状态
-        trainSeatMapper.batchUpdateSeatStatus(conditionDTOList);
+        if (seatStatusUpdateDTOList == null || seatStatusUpdateDTOList.isEmpty()) {
+            throw new BusinessException("待更新的座位状态列表为空");
+        }
+        // 批量更新座位状态
+        trainSeatMapper.batchUpdateSeatStatus(seatStatusUpdateDTOList);
     }
 
     /**
@@ -220,8 +216,8 @@ public class TicketServiceImpl implements TicketService {
      * @param updateSeatStatusDTOList
      * @return
      */
-    private List<Integer> checkSeatIntervalOccupationStatus(List<UpdateSeatStatusDTO> updateSeatStatusDTOList) {
-        // TODO 查询列车下指定的席别类型下的指定座位的占用区间
+    private List<SeatStatusUpdateConditionDTO> checkSeatIntervalOccupationStatus(List<UpdateSeatStatusDTO> updateSeatStatusDTOList) {
+        // 查询列车下指定的席别类型下的指定座位的占用区间
         List<IntervalOccupyDTO> intervalOccupyDTOList = seatIntervalOccupyMapper.getIntervalOccupy(updateSeatStatusDTOList);
         // 合并区间，修改座位状态
         if(intervalOccupyDTOList == null || intervalOccupyDTOList.isEmpty()) {
@@ -229,17 +225,19 @@ public class TicketServiceImpl implements TicketService {
         }
 
         // 返回的状态集合
-        List<Integer> statusList = new ArrayList<>();
-        Long trainId = updateSeatStatusDTOList.get(0).getTrainId();
+        Long trainId = intervalOccupyDTOList.get(0).getTrainId();
+        List<SeatStatusUpdateConditionDTO> seatStatusUpdateConditionDTOList = BeanUtil
+                        .copyToList(intervalOccupyDTOList, SeatStatusUpdateConditionDTO.class);
 
-        for (IntervalOccupyDTO intervalOccupyDTO : intervalOccupyDTOList) {
+        for (int i = 0; i < intervalOccupyDTOList.size(); i++) {
+            IntervalOccupyDTO intervalOccupyDTO = intervalOccupyDTOList.get(i);
             List<Pair<Integer, Integer>> intervalList = intervalOccupyDTO.getIntervalList();
 
             Integer seatStatus = getSeatStatus(intervalList, trainId);
 
-            statusList.add(seatStatus);
+            seatStatusUpdateConditionDTOList.get(i).setStatus(seatStatus);
         }
-        return statusList;
+        return seatStatusUpdateConditionDTOList;
     }
 
     /**

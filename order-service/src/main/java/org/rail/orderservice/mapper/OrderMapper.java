@@ -45,8 +45,8 @@ public interface OrderMapper {
      * @param preOrderId
      * @return
      */
-    @Select("select id, temp_seat_no from pre_order_details where pre_order_id = #{preOrderId}")
-    List<PreOrderDetails> getIdAndTempSeatNoByPreOrderId(Long preOrderId);
+    @Select("select id, seat_type, carriage_number, temp_seat_no from pre_order_details where pre_order_id = #{preOrderId}")
+    List<PreOrderDetails> getTempSeatInfoByPreOrderId(Long preOrderId);
 
     /**
      * 更新预订单

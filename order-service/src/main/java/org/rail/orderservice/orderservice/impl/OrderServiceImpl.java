@@ -8,6 +8,7 @@ import org.rail.commonapi.client.TicketFeignClient;
 import org.rail.commonapi.client.UserFeignClient;
 import org.rail.commonapi.dto.AvailableSeatDTO;
 import org.rail.commonapi.dto.RandomSeatQueryDTO;
+import org.rail.commonapi.dto.UpdateSeatStatusDTO;
 import org.rail.commonapi.dto.UserIdCardDTO;
 import org.rail.commonservice.exception.BusinessException;
 import org.rail.commonservice.exception.OpenFeignException;
@@ -77,12 +78,26 @@ public class OrderServiceImpl implements OrderService {
 
             // 修改临时座位信息
             Long preOrderId = preOrder.getId();
-            List<PreOrderDetails> preOrderDetailsList = orderMapper.getIdAndTempSeatNoByPreOrderId(preOrderId);
+            List<PreOrderDetails> preOrderDetailsList = orderMapper.getTempSeatInfoByPreOrderId(preOrderId);
             List<ChooseSeatDTO> chooseSeats = createPreOrderDTO.getChooseSeats();
 
             // 校验预订单详情列表不为空（必须有乘客信息）
             if (preOrderDetailsList == null || preOrderDetailsList.isEmpty()) {
                 throw new IllegalArgumentException("预订单详情列表不能为空");
+            }
+
+            // 构建远程调用的条件，更新座位的状态（status），【先前的座位信息】
+            List<UpdateSeatStatusDTO> updateSeatStatusDTOList = new ArrayList<>();
+            if(preOrderDetailsList.get(0).getTempSeatNo() != null) {
+                updateSeatStatusDTOList = BeanUtil.copyToList(
+                        preOrderDetailsList,
+                        UpdateSeatStatusDTO.class,
+                        CopyOptions
+                                .create()
+                                .setFieldMapping(new HashMap<>(){{
+                                    put("tempSeatNo", "seatNo");
+                                }})
+                );
             }
 
             // 处理“取消选座”场景（chooseSeats为空）
@@ -102,12 +117,31 @@ public class OrderServiceImpl implements OrderService {
                     ChooseSeatDTO seat = chooseSeats.get(i);
                     details.setCarriageNumber(seat.getCarriageNumber());
                     details.setTempSeatNo(seat.getTempSeatNo());
+
+                    // 构建远程调用的条件，更新座位的状态（status），【现在的座位信息】
+                    UpdateSeatStatusDTO updateSeatStatusDTO = new UpdateSeatStatusDTO();
+                    BeanUtil.copyProperties (
+                                    details,
+                                    updateSeatStatusDTO,
+                                    CopyOptions
+                                            .create()
+                                            .setFieldMapping(new HashMap<>(){{
+                                                put("tempSeatNo", "seatNo");
+                                            }})
+                            );
+                    updateSeatStatusDTOList.add(updateSeatStatusDTO);
                 }
             }
 
             // 执行更新
             orderMapper.updatePreOrderDetailsList(preOrderDetailsList);
-            // TODO 远程调用，更新这个座位的状态（status）
+            // 远程调用，更新座位的状态（status）
+            Long trainId = createPreOrderDTO.getTrainId();
+            // 流式遍历，为每个DTO设置trainId
+            updateSeatStatusDTOList.stream()
+                    .forEach(dto -> dto.setTrainId(trainId));
+            ticketFeignClient.updateSeatStatus(updateSeatStatusDTOList);
+
             return preOrder.getPreOrderSn();
         }
 
@@ -161,6 +195,7 @@ public class OrderServiceImpl implements OrderService {
                         BeanUtil.copyProperties(createOrderDTO, orderDetails)
                 );
 
+
         // 4.判断座位是否为空，若为空，则随机分配
         String seatNo = orderDetailsList.get(0).getSeatNo();
         if (seatNo == null) {
@@ -176,6 +211,16 @@ public class OrderServiceImpl implements OrderService {
                 orderDetails.setSeatNo(currentSeatNo);
                 pairs.remove(first);
             }
+
+
+            // 构建远程调用的条件，更新座位的状态（status），【随机分配的座位信息】
+            List<UpdateSeatStatusDTO> updateSeatStatusDTOList = BeanUtil.copyToList(orderDetailsList, UpdateSeatStatusDTO.class);
+            // 远程调用，更新座位的状态（status）
+            Long trainId = order.getTrainId();
+            // 流式遍历，为每个DTO设置trainId
+            updateSeatStatusDTOList.stream()
+                    .forEach(dto -> dto.setTrainId(trainId));
+            ticketFeignClient.updateSeatStatus(updateSeatStatusDTOList);
         }
 
         // 5.遍历orderDetails,拷贝属性
@@ -190,6 +235,7 @@ public class OrderServiceImpl implements OrderService {
 
         // 标记预订单为已转为正式订单
         markPreOrderStatus2(preOrderId);
+
 
         /**        封装数据,返回        **/
         CreateOrderVO createOrderVO = BeanUtil.copyProperties(createOrderDTO, CreateOrderVO.class);
@@ -335,6 +381,8 @@ public class OrderServiceImpl implements OrderService {
 
         List<PreOrderDetails> preOrderDetailsList = new ArrayList<>();
         List<ChooseSeatDTO> chooseSeats = createPreOrderDTO.getChooseSeats();
+        // 构建远程调用的条件，更新座位的状态（status），【先前的座位信息】
+        List<UpdateSeatStatusDTO> updateSeatStatusDTOList = new ArrayList<>();
 
         for (int i = 0; i < passengerOrderDetailDTOList.size(); i++) {
             PassengerOrderDetailDTO passengerDTO = passengerOrderDetailDTOList.get(i); // 第i个乘客
@@ -355,6 +403,19 @@ public class OrderServiceImpl implements OrderService {
                 ChooseSeatDTO seat = chooseSeats.get(i);
                 preOrderDetails.setCarriageNumber(seat.getCarriageNumber());
                 preOrderDetails.setTempSeatNo(seat.getTempSeatNo());
+
+                // 构建远程调用的条件，更新座位的状态（status），【座位信息】
+                UpdateSeatStatusDTO updateSeatStatusDTO = new UpdateSeatStatusDTO();
+                BeanUtil.copyProperties (
+                        preOrderDetails,
+                        updateSeatStatusDTO,
+                        CopyOptions
+                                .create()
+                                .setFieldMapping(new HashMap<>(){{
+                                    put("tempSeatNo", "seatNo");
+                                }})
+                );
+                updateSeatStatusDTOList.add(updateSeatStatusDTO);
             }
 
             preOrderDetailsList.add(preOrderDetails);
@@ -363,6 +424,16 @@ public class OrderServiceImpl implements OrderService {
 
         // 4.插入预订单明细到数据库
         orderMapper.batchInsertPreOrderDetails(preOrderDetailsList);
+
+        if(updateSeatStatusDTOList != null && !updateSeatStatusDTOList.isEmpty()) {
+            // 5.远程调用，更新座位的状态（status）
+            Long trainId = createPreOrderDTO.getTrainId();
+            // 流式遍历，为每个DTO设置trainId
+            updateSeatStatusDTOList.stream()
+                    .forEach(dto -> dto.setTrainId(trainId));
+            ticketFeignClient.updateSeatStatus(updateSeatStatusDTOList);
+        }
+
         return preOrderSn;
     }
 

@@ -8,6 +8,8 @@ import java.util.List;
 @Data
 public class IntervalOccupyDTO {
 
+    // 列车类型
+    private Long trainId;
     // 席别类型
     private Integer seatType;
     // 车厢号

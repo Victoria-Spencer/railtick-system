@@ -7,6 +7,7 @@
 
     <resultMap id="IntervalOccupyDTOResultMap" type="org.rail.ticketservice.pojo.dto.IntervalOccupyDTO">
         <!-- 基础字段映射 -->
+        <result property="trainId" column="trainId"/>
         <result property="seatType" column="seatType"/>
         <result property="carriageNumber" column="carriageNumber"/>
         <result property="seatNo" column="seatNo"/>
@@ -24,6 +25,7 @@
     <select id="getIntervalOccupy" resultMap="IntervalOccupyDTOResultMap"
             parameterType="java.util.List">
         SELECT
+            tsc.train_id AS trainId,
             sc.type AS seatType,
             tsc.carriage_number AS carriageNumber,
             ts.seat_no AS seatNo,

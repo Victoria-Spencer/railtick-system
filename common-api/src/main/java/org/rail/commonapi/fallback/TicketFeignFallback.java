@@ -4,6 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.rail.commonapi.client.TicketFeignClient;
 import org.rail.commonapi.dto.AvailableSeatDTO;
 import org.rail.commonapi.dto.RandomSeatQueryDTO;
+import org.rail.commonapi.dto.UpdateSeatStatusDTO;
 import org.rail.commonservice.result.Result;
 import org.springframework.stereotype.Component;
 
@@ -22,6 +23,15 @@ public class TicketFeignFallback implements TicketFeignClient {
      * @return
      */
     public Result<List<AvailableSeatDTO>> getAvailableSeats(RandomSeatQueryDTO randomSeatQueryDTO) {
+        log.error("服务临时不可用，请稍后重试");
+        return Result.error("服务临时不可用，请稍后重试");
+    }
+
+    /**
+     * 批量更新座位状态
+     * @param updateSeatStatusDTOList
+     */
+    public Result updateSeatStatus(List<UpdateSeatStatusDTO> updateSeatStatusDTOList) {
         log.error("服务临时不可用，请稍后重试");
         return Result.error("服务临时不可用，请稍后重试");
     }

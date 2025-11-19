@@ -1,7 +1,6 @@
 package org.rail.orderservice.pojo.entity;
 
 import lombok.Data;
-import org.rail.orderservice.constant.TicketType;
 
 /**
  * 预订单明细

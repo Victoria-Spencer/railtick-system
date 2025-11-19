@@ -2,11 +2,13 @@ package org.rail.commonapi.client;
 
 import org.rail.commonapi.dto.AvailableSeatDTO;
 import org.rail.commonapi.dto.RandomSeatQueryDTO;
+import org.rail.commonapi.dto.UpdateSeatStatusDTO;
 import org.rail.commonapi.fallback.TicketFeignFallback;
 import org.rail.commonservice.result.Result;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
 import java.util.List;
@@ -21,4 +23,11 @@ public interface TicketFeignClient {
      */
     @PostMapping("/api/ticket-service/ticket/seats/available")
     Result<List<AvailableSeatDTO>> getAvailableSeats(@RequestBody RandomSeatQueryDTO randomSeatQueryDTO);
+
+    /**
+     * 批量更新座位状态
+     * @param updateSeatStatusDTOList
+     */
+    @PutMapping("/api/ticket-service/ticket/seat-status/update")
+    Result updateSeatStatus(@RequestBody List<UpdateSeatStatusDTO> updateSeatStatusDTOList);
 }
