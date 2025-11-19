@@ -219,12 +219,6 @@ public class TicketServiceImpl implements TicketService {
 
 
     /**
-     * 查询 trainId, departureTime, arrivalTime, departureStationId, arrivalStationId 5个属性
-     * @param ticketQueryDTO
-     * @return
-     */
-
-    /**
      * 判断站点是否为列车的始发站
      */
     public boolean checkDepartureStation(Long trainId, Integer stationId) {

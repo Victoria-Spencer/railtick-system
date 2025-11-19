@@ -159,7 +159,13 @@ public class OrderServiceImpl implements OrderService {
                         }})
                 );
 
-        // 3.判断座位是否为空，若为空，则随机分配
+        // 3.拷贝前端传递过来的字段
+        orderDetailsList.stream()
+                .forEach(orderDetails ->
+                        BeanUtil.copyProperties(createOrderDTO, orderDetails)
+                );
+
+        // 4.判断座位是否为空，若为空，则随机分配
         String seatNo = orderDetailsList.get(0).getSeatNo();
         if (seatNo == null) {
             Map<Integer, List<Pair<String, String>>> seatTypeToSeatsMap = getSeatTypeToSeatsMap(order, orderDetailsList);
@@ -176,16 +182,13 @@ public class OrderServiceImpl implements OrderService {
             }
         }
 
-        // 4.遍历orderDetails,拷贝属性
+        // 5.遍历orderDetails,拷贝属性
         for (OrderDetails orderDetails : orderDetailsList) {
             // 设置外键
             orderDetails.setOrderId(order.getId());
 
             // 分配座位
             orderDetails.setSeatNo(orderDetails.getSeatNo());
-
-            // 拷贝其它属性
-            BeanUtil.copyProperties(createOrderDTO, orderDetails);
         }
         orderMapper.batchInsertOrderDetails(orderDetailsList);
 
