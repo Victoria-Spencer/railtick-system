@@ -3,7 +3,7 @@ package org.rail.orderservice.constant;
 /**
  * 订单状态
  */
-public class OrderStatus {
+public class OrderStatusConstants {
 
     /**
      * 未完成

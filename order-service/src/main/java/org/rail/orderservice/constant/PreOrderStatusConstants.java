@@ -3,7 +3,9 @@ package org.rail.orderservice.constant;
 /**
  * 预订单状态
  */
-public class PreOrderStatus {
+public final class PreOrderStatusConstants {
+
+    private PreOrderStatus() {}
 
     // 有效
     public static final Integer VALID  = 0;

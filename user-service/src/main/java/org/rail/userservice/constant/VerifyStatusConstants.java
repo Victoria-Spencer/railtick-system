@@ -3,7 +3,7 @@ package org.rail.userservice.constant;
 /**
  * 审核状态
  */
-public class VerifyStatus {
+public class VerifyStatusConstants {
 
     /**
      * 未审核
