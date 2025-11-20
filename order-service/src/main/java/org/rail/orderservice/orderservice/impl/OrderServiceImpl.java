@@ -154,6 +154,7 @@ public class OrderServiceImpl implements OrderService {
      * @param createOrderDTO
      * @return
      */
+    // TODO 全局事务
     @Transactional
     public CreateOrderVO createOrder(CreateOrderDTO createOrderDTO) {
         /**       插入订单数据        **/

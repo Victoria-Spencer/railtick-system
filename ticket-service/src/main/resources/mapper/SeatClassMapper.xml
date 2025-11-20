@@ -50,6 +50,8 @@
             WHERE
                 -- 仅统计有效占用（锁定中或已售出，排除已释放）
                 sio.status IN (1, 2)
+                -- 未过期
+                AND (sio.expire_time IS NULL OR sio.expire_time &gt; NOW())
                 -- 占用区间与查询区间重叠：占用的起点 &lt; 到达站序 且 占用的终点 &gt; 出发站序
                 -- 使用临时表中当前trainId对应的区间参数
                 AND sio.start_sequence &lt; qp.end_sequence
@@ -71,9 +73,6 @@
             ON sc.id = tsc.seat_class_id
         INNER JOIN train_seat ts
             ON tsc.id = ts.train_seat_class_id
-        LEFT JOIN seat_interval_occupy sio
-            ON ts.id = sio.seat_id
-            AND sio.status IN (1, 2)  -- 仅关联有效占用（锁定中/已售出，排除已释放）
         INNER JOIN train_stop_station tss_a
             ON tsc.train_id = tss_a.train_id
         INNER JOIN train_stop_station tss_b
@@ -88,13 +87,16 @@
             AND s_start.code = #{departureCode}
             AND s_end.code = #{arrivalCode}
             AND tss_a.sequence &lt; tss_b.sequence
-            <!-- 座位没有被占用 -->
-            AND (
-                sio.id IS NULL  -- 无任何占用记录，直接可用
-                OR (
-                    tss_b.sequence &lt;= sio.start_sequence -- 到达站序 ≤ 占用区间起点（不重叠）
-                    OR tss_a.sequence &gt;= sio.end_sequence -- 出发站序 ≥ 占用区间终点（不重叠）
-                )
+            <!-- 核心修正：确保座位没有任何重叠的有效占用区间 -->
+            AND NOT EXISTS (
+                SELECT 1
+                FROM seat_interval_occupy sio
+                WHERE sio.seat_id = ts.id
+                    AND sio.status IN (1, 2) -- 仅关联有效占用（锁定中/已售出，排除已释放）
+                    AND (sio.expire_time IS NULL OR sio.expire_time &gt; NOW()) -- 未过期
+                    <!-- 区间重叠的判断条件：目标区间与占用区间有交集 -->
+                    AND tss_a.sequence &lt; sio.end_sequence -- 目标出发站 &lt; 占用区间终点
+                    AND tss_b.sequence &gt; sio.start_sequence -- 目标到达站 &gt; 占用区间起点
             )
         -- 按车厢号+座位号排序，确保返回结果有序
         ORDER BY tsc.carriage_number, ts.seat_no

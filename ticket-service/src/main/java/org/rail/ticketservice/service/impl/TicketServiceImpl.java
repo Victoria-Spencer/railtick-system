@@ -200,6 +200,7 @@ public class TicketServiceImpl implements TicketService {
      * 更新座位状态
      * @param updateSeatStatusDTOList
      */
+    // TODO 更新座位占用区间
     public void updateSeatStatus(List<UpdateSeatStatusDTO> updateSeatStatusDTOList) {
         // 获取座位状态集合
         List<SeatStatusUpdateConditionDTO> seatStatusUpdateDTOList = checkSeatIntervalOccupationStatus(updateSeatStatusDTOList);
