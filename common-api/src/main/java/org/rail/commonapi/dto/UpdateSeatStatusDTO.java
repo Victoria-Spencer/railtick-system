@@ -7,7 +7,7 @@ import java.util.List;
 @Data
 public class UpdateSeatStatusDTO {
 
-    // 列车ID
+    // 列车id
     private Long trainId;
     // 席别类型
     private Integer seatType;
