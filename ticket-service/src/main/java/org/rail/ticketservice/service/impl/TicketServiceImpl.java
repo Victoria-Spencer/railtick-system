@@ -3,20 +3,21 @@ package org.rail.ticketservice.service.impl;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.bean.copier.CopyOptions;
 import cn.hutool.core.lang.Pair;
-import org.rail.commonapi.dto.AvailableSeatDTO;
-import org.rail.commonapi.dto.RandomSeatQueryDTO;
-import org.rail.commonapi.dto.SeatTypeQueryDTO;
-import org.rail.commonapi.dto.UpdateSeatStatusDTO;
+import com.alibaba.nacos.common.utils.CollectionUtils;
+import org.rail.commonapi.dto.*;
 import org.rail.commonservice.exception.BusinessException;
 import org.rail.commonservice.utils.BeanUtils;
 import org.rail.ticketservice.constant.SeatStatusConstants;
 import org.rail.ticketservice.mapper.*;
 import org.rail.ticketservice.pojo.dto.*;
+import org.rail.ticketservice.pojo.entity.SeatIntervalOccupy;
 import org.rail.ticketservice.pojo.entity.Train;
 import org.rail.ticketservice.pojo.vo.*;
 import org.rail.ticketservice.service.TicketService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -44,6 +45,10 @@ public class TicketServiceImpl implements TicketService {
     @Autowired
     private TrainSeatMapper trainSeatMapper;
     @Autowired SeatIntervalOccupyMapper seatIntervalOccupyMapper;
+
+    // 从配置文件注入预订单有效期（分钟）
+    @Value("${order.pre.expire-minutes : 15}") // 默认15分钟
+    private Integer preOrderExpireMinutes;
 
     /**
      * 查询购票列表
@@ -197,19 +202,64 @@ public class TicketServiceImpl implements TicketService {
     }
 
     /**
-     * 更新座位状态
-     * @param updateSeatStatusDTOList
+     * 更新座位占用区间，并同步新的座位状态
+     * @param sioDTO
      */
-    // TODO 更新座位占用区间
-    public void updateSeatStatus(List<UpdateSeatStatusDTO> updateSeatStatusDTOList) {
+    @Transactional
+    public void updateSeatStatus(SeatIntervalOccupyDTO sioDTO) {
+        List<SeatIntervalOccupyInsertDTO> insertDTOList = sioDTO.getInsertDTOList();
+        List<SeatIntervalOccupyUpdateDTO> updateDTOList = sioDTO.getUpdateDTOList();
+
+        // 1.变动座区间占用记录
+        operateSeatIntervalOccupy(insertDTOList, updateDTOList);
+
+
+        // 2.批量更新座位状态
+        // 构建更新条件
+        List<UpdateSeatStatusDTO> updateSeatStatusDTOList = new ArrayList<>();
+        if(insertDTOList != null && !insertDTOList.isEmpty()) {
+            List<UpdateSeatStatusDTO> insertConverted = BeanUtils.copyToList(insertDTOList, UpdateSeatStatusDTO.class);
+            updateSeatStatusDTOList.addAll(insertConverted);
+        }
+        if(updateDTOList != null && !updateDTOList.isEmpty()) {
+            List<UpdateSeatStatusDTO> updateConverted = BeanUtils.copyToList(updateDTOList, UpdateSeatStatusDTO.class);
+            updateSeatStatusDTOList.addAll(updateConverted);
+        }
+
         // 获取座位状态集合
         List<SeatStatusUpdateConditionDTO> seatStatusUpdateDTOList = checkSeatIntervalOccupationStatus(updateSeatStatusDTOList);
-        // 批量更新座位状态
         if (seatStatusUpdateDTOList == null || seatStatusUpdateDTOList.isEmpty()) {
             throw new BusinessException("待更新的座位状态列表为空");
         }
         // 批量更新座位状态
         trainSeatMapper.batchUpdateSeatStatus(seatStatusUpdateDTOList);
+    }
+
+    private void operateSeatIntervalOccupy(List<SeatIntervalOccupyInsertDTO> insertDTOList, List<SeatIntervalOccupyUpdateDTO> updateDTOList) {
+        // 1 先执行更新操作，避免一同修改新增的数据
+        List<SeatIntervalOccupyModifyDTO> occupyModifyDTOS = BeanUtils.copyToList(updateDTOList, SeatIntervalOccupyModifyDTO.class);
+        if (CollectionUtils.isNotEmpty(occupyModifyDTOS)) {
+            seatIntervalOccupyMapper.batchUpdateSIOOccupyRecodes(occupyModifyDTOS);
+        }
+
+        // 2.新增操作
+        // 查询座位ID,开始站序，结束站序
+        List<SeatInfoQueryDTO> seatInfoQueryDTOList = BeanUtils.copyToList(insertDTOList, SeatInfoQueryDTO.class);
+        List<SeatIntervalBaseDTO> seatIntervalBaseDTOList = trainSeatMapper.batchQuerySIOBaseInfo(seatInfoQueryDTOList);
+        // 新增条件构建
+        List<SeatIntervalOccupy> seatIntervalOccupyList = BeanUtils.copyToList(seatIntervalBaseDTOList, SeatIntervalOccupy.class);
+        for (int i = 0; i < seatIntervalOccupyList.size(); i++) {
+            SeatIntervalOccupy seatIntervalOccupy = seatIntervalOccupyList.get(0);
+            SeatIntervalOccupyInsertDTO insertDTO = insertDTOList.get(0);
+            BeanUtils.copyProperties(insertDTO, seatIntervalOccupy);
+
+            // 设置创建时间和过期时间
+            seatIntervalOccupy.setCreateTime(LocalDateTime.now());
+            seatIntervalOccupy.setExpireTime(calculateExpireTime());
+        }
+        if (CollectionUtils.isNotEmpty(seatIntervalOccupyList)) {
+            seatIntervalOccupyMapper.batchInsertSIOOccupyRecords(seatIntervalOccupyList);
+        }
     }
 
     /**
@@ -338,5 +388,22 @@ public class TicketServiceImpl implements TicketService {
             minutesInteger = (int) minutesLong;
         }
         return minutesInteger;
+    }
+
+    /**
+     * 计算过期时间
+     * @return
+     */
+    public LocalDateTime calculateExpireTime() {
+        // 1. 获取当前时间
+        LocalDateTime now = LocalDateTime.now();
+
+        // 2. 处理null情况（避免空指针，设置默认值，例如15分钟）
+        int minutes = (preOrderExpireMinutes != null) ? preOrderExpireMinutes : 15;
+
+        // 3. 计算过期时间：当前时间 + 过期分钟数
+        LocalDateTime expireTime = now.plusMinutes(minutes);
+
+        return expireTime;
     }
 }

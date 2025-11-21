@@ -46,7 +46,7 @@ public class OrderServiceImpl implements OrderService {
     @Autowired
     private OrderMapper orderMapper;
     // 从配置文件注入预订单有效期（分钟）
-    @Value("${order.pre.expire-minutes}")
+    @Value("${order.pre.expire-minutes : 15}") // 默认15分钟
     private Integer preOrderExpireMinutes;
     @Autowired
     private UserFeignClient userFeignClient;
@@ -446,8 +446,8 @@ public class OrderServiceImpl implements OrderService {
         // 1. 获取当前时间
         LocalDateTime now = LocalDateTime.now();
 
-        // 2. 处理null情况（避免空指针，设置默认值，例如30分钟）
-        int minutes = (preOrderExpireMinutes != null) ? preOrderExpireMinutes : 30;
+        // 2. 处理null情况（避免空指针，设置默认值，例如15分钟）
+        int minutes = (preOrderExpireMinutes != null) ? preOrderExpireMinutes : 15;
 
         // 3. 计算过期时间：当前时间 + 过期分钟数
         LocalDateTime expireTime = now.plusMinutes(minutes);

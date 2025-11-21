@@ -62,4 +62,46 @@
             ORDER BY tsc.carriage_number, ts.seat_no, sio.start_sequence
         </if>
     </select>
+
+    <insert id="batchInsertSIOOccupyRecords"
+            parameterType="java.util.List">
+        INSERT INTO seat_interval_occupy (
+          seat_id,
+          start_sequence,
+          end_sequence,
+          order_id,
+          order_type,
+          status,
+          create_time,
+          expire_time
+        )
+        VALUES
+        <foreach collection="list" item="item" separator=",">
+            (
+                #{item.seatId},
+                #{item.startSequence},
+                #{item.endSequence},
+                #{item.orderId},
+                #{item.orderType},
+                #{item.status},
+                #{item.createTime},
+                #{item.expireTime}
+            )
+        </foreach>
+    </insert>
+
+    <update id="batchUpdateSIOOccupyRecodes"
+            parameterType="java.util.List">
+        UPDATE seat_interval_occupy
+        SET
+            status = CASE
+                <foreach collection="list" item="item" separator="">
+                    WHEN order_id = #{item.orderId} AND order_type = #{item.orderType} THEN #{item.status}
+                </foreach>
+            END
+        WHERE (order_id, order_type) IN
+            <foreach collection="list" item="item" open="(" close=")" separator=",">
+                (#{item.orderId},#{item.orderType})
+            </foreach>
+    </update>
 </mapper>

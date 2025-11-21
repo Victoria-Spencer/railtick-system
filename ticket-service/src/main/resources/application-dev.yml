@@ -9,3 +9,6 @@ spring:
 logging:
   level:
     org.rail.ticketservice.mapper.StationMapper: DEBUG # sql语句打印
+order:
+  pre:
+    expire-minutes: 15  # 预订单有效期（分钟）
