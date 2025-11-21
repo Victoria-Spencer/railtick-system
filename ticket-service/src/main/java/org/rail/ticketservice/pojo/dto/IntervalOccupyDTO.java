@@ -17,5 +17,5 @@ public class IntervalOccupyDTO {
     // 座位号
     private String seatNo;
     // 占用区间
-    private List<Pair<Integer, Integer>> intervalList;
+    private List<SequenceDTO> intervalList;
 }

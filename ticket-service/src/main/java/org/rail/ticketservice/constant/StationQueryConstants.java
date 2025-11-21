@@ -19,26 +19,26 @@ public final class StationQueryConstants {
     /**
      * A-E
      */
-    private static final Integer A_E = 1;
+    public static final Integer A_E = 1;
 
     /**
      * F-J
      */
-    private static final Integer F_J = 2;
+    public static final Integer F_J = 2;
 
     /**
      * K-O
      */
-    private static final Integer K_O = 3;
+    public static final Integer K_O = 3;
 
     /**
      * P-T
      */
-    private static final Integer P_T = 4;
+    public static final Integer P_T = 4;
 
     /**
      * U-Z
      */
-    private static final Integer U_Z = 5;
+    public static final Integer U_Z = 5;
 
 }

@@ -32,38 +32,24 @@
         </where>
     </update>
 
-    <select id="batchQuerySIOBaseInfo" resultType="org.rail.ticketservice.pojo.dto.SeatIntervalBaseDTO"
+    <select id="getSeatIdByQueryDTO" resultType="java.lang.Long"
             parameterType="java.util.List">
         SELECT
-            ts.id AS seatId,
-            tss_a.sequence AS startSequence,
-            tss_b.sequence AS endSequence
-        FROM seat_class sc
+            ts.id
+        FROM train_seat ts
         INNER JOIN train_seat_class tsc
-            ON sc.id = tsc.seat_class_id
-        INNER JOIN train_stop_station tss_a
-            ON tsc.train_id = tss_a.train_id
-        INNER JOIN train_stop_station tss_b
-            ON tss_a.train_id = tss_b.train_id
-        INNER JOIN station s_start
-            ON tss_a.station_id = s_start.id
-        INNER JOIN station s_end
-            ON tss_b.station_id = s_end.id
-        INNER JOIN train_seat ts
-            ON tsc.id = ts.train_seat_class_id
-        <where>
-            (tsc.train_id, sc.type, tsc.carriage_number, ts.seat_no, s_start.code, s_end.code) IN
+            ON ts.train_seat_class_id = tsc.id
+        INNER JOIN seat_class sc
+            ON tsc.seat_class_id = sc.id
+        WHERE
+            (tsc.train_id, sc.type, tsc.carriage_number, ts.seat_no) IN
             <foreach collection="list" item="item" open="(" close=")" separator=",">
                 (
                     #{item.trainId},
                     #{item.seatType},
                     #{item.carriageNumber},
-                    #{item.seatNo},
-                    #{item.departureCode},
-                    #{item.arrivalCode}
+                    #{item.seatNo}
                 )
             </foreach>
-            AND tss_a.sequence &lt; tss_b.sequence
-        </where>
     </select>
 </mapper>

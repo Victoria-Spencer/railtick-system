@@ -45,7 +45,7 @@ public interface OrderMapper {
      * @param preOrderId
      * @return
      */
-    @Select("select id, seat_type, carriage_number, temp_seat_no from pre_order_details where pre_order_id = #{preOrderId}")
+    @Select("select id, pre_order_id, seat_type, carriage_number, temp_seat_no from pre_order_details where pre_order_id = #{preOrderId}")
     List<PreOrderDetails> getTempSeatInfoByPreOrderId(Long preOrderId);
 
     /**

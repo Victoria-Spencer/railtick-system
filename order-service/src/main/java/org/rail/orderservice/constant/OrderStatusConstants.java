@@ -10,15 +10,15 @@ public final class OrderStatusConstants {
     /**
      * 未完成
      */
-    private static final Integer UNFINISHED = 0;
+    public static final Integer UNFINISHED = 0;
 
     /**
      * 未出行
      */
-    private static final Integer UNTRAVELLED = 1;
+    public static final Integer UNTRAVELLED = 1;
 
     /**
      * 历史订单
      */
-    private static final Integer HISTORY = 2;
+    public static final Integer HISTORY = 2;
 }

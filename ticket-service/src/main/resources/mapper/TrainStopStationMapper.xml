@@ -30,4 +30,23 @@
             AND s_start.code = #{departureCode}
             AND s_end.code = #{arrivalCode}
     </select>
+
+    <select id="getSequenceInfo" resultType="cn.hutool.core.lang.Pair"
+            parameterType="org.rail.ticketservice.pojo.dto.SequenceQueryDTO">
+        SELECT
+            tss_a.sequence AS startSequence,
+            tss_b.sequence AS stopSequence
+        FROM train_stop_station tss_a
+        INNER JOIN train_stop_station tss_b
+            ON tss_a.train_id = tss_b.train_id
+        INNER JOIN station s_start
+            ON tss_a.station_id = s_start.id
+        INNER JOIN station s_end
+            ON tss_b.station_id = s_end.id
+        WHERE
+            tss_a.train_id = #{trainId}
+            AND tss_a.sequence &lt; tss_b.sequence
+            AND s_start.code = #{departureCode}
+            AND s_end.code = #{arrivalCode}
+    </select>
 </mapper>

@@ -27,7 +27,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 @Service
 public class TicketServiceImpl implements TicketService {
@@ -243,17 +242,23 @@ public class TicketServiceImpl implements TicketService {
         }
 
         // 2.新增操作
-        // 查询座位ID,开始站序，结束站序
+        // 查询开始站序，结束站序
+        SequenceQueryDTO sequenceQueryDTO = BeanUtil.copyProperties(insertDTOList.getFirst(), SequenceQueryDTO.class);
+        Pair<Integer, Integer> seqs = trainStopStationMapper.getSequenceInfo(sequenceQueryDTO);
+        // 查询座位ID
         List<SeatInfoQueryDTO> seatInfoQueryDTOList = BeanUtils.copyToList(insertDTOList, SeatInfoQueryDTO.class);
-        List<SeatIntervalBaseDTO> seatIntervalBaseDTOList = trainSeatMapper.batchQuerySIOBaseInfo(seatInfoQueryDTOList);
-        // 新增条件构建
-        List<SeatIntervalOccupy> seatIntervalOccupyList = BeanUtils.copyToList(seatIntervalBaseDTOList, SeatIntervalOccupy.class);
-        for (int i = 0; i < seatIntervalOccupyList.size(); i++) {
-            SeatIntervalOccupy seatIntervalOccupy = seatIntervalOccupyList.get(0);
-            SeatIntervalOccupyInsertDTO insertDTO = insertDTOList.get(0);
-            BeanUtils.copyProperties(insertDTO, seatIntervalOccupy);
+        List<Long> seatIdList = trainSeatMapper.getSeatIdByQueryDTO(seatInfoQueryDTOList);
 
-            // 设置创建时间和过期时间
+        // 新增条件构建
+        List<SeatIntervalOccupy> seatIntervalOccupyList = BeanUtils.copyToList(insertDTOList, SeatIntervalOccupy.class);
+        for (int i = 0; i < seatIntervalOccupyList.size(); i++) {
+            SeatIntervalOccupy seatIntervalOccupy = seatIntervalOccupyList.get(i);
+
+            // 设置其它属性
+            Long seatId = seatIdList.get(i);
+            seatIntervalOccupy.setSeatId(seatId);
+            seatIntervalOccupy.setStartSequence(seqs.getKey());
+            seatIntervalOccupy.setEndSequence(seqs.getValue());
             seatIntervalOccupy.setCreateTime(LocalDateTime.now());
             seatIntervalOccupy.setExpireTime(calculateExpireTime());
         }
@@ -282,7 +287,7 @@ public class TicketServiceImpl implements TicketService {
 
         for (int i = 0; i < intervalOccupyDTOList.size(); i++) {
             IntervalOccupyDTO intervalOccupyDTO = intervalOccupyDTOList.get(i);
-            List<Pair<Integer, Integer>> intervalList = intervalOccupyDTO.getIntervalList();
+            List<SequenceDTO> intervalList = intervalOccupyDTO.getIntervalList();
 
             Integer seatStatus = getSeatStatus(intervalList, trainId);
 
@@ -297,7 +302,7 @@ public class TicketServiceImpl implements TicketService {
      * @param trainId
      * @return
      */
-    private Integer getSeatStatus(List<Pair<Integer, Integer>> intervalList, Long trainId) {
+    private Integer getSeatStatus(List<SequenceDTO> intervalList, Long trainId) {
         // 无占用
         if(intervalList == null || intervalList.isEmpty()) {
             // 无占用
@@ -308,15 +313,15 @@ public class TicketServiceImpl implements TicketService {
         Integer beginSeq = 1;
         Integer terminalSeq = trainStopStationMapper.getTerminalSequence(trainId);
         // 开始站序不是起点站序或最后站序不是终点站序，则部分占用
-        if(intervalList.getFirst().getKey() != beginSeq || intervalList.getLast().getKey() != terminalSeq) {
+        if(intervalList.getFirst().getStartSequence() != beginSeq || intervalList.getLast().getEndSequence() != terminalSeq) {
             return SeatStatusConstants.PARTIALLY_OCCUPIED;
         }
 
         // 其余为部分或全部占用
         Integer preArrSeq = 1;
-        for (Pair<Integer, Integer> pair : intervalList) {
-            Integer depSeq = pair.getKey();
-            Integer arrSeq = pair.getValue();
+        for (SequenceDTO interval : intervalList) {
+            Integer depSeq = interval.getStartSequence();
+            Integer arrSeq = interval.getEndSequence();
 
             if(arrSeq > preArrSeq) {
                 return SeatStatusConstants.PARTIALLY_OCCUPIED;

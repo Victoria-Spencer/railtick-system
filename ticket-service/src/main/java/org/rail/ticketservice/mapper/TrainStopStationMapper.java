@@ -1,8 +1,10 @@
 package org.rail.ticketservice.mapper;
 
+import cn.hutool.core.lang.Pair;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Select;
 import org.rail.ticketservice.pojo.dto.PlannedTicketQueryDTO;
+import org.rail.ticketservice.pojo.dto.SequenceQueryDTO;
 import org.rail.ticketservice.pojo.dto.StopInfoDTO;
 
 import java.util.List;
@@ -52,4 +54,11 @@ public interface TrainStopStationMapper {
      */
     @Select("select max(sequence) from train_stop_station where train_id = #{trainId}")
     Integer getTerminalSequence(Long trainId);
+
+    /**
+     * 查询出发站站序和到达站站序
+     * @param sequenceQueryDTO
+     * @return
+     */
+    Pair<Integer, Integer> getSequenceInfo(SequenceQueryDTO sequenceQueryDTO);
 }

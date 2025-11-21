@@ -13,8 +13,4 @@ public class SeatInfoQueryDTO {
     private String carriageNumber;
     // 座位号
     private String seatNo;
-    // 出发站编码
-    private String departureCode;
-    // 到达站编码
-    private String arrivalCode;
 }

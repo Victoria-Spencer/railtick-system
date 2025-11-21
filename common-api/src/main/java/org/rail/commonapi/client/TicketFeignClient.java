@@ -2,6 +2,7 @@ package org.rail.commonapi.client;
 
 import org.rail.commonapi.dto.AvailableSeatDTO;
 import org.rail.commonapi.dto.RandomSeatQueryDTO;
+import org.rail.commonapi.dto.SeatIntervalOccupyDTO;
 import org.rail.commonapi.dto.UpdateSeatStatusDTO;
 import org.rail.commonapi.fallback.TicketFeignFallback;
 import org.rail.commonservice.result.Result;
@@ -25,9 +26,9 @@ public interface TicketFeignClient {
     Result<List<AvailableSeatDTO>> getAvailableSeats(@RequestBody RandomSeatQueryDTO randomSeatQueryDTO);
 
     /**
-     * 批量更新座位状态
-     * @param updateSeatStatusDTOList
+     * 修改占用区间，并同步新的座位状态
+     * @param sioDTO
      */
     @PutMapping("/api/ticket-service/ticket/seat-status/update")
-    Result updateSeatStatus(@RequestBody List<UpdateSeatStatusDTO> updateSeatStatusDTOList);
+    public Result updateSeatStatus(@RequestBody SeatIntervalOccupyDTO sioDTO);
 }
