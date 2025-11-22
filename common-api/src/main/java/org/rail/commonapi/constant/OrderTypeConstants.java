@@ -1,4 +1,4 @@
-package org.rail.orderservice.constant;
+package org.rail.commonapi.constant;
 
 /**
  * 订单类型常量类

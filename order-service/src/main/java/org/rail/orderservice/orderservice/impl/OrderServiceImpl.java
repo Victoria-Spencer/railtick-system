@@ -2,20 +2,18 @@ package org.rail.orderservice.orderservice.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.bean.copier.CopyOptions;
-import cn.hutool.core.lang.Pair;
 import com.github.pagehelper.PageHelper;
 import org.rail.commonapi.client.TicketFeignClient;
 import org.rail.commonapi.client.UserFeignClient;
+import org.rail.commonapi.constant.OrderTypeConstants;
 import org.rail.commonapi.dto.*;
 import org.rail.commonservice.exception.BusinessException;
 import org.rail.commonservice.exception.OpenFeignException;
 import org.rail.commonservice.exception.OrderNotFoundException;
 import org.rail.commonservice.result.PageResult;
 import org.rail.commonservice.result.Result;
-import org.rail.orderservice.constant.OrderStatusConstants;
-import org.rail.orderservice.constant.OrderTypeConstants;
 import org.rail.orderservice.constant.PreOrderStatusConstants;
-import org.rail.orderservice.constant.SeatIntervalStatusConstants;
+import org.rail.commonapi.constant.SeatIntervalStatusConstants;
 import org.rail.orderservice.mapper.OrderMapper;
 import org.rail.orderservice.orderservice.OrderService;
 import org.rail.orderservice.pojo.dto.*;
@@ -212,56 +210,83 @@ public class OrderServiceImpl implements OrderService {
                         }})
                 );
 
-        // 3.拷贝前端传递过来的字段
-        orderDetailsList.stream()
-                .forEach(orderDetails ->
-                        BeanUtil.copyProperties(createOrderDTO, orderDetails)
-                );
+        // 3.遍历orderDetails,拷贝属性并设置外键
+        for (OrderDetails orderDetails : orderDetailsList) {
+            BeanUtil.copyProperties(createOrderDTO, orderDetails);
+            // 设置外键
+            orderDetails.setOrderId(order.getId());
+        }
 
+        // 构建远程调用的条件
+        SeatIntervalOccupyDTO sioDTO = new SeatIntervalOccupyDTO();
 
         // 4.判断座位是否为空，若为空，则随机分配
         String seatNo = orderDetailsList.get(0).getSeatNo();
         if (seatNo == null) {
-            Map<Integer, List<Pair<String, String>>> seatTypeToSeatsMap = getSeatTypeToSeatsMap(order, orderDetailsList);
+            Map<Integer, List<SeatDTO>> seatTypeToSeatsMap = getSeatTypeToSeatsMap(order, orderDetailsList);
 
             // 遍历orderDetailsList，为每个乘客添加座位信息
             for (OrderDetails orderDetails : orderDetailsList) {
-                List<Pair<String, String>> pairs = seatTypeToSeatsMap.get(orderDetails.getSeatType());
-                Pair<String, String> first = pairs.getFirst();
-                String carriageNumber = first.getKey();
-                String currentSeatNo = first.getValue();
+                List<SeatDTO> pairs = seatTypeToSeatsMap.get(orderDetails.getSeatType());
+
+                if (pairs == null) {
+                    throw new BusinessException("无可分配座位");
+                }
+                SeatDTO first = pairs.getFirst();
+                String carriageNumber = first.getCarriageNumber();
+                String currentSeatNo = first.getSeatNo();
                 orderDetails.setCarriageNumber(carriageNumber);
                 orderDetails.setSeatNo(currentSeatNo);
                 pairs.remove(first);
             }
+            // 座位占用区间，【新增占用记录】
+            List<SeatIntervalOccupyInsertDTO> insertDTOList = BeanUtil.copyToList(orderDetailsList, SeatIntervalOccupyInsertDTO.class);
+            for (SeatIntervalOccupyInsertDTO insertDTO : insertDTOList) {
+                insertDTO.setTrainId(order.getTrainId());
+                // 订单类型为订单
+                insertDTO.setOrderType(OrderTypeConstants.ORDER);
+                // 座位区间状态锁定中
+                insertDTO.setStatus(SeatIntervalStatusConstants.LOCKED);
+            }
+            sioDTO.setInsertDTOList(insertDTOList);
+        } else {
+            // 预订单修改占用状态为已释放
+            List<SeatIntervalOccupyUpdateDTO> updateDTOList = BeanUtil.copyToList(
+                    preOrderDetailsList,
+                    SeatIntervalOccupyUpdateDTO.class,
+                    CopyOptions
+                            .create()
+                            .setFieldMapping(new HashMap<>(){{
+                                put("tempSeatNo", "seatNo");
+                                put("preOrderId", "orderId");
+                            }})
+            );
+            for (SeatIntervalOccupyUpdateDTO updateDTO : updateDTOList) {
+                updateDTO.setTrainId(preOrder.getTrainId());
+                updateDTO.setOrderType(OrderTypeConstants.PREORDER);
+                updateDTO.setStatus(SeatIntervalStatusConstants.RELEASED);
+            }
+            sioDTO.setUpdateDTOList(updateDTOList);
+
+
+            // 订单新生成占用区间
+            List<SeatIntervalOccupyInsertDTO> insertDTOList = BeanUtil.copyToList(orderDetailsList, SeatIntervalOccupyInsertDTO.class);
+            for (SeatIntervalOccupyInsertDTO insertDTO : insertDTOList) {
+                insertDTO.setTrainId(order.getTrainId());
+                insertDTO.setOrderType(OrderTypeConstants.ORDER);
+                insertDTO.setStatus(SeatIntervalStatusConstants.LOCKED);
+            }
+            sioDTO.setInsertDTOList(insertDTOList);
         }
 
-        // 5.遍历orderDetails,拷贝属性
-        for (OrderDetails orderDetails : orderDetailsList) {
-            // 设置外键
-            orderDetails.setOrderId(order.getId());
-
-            // 分配座位
-            orderDetails.setSeatNo(orderDetails.getSeatNo());
-        }
         orderMapper.batchInsertOrderDetails(orderDetailsList);
-
         // 标记预订单为已转为正式订单
         markPreOrderStatus2(preOrderId);
 
-        // 构建远程调用的条件，【新增占用记录】
-        SeatIntervalOccupyDTO sioDTO = new SeatIntervalOccupyDTO();
-        List<SeatIntervalOccupyInsertDTO> insertDTOList = BeanUtil.copyToList(orderDetailsList, SeatIntervalOccupyInsertDTO.class);
-        for (SeatIntervalOccupyInsertDTO insertDTO : insertDTOList) {
-            insertDTO.setTrainId(order.getTrainId());
-            // 订单类型为订单
-            insertDTO.setOrderType(OrderTypeConstants.ORDER);
-            // 座位区间状态锁定中
-            insertDTO.setStatus(SeatIntervalStatusConstants.LOCKED);
+        // 远程调用，修改区间和更新座位的状态
+        if (sioDTO != null && !sioDTO.isEmpty()) {
+            ticketFeignClient.updateSeatStatus(sioDTO);
         }
-        sioDTO.setInsertDTOList(insertDTOList);
-        // 远程调用，新增区间和更新座位的状态
-        ticketFeignClient.updateSeatStatus(sioDTO);
 
 
         /**        封装数据,返回        **/
@@ -275,7 +300,7 @@ public class OrderServiceImpl implements OrderService {
         return createOrderVO;
     }
 
-    private Map<Integer, List<Pair<String, String>>> getSeatTypeToSeatsMap(Order order, List<OrderDetails> orderDetailsList) {
+    private Map<Integer, List<SeatDTO>> getSeatTypeToSeatsMap(Order order, List<OrderDetails> orderDetailsList) {
         // 远程调用，判断是否还有空座位（车厢号，座位号），若有则返回
         // 列车ID, 席别类型，出发站点编码，到达站点编码
         RandomSeatQueryDTO randomSeatQueryDTO = new RandomSeatQueryDTO();
@@ -300,7 +325,7 @@ public class OrderServiceImpl implements OrderService {
         }
 
         // 核心：构建席别类型与（车厢号，座位号）列表的映射Map
-        Map<Integer, List<Pair<String, String>>> seatTypeToSeatsMap = new HashMap<>();
+        Map<Integer, List<SeatDTO>> seatTypeToSeatsMap = new HashMap<>();
 
         for (AvailableSeatDTO seatDTO : availableSeatDTOList) {
             // 从可用座位DTO中获取席别类型
@@ -311,7 +336,7 @@ public class OrderServiceImpl implements OrderService {
 
             // 为当前席别类型初始化列表（若不存在则创建），并添加座位信息
             seatTypeToSeatsMap.computeIfAbsent(seatType, k -> new ArrayList<>())
-                    .add(new Pair<>(carriageNumber, currentSeatNo));
+                    .add(new SeatDTO(carriageNumber, currentSeatNo));
         }
         return seatTypeToSeatsMap;
     }

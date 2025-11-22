@@ -1,9 +1,9 @@
 package org.rail.ticketservice.mapper;
 
-import cn.hutool.core.lang.Pair;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Select;
 import org.rail.ticketservice.pojo.dto.PlannedTicketQueryDTO;
+import org.rail.ticketservice.pojo.dto.SequenceDTO;
 import org.rail.ticketservice.pojo.dto.SequenceQueryDTO;
 import org.rail.ticketservice.pojo.dto.StopInfoDTO;
 
@@ -60,5 +60,5 @@ public interface TrainStopStationMapper {
      * @param sequenceQueryDTO
      * @return
      */
-    Pair<Integer, Integer> getSequenceInfo(SequenceQueryDTO sequenceQueryDTO);
+    SequenceDTO getSequenceInfo(SequenceQueryDTO sequenceQueryDTO);
 }

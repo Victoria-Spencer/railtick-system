@@ -1,4 +1,4 @@
-package org.rail.orderservice.constant;
+package org.rail.commonapi.constant;
 
 /**
  * 车票类型

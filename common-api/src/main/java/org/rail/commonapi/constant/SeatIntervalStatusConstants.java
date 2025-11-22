@@ -1,4 +1,4 @@
-package org.rail.orderservice.constant;
+package org.rail.commonapi.constant;
 
 /**
  * 座位区间占用常量类

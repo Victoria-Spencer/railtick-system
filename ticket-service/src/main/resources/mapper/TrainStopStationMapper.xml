@@ -31,11 +31,11 @@
             AND s_end.code = #{arrivalCode}
     </select>
 
-    <select id="getSequenceInfo" resultType="cn.hutool.core.lang.Pair"
+    <select id="getSequenceInfo" resultType="org.rail.ticketservice.pojo.dto.SequenceDTO"
             parameterType="org.rail.ticketservice.pojo.dto.SequenceQueryDTO">
         SELECT
             tss_a.sequence AS startSequence,
-            tss_b.sequence AS stopSequence
+            tss_b.sequence AS endSequence
         FROM train_stop_station tss_a
         INNER JOIN train_stop_station tss_b
             ON tss_a.train_id = tss_b.train_id

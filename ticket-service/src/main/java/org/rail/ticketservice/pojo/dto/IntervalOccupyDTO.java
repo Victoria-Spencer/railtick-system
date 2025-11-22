@@ -1,6 +1,5 @@
 package org.rail.ticketservice.pojo.dto;
 
-import cn.hutool.core.lang.Pair;
 import lombok.Data;
 
 import java.util.List;

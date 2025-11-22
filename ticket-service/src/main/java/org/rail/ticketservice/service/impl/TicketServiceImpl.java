@@ -2,8 +2,8 @@ package org.rail.ticketservice.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.bean.copier.CopyOptions;
-import cn.hutool.core.lang.Pair;
 import com.alibaba.nacos.common.utils.CollectionUtils;
+import org.rail.commonapi.constant.OrderTypeConstants;
 import org.rail.commonapi.dto.*;
 import org.rail.commonservice.exception.BusinessException;
 import org.rail.commonservice.utils.BeanUtils;
@@ -236,15 +236,20 @@ public class TicketServiceImpl implements TicketService {
 
     private void operateSeatIntervalOccupy(List<SeatIntervalOccupyInsertDTO> insertDTOList, List<SeatIntervalOccupyUpdateDTO> updateDTOList) {
         // 1 先执行更新操作，避免一同修改新增的数据
-        List<SeatIntervalOccupyModifyDTO> occupyModifyDTOS = BeanUtils.copyToList(updateDTOList, SeatIntervalOccupyModifyDTO.class);
-        if (CollectionUtils.isNotEmpty(occupyModifyDTOS)) {
-            seatIntervalOccupyMapper.batchUpdateSIOOccupyRecodes(occupyModifyDTOS);
+        if (updateDTOList != null && !updateDTOList.isEmpty()) {
+            List<SeatIntervalOccupyModifyDTO> occupyModifyDTOS = BeanUtils.copyToList(updateDTOList, SeatIntervalOccupyModifyDTO.class);
+            if (CollectionUtils.isNotEmpty(occupyModifyDTOS)) {
+                seatIntervalOccupyMapper.batchUpdateSIOOccupyRecodes(occupyModifyDTOS);
+            }
         }
 
         // 2.新增操作
+        if (insertDTOList == null || insertDTOList.isEmpty()) {
+            return;
+        }
         // 查询开始站序，结束站序
         SequenceQueryDTO sequenceQueryDTO = BeanUtil.copyProperties(insertDTOList.getFirst(), SequenceQueryDTO.class);
-        Pair<Integer, Integer> seqs = trainStopStationMapper.getSequenceInfo(sequenceQueryDTO);
+        SequenceDTO seqs = trainStopStationMapper.getSequenceInfo(sequenceQueryDTO);
         // 查询座位ID
         List<SeatInfoQueryDTO> seatInfoQueryDTOList = BeanUtils.copyToList(insertDTOList, SeatInfoQueryDTO.class);
         List<Long> seatIdList = trainSeatMapper.getSeatIdByQueryDTO(seatInfoQueryDTOList);
@@ -257,10 +262,12 @@ public class TicketServiceImpl implements TicketService {
             // 设置其它属性
             Long seatId = seatIdList.get(i);
             seatIntervalOccupy.setSeatId(seatId);
-            seatIntervalOccupy.setStartSequence(seqs.getKey());
-            seatIntervalOccupy.setEndSequence(seqs.getValue());
+            seatIntervalOccupy.setStartSequence(seqs.getStartSequence());
+            seatIntervalOccupy.setEndSequence(seqs.getEndSequence());
             seatIntervalOccupy.setCreateTime(LocalDateTime.now());
-            seatIntervalOccupy.setExpireTime(calculateExpireTime());
+            if (seatIntervalOccupy.getOrderType() == OrderTypeConstants.PREORDER) {
+                seatIntervalOccupy.setExpireTime(calculateExpireTime());
+            }
         }
         if (CollectionUtils.isNotEmpty(seatIntervalOccupyList)) {
             seatIntervalOccupyMapper.batchInsertSIOOccupyRecords(seatIntervalOccupyList);
