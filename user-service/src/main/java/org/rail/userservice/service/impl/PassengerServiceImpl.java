@@ -5,7 +5,7 @@ import com.github.pagehelper.PageHelper;
 import lombok.val;
 import org.rail.commonservice.result.PageResult;
 import org.rail.commonservice.utils.ThreadLocalUtils;
-import org.rail.userservice.constant.VerifyStatus;
+import org.rail.userservice.constant.VerifyStatusConstants;
 import org.rail.userservice.mapper.PassengerMapper;
 import org.rail.userservice.pojo.dto.PsgrPageQueryDTO;
 import org.rail.userservice.pojo.dto.PsgrUpdateDTO;
@@ -35,7 +35,7 @@ public class PassengerServiceImpl implements PassengerService {
         // 2. 执行查询（PageHelper会自动拦截该查询，拼接LIMIT分页）
         List<Passenger> userList = passengerMapper.query(psgrPageQueryDTO);
 
-        psgrPageQueryDTO.setVerifyStatus(VerifyStatus.UNREVIEWED);
+        psgrPageQueryDTO.setVerifyStatus(VerifyStatusConstants.UNREVIEWED);
 
         // 封装成PageResult返回
         return new PageResult<>(userList);
@@ -69,7 +69,7 @@ public class PassengerServiceImpl implements PassengerService {
         passenger.setUserId(userId);
 
         // 设置审核状态
-        passenger.setVerifyStatus(VerifyStatus.UNREVIEWED);
+        passenger.setVerifyStatus(VerifyStatusConstants.UNREVIEWED);
 
         // 设置变动时间
         passenger.setCreateTime(LocalDateTime.now());

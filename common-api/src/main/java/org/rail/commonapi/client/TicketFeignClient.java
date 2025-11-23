@@ -30,5 +30,5 @@ public interface TicketFeignClient {
      * @param sioDTO
      */
     @PutMapping("/api/ticket-service/ticket/seat-status/update")
-    public Result updateSeatStatus(@RequestBody SeatIntervalOccupyDTO sioDTO);
+    Result updateSeatStatus(@RequestBody SeatIntervalOccupyDTO sioDTO);
 }

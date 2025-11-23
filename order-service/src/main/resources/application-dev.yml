@@ -8,6 +8,9 @@ spring:
     password: root
 logging:
   level:
+    io.seata: DEBUG  # Seata核心日志
+    io.seata.rm: DEBUG  # 资源管理器（数据源代理）日志
+    io.seata.tm: DEBUG  # 事务管理器（@GlobalTransactional）日志
     org.rail.orderservice.mapper: DEBUG # sql语句打印
 order:
   pre:

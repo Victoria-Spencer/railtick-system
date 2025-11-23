@@ -4,7 +4,6 @@ package org.rail.userservice.pojo.entity;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.rail.userservice.constant.VerifyStatus;
 
 import java.time.LocalDateTime;
 

@@ -204,7 +204,6 @@ public class TicketServiceImpl implements TicketService {
      * 更新座位占用区间，并同步新的座位状态
      * @param sioDTO
      */
-    @Transactional
     public void updateSeatStatus(SeatIntervalOccupyDTO sioDTO) {
         List<SeatIntervalOccupyInsertDTO> insertDTOList = sioDTO.getInsertDTOList();
         List<SeatIntervalOccupyUpdateDTO> updateDTOList = sioDTO.getUpdateDTOList();

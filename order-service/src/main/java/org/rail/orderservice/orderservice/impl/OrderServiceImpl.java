@@ -3,6 +3,7 @@ package org.rail.orderservice.orderservice.impl;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.bean.copier.CopyOptions;
 import com.github.pagehelper.PageHelper;
+import io.seata.spring.annotation.GlobalTransactional;
 import org.rail.commonapi.client.TicketFeignClient;
 import org.rail.commonapi.client.UserFeignClient;
 import org.rail.commonapi.constant.OrderTypeConstants;
@@ -63,7 +64,7 @@ public class OrderServiceImpl implements OrderService {
      * @return
      */
     // 全局事务
-    @Transactional
+    @GlobalTransactional
     public String createPreOrder(CreatePreOrderDTO createPreOrderDTO) {
         // 1.根据用户ID和列车ID，查询是否已存在预订单
         PreOrder preOrder = orderMapper.getByPreOrderUserIdAndTrainId(createPreOrderDTO.getUserId(), createPreOrderDTO.getTrainId());
@@ -174,8 +175,8 @@ public class OrderServiceImpl implements OrderService {
      * @param createOrderDTO
      * @return
      */
-    // TODO 全局事务
-    @Transactional
+    // 全局事务
+    @GlobalTransactional
     public CreateOrderVO createOrder(CreateOrderDTO createOrderDTO) {
         /**       插入订单数据        **/
         // 1. 查询预订单数据
@@ -359,6 +360,7 @@ public class OrderServiceImpl implements OrderService {
      * @param frontSelfTicketPageDTO
      * @return
      */
+    @GlobalTransactional
     public PageResult<SelfTicketPageVO> selfTicketPageQuery(FrontSelfTicketPageDTO frontSelfTicketPageDTO) {
         // 远程调用user-service，根据userId查询idType和idCard，UserIdCardDTO
         Result<UserIdCardDTO> userIdCardDTOResult = userFeignClient.getIdCardInfo(frontSelfTicketPageDTO.getUserId());
