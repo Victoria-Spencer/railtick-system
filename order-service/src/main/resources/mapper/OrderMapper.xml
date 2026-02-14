@@ -55,30 +55,30 @@
         where id = #{id}
     </update>
 
-    <update id="updatePreOrderDetailsList">
+    <!--<update id="updatePreOrderDetailsList">
         UPDATE pre_order_details
         <set>
-            <!-- 更新车厢号 carriage_number -->
+            &lt;!&ndash; 更新车厢号 carriage_number &ndash;&gt;
             carriage_number = CASE id
             <foreach collection="list" item="detail">
                 WHEN #{detail.id} THEN #{detail.carriageNumber}
             </foreach>
-            ELSE carriage_number  <!-- 不匹配的记录保持原值 -->
+            ELSE carriage_number  &lt;!&ndash; 不匹配的记录保持原值 &ndash;&gt;
             END,
-            <!-- 更新临时座位号 temp_seat_no -->
+            &lt;!&ndash; 更新临时座位号 temp_seat_no &ndash;&gt;
             temp_seat_no = CASE id
             <foreach collection="list" item="detail">
                 WHEN #{detail.id} THEN #{detail.tempSeatNo}
             </foreach>
-            ELSE temp_seat_no  <!-- 不匹配的记录保持原值 -->
+            ELSE temp_seat_no  &lt;!&ndash; 不匹配的记录保持原值 &ndash;&gt;
             END
         </set>
-        <!-- 只更新list中包含的id，避免全表扫描 -->
+        &lt;!&ndash; 只更新list中包含的id，避免全表扫描 &ndash;&gt;
         WHERE id IN
         <foreach collection="list" item="detail" open="(" separator="," close=")">
             #{detail.id}
         </foreach>
-    </update>
+    </update>-->
 
     <insert id="insertOrder" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
         INSERT INTO

@@ -1,9 +1,7 @@
 package org.rail.orderservice.mapper;
 
-import org.apache.ibatis.annotations.Mapper;
-import org.apache.ibatis.annotations.Param;
-import org.apache.ibatis.annotations.Select;
-import org.apache.ibatis.annotations.Update;
+import lombok.Data;
+import org.apache.ibatis.annotations.*;
 import org.rail.orderservice.pojo.dto.OrderPageQueryDTO;
 import org.rail.orderservice.pojo.dto.SelfTicketPageDTO;
 import org.rail.orderservice.pojo.entity.Order;
@@ -58,7 +56,7 @@ public interface OrderMapper {
      * 批量更新预订单明细
      * @param preOrderDetailsList
      */
-    void updatePreOrderDetailsList(List<PreOrderDetails> preOrderDetailsList);
+//    void updatePreOrderDetailsList(List<PreOrderDetails> preOrderDetailsList);
 
     /**
      * 查询预订单数据
@@ -112,4 +110,11 @@ public interface OrderMapper {
      */
     @Update("update `order` set status = 2 where order_sn = #{orderSn}")
     void updateOrderByOrderSn(String orderSn);
+
+    /**
+     * 根据预订单id删除预订单明细
+     * @param id
+     */
+    @Delete("delete from pre_order_details where pre_order_id = #{id}")
+    void deletePreOrderDetailsByPreOrderId(Long id);
 }
