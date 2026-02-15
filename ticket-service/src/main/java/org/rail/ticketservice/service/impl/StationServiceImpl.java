@@ -3,38 +3,120 @@ package org.rail.ticketservice.service.impl;
 import cn.hutool.core.convert.Convert;
 import cn.hutool.json.JSONUtil;
 import com.github.pagehelper.PageHelper;
+import lombok.extern.slf4j.Slf4j;
 import lombok.val;
+import org.rail.commonservice.constant.RedisConstants;
+import org.rail.commonservice.pageQuery.PageQuery;
 import org.rail.commonservice.result.PageResult;
+import org.rail.commonservice.utils.CacheClient;
 import org.rail.ticketservice.mapper.StationMapper;
 import org.rail.ticketservice.pojo.dto.StationPageQueryDTO;
+import org.rail.ticketservice.pojo.entity.Station;
 import org.rail.ticketservice.pojo.vo.StationPageQueryVO;
 import org.rail.ticketservice.pojo.vo.TrainStopStationVO;
 import org.rail.ticketservice.service.StationService;
+import org.rail.ticketservice.task.StationLocalCacheManager;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
+import static org.rail.commonservice.constant.RedisConstants.RAIL_STATION_KEYWORD_PREFIX;
+import static org.rail.commonservice.constant.RedisConstants.RAIL_STATION_TYPE_PREFIX;
+
+@Slf4j
 @Service
 public class StationServiceImpl implements StationService {
 
     @Autowired
     private StationMapper stationMapper;
+    @Autowired
+    private StationLocalCacheManager stationLocalCacheManager;
 
     /**
      * 根据查询类型或名称分页查询站点列表
-     * @param stationPageQueryDTO
+     * @param dto
      * @return
      */
-    public PageResult<StationPageQueryVO> pageQueryStations(StationPageQueryDTO stationPageQueryDTO) {
-        // 开始分页
-        PageHelper.startPage(stationPageQueryDTO.getPageNumber(), stationPageQueryDTO.getPageSize());
+    public PageResult<StationPageQueryVO> pageQueryStations(StationPageQueryDTO dto) {
+        /*// 开始分页
+        PageHelper.startPage(dto.getPageNumber(), dto.getPageSize());
         // 查询站点列表
-        List<StationPageQueryVO> list = stationMapper.pageQuery(stationPageQueryDTO);
-        return new PageResult<>(list);
+        List<StationPageQueryVO> list = stationMapper.pageQuery(dto);
+        return new PageResult<>(list);*/
+
+        // 1. 从本地缓存获取全量站点数据
+        List<Station> allStations = stationLocalCacheManager.getAllStations();
+        if (allStations.isEmpty()) {
+            log.warn("站点本地缓存为空，返回空结果");
+            return null;
+        }
+
+        // 2. 内存中模糊过滤（名称/拼音包含关键词）
+        Integer queryType = dto.getQueryType();
+        String keyword = dto.getKeyword();
+        List<Station> filteredStations = new ArrayList<>();
+        if (queryType != null) {
+            filteredStations = allStations.stream()
+                    .filter(station -> filterStationByQueryType(station, queryType))
+                    .collect(Collectors.toList());
+        } else {
+            filteredStations = allStations.stream()
+                    .filter(station -> filterStationByKeyword(station, keyword))
+                    .collect(Collectors.toList());
+        }
+        long total = filteredStations.size();
+
+        // 3. 内存中分页
+        List<Station> pageData = pageStationData(filteredStations, dto.getPageNumber(), dto.getPageSize());
+
+        // 4. 转换为VO返回
+        List<StationPageQueryVO> voList = pageData.stream()
+                .map(station -> new StationPageQueryVO(station.getName(), station.getCode(), station.getSpell()))
+                .collect(Collectors.toList());
+
+        return new PageResult<>(total, voList, dto.getPageSize());
+      }
+
+    /**
+     * 按queryType分组过滤
+     */
+    private boolean filterStationByQueryType(Station station, Integer queryType) {
+        return station.getQueryType() != null && station.getQueryType().equals(queryType);
+    }
+
+    /**
+     * 按keyword模糊匹配（名称/拼音包含关键词，忽略大小写）
+     */
+    private boolean filterStationByKeyword(Station station, String keyword) {
+        // 无关键词：返回所有
+        if (!StringUtils.hasText(keyword)) {
+            return true;
+        }
+        // 关键词匹配名称或拼音（忽略大小写）
+        String lowerKeyword = keyword.toLowerCase();
+        return station.getName().toLowerCase().contains(lowerKeyword)
+                || station.getSpell().toLowerCase().contains(lowerKeyword);
+    }
+
+    /**
+     * 内存分页逻辑（避免下标越界）
+     */
+    private List<Station> pageStationData(List<Station> data, int pageNum, int pageSize) {
+        int start = (pageNum - 1) * pageSize;
+        // 起始下标超过数据长度：返回空列表
+        if (start >= data.size()) {
+            return List.of();
+        }
+        int end = Math.min(start + pageSize, data.size());
+        return data.subList(start, end);
     }
 
     /**

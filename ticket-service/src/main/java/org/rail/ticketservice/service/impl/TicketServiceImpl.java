@@ -7,6 +7,7 @@ import org.rail.commonapi.constant.OrderTypeConstants;
 import org.rail.commonapi.dto.*;
 import org.rail.commonservice.exception.BusinessException;
 import org.rail.commonservice.utils.BeanUtils;
+import org.rail.commonservice.utils.CacheClient;
 import org.rail.ticketservice.constant.SeatStatusConstants;
 import org.rail.ticketservice.mapper.*;
 import org.rail.ticketservice.pojo.dto.*;
@@ -44,6 +45,8 @@ public class TicketServiceImpl implements TicketService {
     @Autowired
     private TrainSeatMapper trainSeatMapper;
     @Autowired SeatIntervalOccupyMapper seatIntervalOccupyMapper;
+    @Autowired
+    private CacheClient cacheClient;
 
     // 从配置文件注入预订单有效期（分钟）
     @Value("${order.pre.expire-minutes : 15}") // 默认15分钟
@@ -55,6 +58,7 @@ public class TicketServiceImpl implements TicketService {
      * @return
      */
     public List<TicketQueryVO> queryTicket(TicketQueryDTO ticketQueryDTO) {
+
         // 1.逻辑下沉到 SQL，用批量查询替代循环查询，直接通过一次数据库查询获取所有结果，MyBatis自动封装为List<TrainDetailVO>
         List<TrainDetailVO> trainDetailVOList = stationMapper.getTrainDetailsByDTO(ticketQueryDTO);
 
@@ -114,6 +118,7 @@ public class TicketServiceImpl implements TicketService {
 
             resultList.add(ticketQueryVO);
         }
+
         // 封装返回
         return resultList;
     }

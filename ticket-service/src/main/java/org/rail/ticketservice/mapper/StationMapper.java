@@ -4,6 +4,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Select;
 import org.rail.ticketservice.pojo.dto.StationPageQueryDTO;
 import org.rail.ticketservice.pojo.dto.TicketQueryDTO;
+import org.rail.ticketservice.pojo.entity.Station;
 import org.rail.ticketservice.pojo.vo.StationPageQueryVO;
 import org.rail.ticketservice.pojo.vo.TrainDetailVO;
 import org.rail.ticketservice.pojo.vo.TrainStopStationVO;
@@ -33,4 +34,11 @@ public interface StationMapper {
      * @return
      */
     List<TrainDetailVO> getTrainDetailsByDTO(TicketQueryDTO ticketQueryDTO);
+
+    /**
+     * 查询所有站点
+     * @return
+     */
+    @Select("select * from station")
+    List<Station> selectAllStations();
 }

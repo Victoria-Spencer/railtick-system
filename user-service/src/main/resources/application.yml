@@ -18,6 +18,21 @@ spring:
     username: ${spring.db.username}
     password: ${spring.db.password}
     driver-class-name: com.mysql.cj.jdbc.Driver
+  data:
+    redis:
+      # ========== 单节点核心配置（替换原cluster节点） ==========
+      host: 192.168.43.143  # Redis服务器IP
+      port: 6379             # Redis端口（默认6379）
+      #      password: ""           # Redis密码（无密码则留空/注释，可选）
+      database: 0            # 操作的数据库（默认0）
+      timeout: PT5S          # 连接/读写超时时间（3.5.5推荐ISO-8601格式）
+      client-name: redis-single-client  # 客户端名称
+      lettuce:
+        pool:
+          max-active: 16     # 最大连接数
+          max-idle: 8        # 最大空闲连接
+          min-idle: 4        # 最小空闲连接
+          max-wait: PT2S     # 连接获取超时时间
 seata:
   registry: # 注册中心的配置，微服务根据这些信息去注册中心获取TC服务地址
     type: nacos # 注册中心类型 nacos

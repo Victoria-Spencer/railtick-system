@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.io.Serializable;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -19,7 +20,7 @@ public class PageResult<T> implements Serializable {
     /**
      * 总条数
      */
-    private Long total;
+    private Long total = 0L;
 
     /**
      * 分页数据列表
@@ -29,10 +30,10 @@ public class PageResult<T> implements Serializable {
     /**
      * 总页数
      */
-    private Integer pages;
+    private Integer pages = 0;
 
     /**
-     * 构造方法：自动计算总页数
+     * 构造方法：自动计算总页数（适配PageHelper的Page类型）
      */
     public PageResult(List<T> list) {
         if(list instanceof Page) {
@@ -42,4 +43,19 @@ public class PageResult<T> implements Serializable {
             this.pages = page.getPages(); // 总页数
         }
     }
+
+    /**
+     * 构造方法2：适配内存分页/手动分页（核心：传入总条数+当前页数据，自动计算总页数）
+     * @param total 总条数
+     * @param records 当前页数据
+     * @param pageSize 每页条数（用于计算总页数）
+     */
+    public PageResult(Long total, List<T> records, Integer pageSize) {
+        // 处理空值，避免NPE
+        this.total = total == null ? 0L : total;
+        this.records = records == null ? Collections.emptyList() : records;
+        // 自动计算总页数（向上取整：比如总条数15，页大小10，总页数2）
+        this.pages = this.total == 0L ? 0 : (int) Math.ceil((double) this.total / pageSize);
+    }
+
 }

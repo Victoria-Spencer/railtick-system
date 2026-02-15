@@ -38,3 +38,9 @@ mybatis:
   mapper-locations: classpath:mapper/*.xml  # 扫描 resources/mapper 目录下的所有 XML 文件
   configuration:
     map-underscore-to-camel-case: true  # 开启下划线转驼峰
+# 站点缓存配置
+station:
+  cache:
+    # 定时任务开关（实例A设为true，其他实例设为false）
+    schedule:
+      enable: true

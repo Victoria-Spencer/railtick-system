@@ -1,0 +1,42 @@
+#spring:
+#  data:
+#    redis:
+#      cluster:
+#        nodes:
+#          - 192.168.43.143:6379
+##          - 192.168.43.143:6379
+##          - 192.168.43.143:6379
+##          - 192.168.43.143:6379
+##          - 192.168.43.143:6379
+##          - 192.168.43.143:6379
+#        max-redirects: 3
+#        read-from-replicas: true
+#      timeout: PT5S          # 连接/读写超时时间（3.5.5推荐ISO-8601格式，PT5S=5秒）
+#      client-name: redis-cluster-client  # 客户端名称（可选，便于Redis监控识别）
+#      lettuce:
+#        pool:
+#          max-active: 16     # 最大连接数
+#          max-idle: 8        # 最大空闲连接
+#          min-idle: 4        # 最小空闲连接
+#          max-wait: PT2S     # 连接获取超时时间
+#        cluster:
+#          refresh:
+#            adaptive: true   # 自适应刷新集群拓扑
+#            period: PT30S    # 定时刷新拓扑周期
+
+#spring:
+#  data:
+#    redis:
+#      # ========== 单节点核心配置（替换原cluster节点） ==========
+#      host: 192.168.43.143  # Redis服务器IP
+#      port: 6379             # Redis端口（默认6379）
+##      password: ""           # Redis密码（无密码则留空/注释，可选）
+#      database: 0            # 操作的数据库（默认0）
+#      timeout: PT5S          # 连接/读写超时时间（3.5.5推荐ISO-8601格式）
+#      client-name: redis-single-client  # 客户端名称
+#      lettuce:
+#        pool:
+#          max-active: 16     # 最大连接数
+#          max-idle: 8        # 最大空闲连接
+#          min-idle: 4        # 最小空闲连接
+#          max-wait: PT2S     # 连接获取超时时间
