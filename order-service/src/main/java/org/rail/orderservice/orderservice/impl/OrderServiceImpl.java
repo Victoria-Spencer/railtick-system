@@ -2,17 +2,21 @@ package org.rail.orderservice.orderservice.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.bean.copier.CopyOptions;
+import cn.hutool.core.lang.TypeReference;
 import com.github.pagehelper.PageHelper;
 import io.seata.spring.annotation.GlobalTransactional;
 import org.rail.commonapi.client.TicketFeignClient;
 import org.rail.commonapi.client.UserFeignClient;
 import org.rail.commonapi.constant.OrderTypeConstants;
 import org.rail.commonapi.dto.*;
+import org.rail.commonservice.constant.RedisConstants;
 import org.rail.commonservice.exception.BusinessException;
 import org.rail.commonservice.exception.OpenFeignException;
 import org.rail.commonservice.exception.OrderNotFoundException;
+import org.rail.commonservice.result.AggCacheResult;
 import org.rail.commonservice.result.PageResult;
 import org.rail.commonservice.result.Result;
+import org.rail.commonservice.utils.CacheClient;
 import org.rail.orderservice.constant.PreOrderStatusConstants;
 import org.rail.commonapi.constant.SeatIntervalStatusConstants;
 import org.rail.orderservice.mapper.OrderMapper;
@@ -33,11 +37,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 public class OrderServiceImpl implements OrderService {
@@ -51,6 +54,8 @@ public class OrderServiceImpl implements OrderService {
     private UserFeignClient userFeignClient;
     @Autowired
     private TicketFeignClient ticketFeignClient;
+    @Autowired
+    private CacheClient cacheClient;
 
     /**
      * 1.创建预订单，临时锁定座位
@@ -524,11 +529,68 @@ public class OrderServiceImpl implements OrderService {
      * @return
      */
     public PageResult<OrderPageQueryVO> orderPageQuery(OrderPageQueryDTO orderPageQueryDTO) {
-        // 分页查询
-        PageHelper.startPage(orderPageQueryDTO.getPageNumber(), orderPageQueryDTO.getPageSize());
-        List<OrderPageQueryVO> orderPageQueryVOList = orderMapper.getOrderPageByQueryDTO(orderPageQueryDTO);
+        String aggKey = buildOrderPageCacheKey(orderPageQueryDTO);
+        // 缓存订单分页查询信息
+        TypeReference<PageResult<OrderPageQueryVO>> typeRef = new TypeReference<PageResult<OrderPageQueryVO>>() {};
+        return cacheClient.queryAggCache(
+                aggKey,
+                typeRef,
+                // 缓存未命中时，查库
+                dto -> {
+                    // 分页必须放在dbFallback内部（PageHelper线程绑定）
+                    PageHelper.startPage(dto.getPageNumber(), dto.getPageSize());
+                    List<OrderPageQueryVO> orderPageQueryVOList = orderMapper.getOrderPageByQueryDTO(dto);
 
-        return new PageResult<>(orderPageQueryVOList);
+                    // 组装所有依赖的单表Key
+                    List<String> dependSingleKeys = new ArrayList<>();
+                    for (OrderPageQueryVO orderPageQueryVO : orderPageQueryVOList) {
+                        // orderKey
+                        String orderKey = RedisConstants.RAIL_ORDER_PREFIX + orderPageQueryVO.getOrderSn();
+                        dependSingleKeys.add(orderKey);
+
+                        // detailKeys
+                        List<OrderDetailsVO> detailsVOList = orderPageQueryVO.getOrderDetailsVOList();
+                        List<String> detailKeys = detailsVOList.stream()
+                                .map(detail -> RedisConstants.RAIL_ORDER_DETAILS_PREFIX + detail.getId())
+                                .toList();
+                        dependSingleKeys.addAll(detailKeys);
+                    }
+
+//                    return new PageResult<>(orderPageQueryVOList);
+                    return AggCacheResult.of(new PageResult<>(orderPageQueryVOList), dependSingleKeys);
+                },
+                orderPageQueryDTO,
+                RedisConstants.RAIL_DEFAULT_TTL,
+                TimeUnit.MINUTES
+        );
+        // 分页查询
+        /*PageHelper.startPage(orderPageQueryDTO.getPageNumber(), orderPageQueryDTO.getPageSize());
+        List<OrderPageQueryVO> orderPageQueryVOList = orderMapper.getOrderPageByQueryDTO(orderPageQueryDTO);
+        return new PageResult<>(orderPageQueryVOList);*/
+    }
+
+    /**
+     * 生成订单唯一的缓存Key
+     * @param dto
+     * @return
+     */
+    private String buildOrderPageCacheKey(OrderPageQueryDTO dto) {
+        String prefix = RedisConstants.RAIL_ORDER_PAGE_USER_PREFIX + dto.getUserId() + ":";
+
+        // 拼接所有非空的查询条件和分页参数
+        String conditions = Stream.of(
+                "orderStatus:" + Objects.toString(dto.getOrderStatus(), ""),
+                "orderType:" + Objects.toString(dto.getOrderType(), ""),
+                "startDate:" + Objects.toString(dto.getStartDate(), ""),
+                "endDate:" + Objects.toString(dto.getEndDate(), ""),
+                "orderSn:" + Objects.toString(dto.getOrderSn(), ""),
+                "trainNumber:" + Objects.toString(dto.getTrainNumber(), ""),
+                "realName:" + Objects.toString(dto.getRealName(), ""),
+                "page:" + dto.getPageNumber(),
+                "size:" + dto.getPageSize()
+        ).filter(s -> !s.endsWith(":")).collect(Collectors.joining(":"));
+
+        return prefix + conditions;
     }
 
     /**
@@ -538,6 +600,20 @@ public class OrderServiceImpl implements OrderService {
      */
     @GlobalTransactional
     public PageResult<SelfTicketPageVO> selfTicketPageQuery(FrontSelfTicketPageDTO frontSelfTicketPageDTO) {
+        TypeReference<PageResult<SelfTicketPageVO>> typeRef = new TypeReference<PageResult<SelfTicketPageVO>>() {};
+        return cacheClient.queryWithMutex(
+                    // 生成唯一缓存key
+                    dto -> buildSelfTicketCacheKey(frontSelfTicketPageDTO),
+                    frontSelfTicketPageDTO,
+                    typeRef,
+                    dto -> loadSelfTicketFromDb(frontSelfTicketPageDTO),
+                    RedisConstants.RAIL_DEFAULT_TTL,
+                    TimeUnit.MINUTES,
+                    3
+        );
+    }
+
+    private PageResult<SelfTicketPageVO> loadSelfTicketFromDb(FrontSelfTicketPageDTO frontSelfTicketPageDTO) {
         // 远程调用user-service，根据userId查询idType和idCard，UserIdCardDTO
         Result<UserIdCardDTO> userIdCardDTOResult = userFeignClient.getIdCardInfo(frontSelfTicketPageDTO.getUserId());
         if(!userIdCardDTOResult.isSuccess()) {
@@ -557,11 +633,42 @@ public class OrderServiceImpl implements OrderService {
     }
 
     /**
+     * 生成本人车票查询的唯一缓存Key
+     * 包含：身份证信息 + 车票状态 + 日期范围 + 车次 + 分页参数
+     */
+    private String buildSelfTicketCacheKey(FrontSelfTicketPageDTO dto) {
+        // 先远程获取idType和idCard，用于拼接Key（保证Key唯一性）
+        String idType = "";
+        String idCard = "";
+        Result<UserIdCardDTO> userIdCardDTOResult = userFeignClient.getIdCardInfo(dto.getUserId());
+        if (userIdCardDTOResult.isSuccess() && userIdCardDTOResult.getData() != null) {
+            idType = Objects.toString(userIdCardDTOResult.getData().getIdType(), "");
+            idCard = Objects.toString(userIdCardDTOResult.getData().getIdCard(), "");
+        }
+
+        // 拼接所有非空查询条件和分页参数
+        String conditions = Stream.of(
+                "idType:" + idType,
+                "idCard:" + idCard,
+                "ticketStatus:" + Objects.toString(dto.getTicketStatus(), ""),
+                "startDate:" + Objects.toString(dto.getStartDate(), ""),
+                "endDate:" + Objects.toString(dto.getEndDate(), ""),
+                "trainNumber:" + Objects.toString(dto.getTrainNumber(), ""),
+                "page:" + dto.getPageNumber(),
+                "size:" + dto.getPageSize()
+        ).filter(s -> !s.endsWith(":")).collect(Collectors.joining(":"));
+
+        return RedisConstants.RAIL_TICKET_SELF_PAGE_PREFIX + conditions;
+    }
+
+    /**
      * 取消车票订单
      * @param orderSn
      */
     public void cancelOrder(String orderSn) {
         orderMapper.updateOrderByOrderSn(orderSn);
+        // 自动清理订单及相关聚合key
+        cacheClient.autoClearAggCache(RedisConstants.RAIL_ORDER_PREFIX + orderSn);
     }
 
     /**

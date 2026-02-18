@@ -89,7 +89,10 @@
     </insert>
 
     <insert id="batchInsertOrderDetails"
-            parameterType="java.util.List">
+            parameterType="java.util.List"
+            useGeneratedKeys="true"
+            keyProperty="id"
+            keyColumn="id">
         INSERT INTO
             order_details(order_id, pre_order_detail_id, departure, arrival,
                             departure_code, arrival_code,riding_date, train_number,

@@ -35,8 +35,6 @@ public class PassengerServiceImpl implements PassengerService {
     private PassengerMapper passengerMapper;
     @Autowired
     private CacheClient cacheClient;
-    @Autowired
-    private StringRedisTemplate stringRedisTemplate;
 
     /**
      * 分页查询（管理员）
@@ -68,11 +66,11 @@ public class PassengerServiceImpl implements PassengerService {
         }
         // 缓存乘客信息
         TypeReference<List<Passenger>> typeRef = new TypeReference<List<Passenger>>() {};
-        return cacheClient.<List<Passenger>, Long>queryWithMutex(
+        return cacheClient.queryWithMutex(
                 RedisConstants.RAIL_PASSENGER_LIST_USER_PREFIX,
                 userId,
                 typeRef, // 直接传泛型类型
-                id -> passengerMapper.getByUserId(id),
+                id -> passengerMapper.getByUserId(id), // 缓存未命中时，查库
                 RedisConstants.RAIL_DEFAULT_TTL,
                 TimeUnit.MINUTES
         );
@@ -111,14 +109,17 @@ public class PassengerServiceImpl implements PassengerService {
      * 更新乘车人信息
      * @param psgrUpdateDTO
      */
-    @AutoClearAggCache(
+    /*@AutoClearAggCache(
             keySource = AutoClearAggCache.KeySource.THREAD_LOCAL,
             singleKeyPrefix = RedisConstants.RAIL_PASSENGER_LIST_USER_PREFIX
-    )
+    )*/
     public void update(PsgrUpdateDTO psgrUpdateDTO) {
         Passenger passenger = BeanUtil.copyProperties(psgrUpdateDTO, Passenger.class);
         passenger.setUpdateTime(LocalDateTime.now());
         passengerMapper.updateById(passenger);
+
+        String userId = ThreadLocalUtils.get();
+        cacheClient.autoClearAggCache(RedisConstants.RAIL_PASSENGER_LIST_USER_PREFIX + userId);
         /*// 删除缓存
         String userId = ThreadLocalUtils.get();
         stringRedisTemplate.delete(RedisConstants.RAIL_PASSENGER_LIST_USER_PREFIX + userId);*/
@@ -128,12 +129,15 @@ public class PassengerServiceImpl implements PassengerService {
      * 根据ids移除乘车人
      * @param ids
      */
-    @AutoClearAggCache(
+    /*@AutoClearAggCache(
             keySource = AutoClearAggCache.KeySource.THREAD_LOCAL,
             singleKeyPrefix = RedisConstants.RAIL_PASSENGER_LIST_USER_PREFIX
-    )
+    )*/
     public void deleteByIds(List<Long> ids) {
         passengerMapper.batchDelete(ids);
+
+        String userId = ThreadLocalUtils.get();
+        cacheClient.autoClearAggCache(RedisConstants.RAIL_PASSENGER_LIST_USER_PREFIX + userId);
         // 删除缓存
         /*String userId = ThreadLocalUtils.get();
         stringRedisTemplate.delete(RedisConstants.RAIL_PASSENGER_LIST_USER_PREFIX + userId);*/

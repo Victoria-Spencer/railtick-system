@@ -6,6 +6,7 @@ import cn.hutool.core.util.BooleanUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
 import lombok.extern.slf4j.Slf4j;
+import org.rail.commonservice.result.AggCacheResult;
 import org.rail.commonservice.result.RedisData;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -859,6 +860,77 @@ public class CacheClient {
         return data;
     }
 
+    // ========== 聚合缓存（优化版：自动从包装类提取依赖） ==========
+    /**
+     * 聚合缓存查询（优化版：从AggCacheResult提取依赖单表Key）
+     * @param aggKey 聚合缓存Key
+     * @param typeRef 聚合数据类型
+     * @param dbFallback DB查询回调（返回AggCacheResult，包含数据+依赖单表Key）
+     * @param dto 入参DTO
+     * @param time 缓存过期时间
+     * @param timeUnit 时间单位
+     * @return 聚合数据
+     */
+    public <D, DTO> D queryAggCache(
+            String aggKey,
+            TypeReference<D> typeRef,
+            Function<DTO, AggCacheResult<D>> dbFallback,
+            DTO dto,
+            Long time,
+            TimeUnit timeUnit
+    ) {
+        // 1. 入参校验
+        if (StrUtil.isBlank(aggKey)) {
+            throw new IllegalArgumentException("聚合缓存Key不能为空");
+        }
+        validateParams((d) -> aggKey, dto, dbFallback);
+
+        // 2. 查询聚合缓存
+        String json = stringRedisTemplate.opsForValue().get(aggKey);
+        if (StrUtil.isNotBlank(json)) {
+            try {
+                D data = JSONUtil.toBean(json, typeRef.getType(), false);
+                log.debug("聚合缓存策略-命中缓存，AggKey:{}", aggKey);
+                return data;
+            } catch (Exception e) {
+                log.error("聚合缓存反序列化失败，删除损坏缓存，AggKey:{}", aggKey, e);
+                stringRedisTemplate.delete(aggKey);
+            }
+        }
+
+        // 3. 空值缓存
+        if (json != null) {
+            log.debug("聚合缓存策略-命中空值缓存，AggKey:{}", aggKey);
+            return null;
+        }
+
+        // 4. 缓存未命中，查询数据库（获取包装类）
+        log.debug("聚合缓存策略-缓存未命中，查询数据库，AggKey:{}", aggKey);
+        // 包装类
+        AggCacheResult<D> aggResult = dbFallback.apply(dto);
+        D data = aggResult.getData();
+        List<String> dependSingleKeys = aggResult.getDependSingleKeys();
+
+        // 5. 数据库无数据，缓存空值
+        if (data == null) {
+            set(aggKey, "", CACHE_NULL_TTL, TimeUnit.MINUTES);
+            log.debug("聚合缓存策略-数据库无数据，缓存空值，AggKey:{}", aggKey);
+            return null;
+        }
+
+        // 6. 写入聚合缓存 + 自动记录依赖关系（从包装类提取）
+        set(aggKey, data, time, timeUnit);
+        if (CollectionUtil.isNotEmpty(dependSingleKeys)) {
+            for (String singleKey : dependSingleKeys) {
+                String depSetKey = buildDepSetKey(singleKey);
+                stringRedisTemplate.opsForSet().add(depSetKey, aggKey);
+                log.debug("聚合缓存策略-记录依赖关系，SingleKey:{}, AggKey:{}", singleKey, aggKey);
+            }
+        }
+
+        return data;
+    }
+
     /**
      * 自动清理聚合缓存（供切面调用）
      * 逻辑：删除单表缓存 → 读取dep Set删除聚合缓存 → 清空dep Set
@@ -880,7 +952,7 @@ public class CacheClient {
             Set<String> aggKeys = stringRedisTemplate.opsForSet().members(depSetKey);
 
             // 步骤3：批量删除聚合缓存 + 清空依赖Set
-            if (CollectionUtil.isNotEmpty(aggKeys)) {
+            if (aggKeys != null && CollectionUtil.isNotEmpty(aggKeys)) {
                 stringRedisTemplate.delete(aggKeys);
                 log.debug("清理聚合缓存-批量删除聚合Key，数量:{}, SingleKey:{}", aggKeys.size(), singleKey);
                 stringRedisTemplate.delete(depSetKey); // 清空dep Set，减少空间占用

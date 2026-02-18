@@ -28,8 +28,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import static org.rail.commonservice.constant.RedisConstants.RAIL_STATION_KEYWORD_PREFIX;
-import static org.rail.commonservice.constant.RedisConstants.RAIL_STATION_TYPE_PREFIX;
 
 @Slf4j
 @Service
