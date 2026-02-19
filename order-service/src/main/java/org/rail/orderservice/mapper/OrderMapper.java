@@ -102,7 +102,7 @@ public interface OrderMapper {
      * @param selfTicketPageDTO
      * @return
      */
-    List<SelfTicketPageVO> getSeltTicketPageByQueryDTO(SelfTicketPageDTO selfTicketPageDTO);
+    List<SelfTicketPageVO> getSelfTicketPageByQueryDTO(SelfTicketPageDTO selfTicketPageDTO);
 
     /**
      * 更新订单状态为已经取消

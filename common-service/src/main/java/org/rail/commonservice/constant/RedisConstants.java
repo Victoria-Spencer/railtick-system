@@ -13,10 +13,14 @@ public final class RedisConstants {
     public static final String RAIL_ORDER_PREFIX = "rail:order:";    //  + orderSn
     public static final String RAIL_ORDER_DETAILS_PREFIX = "rail:order:details:";
 
+    public static final String RAIL_SELF_TICKET_PREFIX = "rail:self-ticket:";
+
     // =============== 其它单表key（不唯一，查询条件动态变化） ================
+    public static final String RAIL_TICKET_SELF_PAGE_PREFIX = "rail:ticket:self:page:"; // 本人车票分页
+
     // =============== 多表key ================
-    // 订单分页
-    public static final String RAIL_ORDER_PAGE_USER_PREFIX = "rail:order:page:user:";
-    // 本人车票分页
-    public static final String RAIL_TICKET_SELF_PAGE_PREFIX = "rail:ticket:self:page:";
+    public static final String RAIL_ORDER_PAGE_USER_PREFIX = "rail:order:page:user:"; // 订单分页
+
+    // ================ 聚合缓存对应的布隆过滤器业务类型 =================
+    public static final String AGG_CACHE_ORDER_BIZ_TYPE = "agg_cache:order";  // 订单模块
 }

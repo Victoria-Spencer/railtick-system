@@ -600,20 +600,19 @@ public class OrderServiceImpl implements OrderService {
      */
     @GlobalTransactional
     public PageResult<SelfTicketPageVO> selfTicketPageQuery(FrontSelfTicketPageDTO frontSelfTicketPageDTO) {
+        String aggKey = buildSelfTicketCacheKey(frontSelfTicketPageDTO);
         TypeReference<PageResult<SelfTicketPageVO>> typeRef = new TypeReference<PageResult<SelfTicketPageVO>>() {};
-        return cacheClient.queryWithMutex(
-                    // 生成唯一缓存key
-                    dto -> buildSelfTicketCacheKey(frontSelfTicketPageDTO),
-                    frontSelfTicketPageDTO,
-                    typeRef,
-                    dto -> loadSelfTicketFromDb(frontSelfTicketPageDTO),
-                    RedisConstants.RAIL_DEFAULT_TTL,
-                    TimeUnit.MINUTES,
-                    3
+        return cacheClient.queryAggCache(
+                aggKey,
+                typeRef,
+                dto -> loadSelfTicketFromDb(dto),
+                frontSelfTicketPageDTO,
+                RedisConstants.RAIL_DEFAULT_TTL,
+                TimeUnit.MINUTES
         );
     }
 
-    private PageResult<SelfTicketPageVO> loadSelfTicketFromDb(FrontSelfTicketPageDTO frontSelfTicketPageDTO) {
+    private AggCacheResult<PageResult<SelfTicketPageVO>> loadSelfTicketFromDb(FrontSelfTicketPageDTO frontSelfTicketPageDTO) {
         // 远程调用user-service，根据userId查询idType和idCard，UserIdCardDTO
         Result<UserIdCardDTO> userIdCardDTOResult = userFeignClient.getIdCardInfo(frontSelfTicketPageDTO.getUserId());
         if(!userIdCardDTOResult.isSuccess()) {
@@ -628,8 +627,16 @@ public class OrderServiceImpl implements OrderService {
 
         // 分页查询
         PageHelper.startPage(selfTicketPageDTO.getPageNumber(), selfTicketPageDTO.getPageSize());
-        List<SelfTicketPageVO> SelfTicketPageVOList = orderMapper.getSeltTicketPageByQueryDTO(selfTicketPageDTO);
-        return new PageResult<>(SelfTicketPageVOList);
+        List<SelfTicketPageVO> selfTicketPageVOList = orderMapper.getSelfTicketPageByQueryDTO(selfTicketPageDTO);
+
+        // 组装所有依赖的单表Key
+        List<String> selfTicketKeys = selfTicketPageVOList.stream()
+                .map(selfTicketPageVO -> RedisConstants.RAIL_SELF_TICKET_PREFIX + selfTicketPageVO.getId())
+                .toList();
+        List<String> dependSingleKeys = new ArrayList<>(selfTicketKeys);
+
+//        return new PageResult<>(SelfTicketPageVOList);
+        return AggCacheResult.of(new PageResult<>(selfTicketPageVOList), dependSingleKeys);
     }
 
     /**
@@ -650,7 +657,7 @@ public class OrderServiceImpl implements OrderService {
         String conditions = Stream.of(
                 "idType:" + idType,
                 "idCard:" + idCard,
-                "ticketStatus:" + Objects.toString(dto.getTicketStatus(), ""),
+                "ticketType:" + Objects.toString(dto.getTicketType(), ""),
                 "startDate:" + Objects.toString(dto.getStartDate(), ""),
                 "endDate:" + Objects.toString(dto.getEndDate(), ""),
                 "trainNumber:" + Objects.toString(dto.getTrainNumber(), ""),

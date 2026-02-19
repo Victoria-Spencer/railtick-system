@@ -253,7 +253,7 @@
     </select>
 
 
-    <select id="getSeltTicketPageByQueryDTO" resultType="org.rail.orderservice.pojo.vo.SelfTicketPageVO">
+    <select id="getSelfTicketPageByQueryDTO" resultType="org.rail.orderservice.pojo.vo.SelfTicketPageVO">
         SELECT
             d.id,
             d.departure,
@@ -280,14 +280,17 @@
                 AND d.id_type = #{idType}
                 AND d.id_card = #{idCard}
             </if>
-            <if test="ticketStatus!=null">
-                AND (o.status = 1 OR o.status = 3 OR o.status = 4)<!-- 订单状态是1：已支付状态 或 3：退票 或 4：部分退票状态 -->
-                <if test="ticketStatus == 0">  <!-- 未出行 -->
+            <!--<if test="ticketStatus!=null">
+                AND (o.status = 1 OR o.status = 3 OR o.status = 4)&lt;!&ndash; 订单状态是1：已支付状态 或 3：退票 或 4：部分退票状态 &ndash;&gt;
+                <if test="ticketStatus == 0">  &lt;!&ndash; 未出行 &ndash;&gt;
                     AND d.departure_time &gt; CURRENT_TIMESTAMP
                 </if>
-                <if test="ticketStatus == 1">  <!-- 已出行 -->
+                <if test="ticketStatus == 1">  &lt;!&ndash; 已出行 &ndash;&gt;
                     AND d.departure_time &lt; CURRENT_TIMESTAMP
                 </if>
+            </if>-->
+            <if test="ticketType != null">
+                AND d.ticket_type = #{ticketType}
             </if>
             <if test="startDate != null">
                 AND DATE(d.riding_date) &gt;= #{startDate}

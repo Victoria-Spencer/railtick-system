@@ -5,8 +5,12 @@ import cn.hutool.core.lang.TypeReference;
 import cn.hutool.core.util.BooleanUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
+import org.rail.commonservice.bloomfilter.DistributedBloomFilterManager;
+import org.rail.commonservice.constant.RedisConstants;
 import org.rail.commonservice.result.AggCacheResult;
+import org.rail.commonservice.result.PageResult;
 import org.rail.commonservice.result.RedisData;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,6 +26,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+
+import static org.rail.commonservice.constant.RedisConstants.AGG_CACHE_ORDER_BIZ_TYPE;
 
 /**
  * 缓存客户端工具类（纯 TypeReference 版）
@@ -39,6 +45,11 @@ public class CacheClient {
 
     @Autowired
     private StringRedisTemplate stringRedisTemplate;
+
+    // 注入分布式布隆过滤器管理器
+    @Autowired
+    private DistributedBloomFilterManager bloomFilterManager;
+
 
     // ========== 可配置化参数（支持 application.yml 注入） ==========
     @Value("${cache.client.null-ttl:2}")
@@ -109,6 +120,12 @@ public class CacheClient {
             }
             log.info("缓存重建线程池已关闭");
         }));
+    }
+
+    @PostConstruct
+    public void initAggCacheBloomFilter() {
+        bloomFilterManager.initBloomFilter(AGG_CACHE_ORDER_BIZ_TYPE);
+        log.info("聚合缓存布隆过滤器初始化完成 | BizType:{}", AGG_CACHE_ORDER_BIZ_TYPE);
     }
 
     // ========== 基础方法（仅 TypeReference 支持） ==========
@@ -789,6 +806,167 @@ public class CacheClient {
 
 // ========== 聚合缓存（单Key关联多表Key）- 仅 TypeReference 版 ==========
     /**
+     * 1.布隆过滤器：分页不适用，组合太多，容易引发维度爆炸
+     * 聚合缓存查询（存储聚合结果 + 自动记录单表依赖关系）
+     * @param aggKey 聚合缓存Key（如 rail:agg:order_full:123）
+     * @param dependSingleKeys 该聚合依赖的所有单表Key（如 [rail:order:123, rail:order_details:456]）
+     * @param typeRef 聚合数据类型（TypeReference，兼容泛型）
+     * @param dbFallback DB查询回调（缓存未命中时执行）
+     * @param dto 入参DTO（传递给dbFallback）
+     * @param bizType 布隆过滤器业务类型（如"agg_cache_order"）
+     * @param time 缓存过期时间
+     * @param timeUnit 时间单位
+     * @return 聚合数据
+     */
+    public <D, DTO> D queryAggCache(
+            String aggKey,
+            List<String> dependSingleKeys,
+            TypeReference<D> typeRef,
+            Function<DTO, D> dbFallback,
+            DTO dto,
+            String bizType,
+            Long time,
+            TimeUnit timeUnit
+    ) {
+        // 1. 入参校验（和原有逻辑一致）
+        if (StrUtil.isBlank(aggKey)) {
+            throw new IllegalArgumentException("聚合缓存Key不能为空");
+        }
+        if (StrUtil.isBlank(bizType)) {
+            throw new IllegalArgumentException("布隆过滤器业务类型不能为空");
+        }
+        if (CollectionUtil.isEmpty(dependSingleKeys)) {
+            log.warn("聚合缓存依赖的单表Key列表为空，AggKey:{}", aggKey);
+        }
+        validateParams((d) -> aggKey, dto, dbFallback);
+
+        // 2. 布隆过滤器前置拦截（判断是否是“可能有数据的Key”）
+        // 布隆返回false → 肯定无数据，直接返回null（替代原空值缓存逻辑）
+        boolean mightExist = bloomFilterManager.mightContain(bizType, aggKey);
+        if (!mightExist) {
+            log.debug("聚合缓存策略-布隆过滤器拦截无效Key，直接返回null | AggKey:{}, BizType:{}", aggKey, bizType);
+            return null;
+        }
+        // 3. 查询聚合缓存
+        String json = stringRedisTemplate.opsForValue().get(aggKey);
+        if (StrUtil.isNotBlank(json)) {
+            try {
+                D data = JSONUtil.toBean(json, typeRef.getType(), false);
+                log.debug("聚合缓存策略-命中缓存，AggKey:{}", aggKey);
+                return data;
+            } catch (Exception e) {
+                log.error("聚合缓存反序列化失败，删除损坏缓存，AggKey:{}", aggKey, e);
+                stringRedisTemplate.delete(aggKey);
+            }
+        }
+
+        // 4. 缓存未命中，查询数据库
+        log.debug("聚合缓存策略-缓存未命中，查询数据库，AggKey:{}", aggKey);
+        D data = dbFallback.apply(dto);
+
+        // 5. 数据库无数据 → 直接返回null（不再缓存空值，靠布隆拦截后续请求）
+        if (data == null || (data instanceof PageResult && ((PageResult<?>) data).getTotal() == 0)) {
+            log.debug("聚合缓存策略-数据库无数据，直接返回null | AggKey:{}", aggKey);
+            return null;
+        }
+
+        // 6. 数据库有数据 → ①写入聚合缓存 ②记录依赖 ③将aggKey加入布隆
+        // 6.1 写入聚合缓存
+        set(aggKey, data, time, timeUnit);
+        // 6.2 记录单表依赖关系
+        if (CollectionUtil.isNotEmpty(dependSingleKeys)) {
+            for (String singleKey : dependSingleKeys) {
+                String depSetKey = buildDepSetKey(singleKey);
+                stringRedisTemplate.opsForSet().add(depSetKey, aggKey); // Set自动去重
+                log.debug("聚合缓存策略-记录依赖关系，SingleKey:{}, AggKey:{}", singleKey, aggKey);
+            }
+        }
+        // 6.3 核心：将“有数据的有效aggKey”加入布隆过滤器
+        bloomFilterManager.add(bizType, aggKey);
+        log.debug("聚合缓存策略-有效Key加入布隆过滤器 | AggKey:{}, BizType:{}", aggKey, bizType);
+
+        return data;
+    }
+
+    /**
+     * 聚合缓存查询（布隆过滤优化版：从AggCacheResult提取依赖单表Key）
+     * @param aggKey 聚合缓存Key
+     * @param typeRef 聚合数据类型
+     * @param dbFallback DB查询回调（返回AggCacheResult，包含数据+依赖单表Key）
+     * @param dto 入参DTO
+     * @param bizType 布隆过滤器业务类型
+     * @param time 缓存过期时间
+     * @param timeUnit 时间单位
+     * @return 聚合数据
+     */
+    public <D, DTO> D queryAggCache(
+            String aggKey,
+            TypeReference<D> typeRef,
+            Function<DTO, AggCacheResult<D>> dbFallback,
+            DTO dto,
+            String bizType,
+            Long time,
+            TimeUnit timeUnit
+    ) {
+        // 1. 入参校验
+        if (StrUtil.isBlank(aggKey)) {
+            throw new IllegalArgumentException("聚合缓存Key不能为空");
+        }
+        if (StrUtil.isBlank(bizType)) {
+            throw new IllegalArgumentException("布隆过滤器业务类型不能为空");
+        }
+        validateParams((d) -> aggKey, dto, dbFallback);
+
+        // 2. 布隆过滤器前置拦截
+        boolean mightExist = bloomFilterManager.mightContain(bizType, aggKey);
+        if (!mightExist) {
+            log.debug("聚合缓存策略-布隆过滤器拦截无效Key，直接返回null | AggKey:{}, BizType:{}", aggKey, bizType);
+            return null;
+        }
+
+        // 3. 查询聚合缓存
+        String json = stringRedisTemplate.opsForValue().get(aggKey);
+        if (StrUtil.isNotBlank(json)) {
+            try {
+                D data = JSONUtil.toBean(json, typeRef.getType(), false);
+                log.debug("聚合缓存策略-命中缓存，AggKey:{}", aggKey);
+                return data;
+            } catch (Exception e) {
+                log.error("聚合缓存反序列化失败，删除损坏缓存，AggKey:{}", aggKey, e);
+                stringRedisTemplate.delete(aggKey);
+            }
+        }
+
+        // 4. 缓存未命中，查询数据库
+        log.debug("聚合缓存策略-缓存未命中，查询数据库，AggKey:{}", aggKey);
+        AggCacheResult<D> aggResult = dbFallback.apply(dto);
+        D data = aggResult.getData();
+        List<String> dependSingleKeys = aggResult.getDependSingleKeys();
+
+        // 5. 数据库无数据 → 直接返回null（移除空值缓存）
+        if (data == null || (data instanceof PageResult && ((PageResult<?>) data).getTotal() == 0)) {
+            log.debug("聚合缓存策略-数据库无数据，直接返回null | AggKey:{}", aggKey);
+            return null;
+        }
+
+        // 6. 数据库有数据 → 写入缓存 + 记录依赖 + 加入布隆
+        set(aggKey, data, time, timeUnit);
+        if (CollectionUtil.isNotEmpty(dependSingleKeys)) {
+            for (String singleKey : dependSingleKeys) {
+                String depSetKey = buildDepSetKey(singleKey);
+                stringRedisTemplate.opsForSet().add(depSetKey, aggKey);
+                log.debug("聚合缓存策略-记录依赖关系，SingleKey:{}, AggKey:{}", singleKey, aggKey);
+            }
+        }
+        // 有效Key加入布隆
+        bloomFilterManager.add(bizType, aggKey);
+        log.debug("聚合缓存策略-有效Key加入布隆过滤器 | AggKey:{}, BizType:{}", aggKey, bizType);
+
+        return data;
+    }
+
+    /**
+     * 2，缓存空值
      * 聚合缓存查询（存储聚合结果 + 自动记录单表依赖关系）
      * @param aggKey 聚合缓存Key（如 rail:agg:order_full:123）
      * @param dependSingleKeys 该聚合依赖的所有单表Key（如 [rail:order:123, rail:order_details:456]）
@@ -808,7 +986,7 @@ public class CacheClient {
             Long time,
             TimeUnit timeUnit
     ) {
-        // 1. 入参校验（和原有逻辑一致）
+        // 1. 入参校验
         if (StrUtil.isBlank(aggKey)) {
             throw new IllegalArgumentException("聚合缓存Key不能为空");
         }
@@ -830,25 +1008,22 @@ public class CacheClient {
             }
         }
 
-        // 3. 空值缓存（防穿透）
-        if (json != null) {
-            log.debug("聚合缓存策略-命中空值缓存，AggKey:{}", aggKey);
-            return null;
-        }
-
-        // 4. 缓存未命中，查询数据库
+        // 3. 缓存未命中，查询数据库
         log.debug("聚合缓存策略-缓存未命中，查询数据库，AggKey:{}", aggKey);
         D data = dbFallback.apply(dto);
 
-        // 5. 数据库无数据，缓存空值
-        if (data == null) {
-            set(aggKey, "", CACHE_NULL_TTL, TimeUnit.MINUTES);
-            log.debug("聚合缓存策略-数据库无数据，缓存空值，AggKey:{}", aggKey);
+        // 4. 数据库无数据 → 缓存空值（短TTL）+ 返回null
+        if (data == null || (data instanceof PageResult && ((PageResult<?>) data).getTotal() == 0)) {
+            // 缓存空字符串（Redis中null会被视为key不存在，空字符串更易识别空值缓存）
+            stringRedisTemplate.opsForValue().set(aggKey, "", CACHE_NULL_TTL, TimeUnit.MINUTES);
+            log.debug("聚合缓存策略-数据库无数据，缓存空值（TTL:{}分钟） | AggKey:{}", CACHE_NULL_TTL, aggKey);
             return null;
         }
 
-        // 6. 写入聚合缓存 + 记录依赖关系（核心：单表Key -> 聚合Key）
+        // 5. 数据库有数据 → ①写入聚合缓存 ②记录依赖
+        // 5.1 写入聚合缓存
         set(aggKey, data, time, timeUnit);
+        // 5.2 记录单表依赖关系
         if (CollectionUtil.isNotEmpty(dependSingleKeys)) {
             for (String singleKey : dependSingleKeys) {
                 String depSetKey = buildDepSetKey(singleKey);
@@ -860,15 +1035,14 @@ public class CacheClient {
         return data;
     }
 
-    // ========== 聚合缓存（优化版：自动从包装类提取依赖） ==========
     /**
-     * 聚合缓存查询（优化版：从AggCacheResult提取依赖单表Key）
+     * 聚合缓存查询（纯空值缓存版：从AggCacheResult提取依赖单表Key，无布隆过滤器）
      * @param aggKey 聚合缓存Key
      * @param typeRef 聚合数据类型
      * @param dbFallback DB查询回调（返回AggCacheResult，包含数据+依赖单表Key）
      * @param dto 入参DTO
-     * @param time 缓存过期时间
-     * @param timeUnit 时间单位
+     * @param time 正常数据缓存过期时间
+     * @param timeUnit 正常数据缓存时间单位
      * @return 聚合数据
      */
     public <D, DTO> D queryAggCache(
@@ -898,27 +1072,21 @@ public class CacheClient {
             }
         }
 
-        // 3. 空值缓存
-        if (json != null) {
-            log.debug("聚合缓存策略-命中空值缓存，AggKey:{}", aggKey);
-            return null;
-        }
-
-        // 4. 缓存未命中，查询数据库（获取包装类）
+        // 3. 缓存未命中，查询数据库
         log.debug("聚合缓存策略-缓存未命中，查询数据库，AggKey:{}", aggKey);
-        // 包装类
         AggCacheResult<D> aggResult = dbFallback.apply(dto);
         D data = aggResult.getData();
         List<String> dependSingleKeys = aggResult.getDependSingleKeys();
 
-        // 5. 数据库无数据，缓存空值
-        if (data == null) {
-            set(aggKey, "", CACHE_NULL_TTL, TimeUnit.MINUTES);
-            log.debug("聚合缓存策略-数据库无数据，缓存空值，AggKey:{}", aggKey);
+        // 4. 数据库无数据 → 缓存空值（短TTL）+ 返回null
+        if (data == null || (data instanceof PageResult && ((PageResult<?>) data).getTotal() == 0)) {
+            // 缓存空字符串（Redis中null会被视为key不存在，空字符串更易识别空值缓存）
+            stringRedisTemplate.opsForValue().set(aggKey, "", CACHE_NULL_TTL, TimeUnit.MINUTES);
+            log.debug("聚合缓存策略-数据库无数据，缓存空值（TTL:{}分钟） | AggKey:{}", CACHE_NULL_TTL, aggKey);
             return null;
         }
 
-        // 6. 写入聚合缓存 + 自动记录依赖关系（从包装类提取）
+        // 5. 数据库有数据 → 写入缓存 + 记录依赖
         set(aggKey, data, time, timeUnit);
         if (CollectionUtil.isNotEmpty(dependSingleKeys)) {
             for (String singleKey : dependSingleKeys) {

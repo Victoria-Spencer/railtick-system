@@ -11,8 +11,8 @@ import java.time.LocalDate;
 @Data
 public class SelfTicketPageDTO extends PageQuery {
 
-    // 车票状态（0：未出行，1：已出行）
-    private Integer ticketStatus;
+    // 车票类型（0：成人，1：儿童，2：学生，3：残疾军人）
+    private Integer ticketType;
     // 开始日期
     private LocalDate startDate;
     // 结束日期
