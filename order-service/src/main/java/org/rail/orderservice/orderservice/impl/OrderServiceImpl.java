@@ -5,6 +5,7 @@ import cn.hutool.core.bean.copier.CopyOptions;
 import cn.hutool.core.lang.TypeReference;
 import com.github.pagehelper.PageHelper;
 import io.seata.spring.annotation.GlobalTransactional;
+import lombok.extern.slf4j.Slf4j;
 import org.rail.commonapi.client.TicketFeignClient;
 import org.rail.commonapi.client.UserFeignClient;
 import org.rail.commonapi.constant.OrderTypeConstants;
@@ -42,6 +43,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+@Slf4j
 @Service
 public class OrderServiceImpl implements OrderService {
 

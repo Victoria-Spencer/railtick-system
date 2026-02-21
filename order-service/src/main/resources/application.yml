@@ -33,6 +33,15 @@ spring:
           max-idle: 8        # 最大空闲连接
           min-idle: 4        # 最小空闲连接
           max-wait: PT2S     # 连接获取超时时间
+    # ES 核心配置
+    elasticsearch:
+      rest:
+        uris: http://192.168.43.143:9200 # ES 地址+端口（默认9200）
+        # 若 ES 8.x 开启了用户名/密码认证，添加以下配置
+        # username: elastic
+        # password: 你的ES密码（安装时生成的）
+        connection-timeout: 10s # 连接超时
+        read-timeout: 30s # 读取超时
 seata:
   registry: # 注册中心的配置，微服务根据这些信息去注册中心获取TC服务地址
     type: nacos # 注册中心类型 nacos

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration scan="true" scanPeriod="60 seconds">
+    <!-- 1. 服务个性化配置 -->
+    <property name="APP_NAME" value="order-service"/>
+    <property name="LOG_PATH" value="D:/repository/rs/railtick-system/logs/${APP_NAME}"/>
+
+    <!-- 2. 引入公共日志配置（复用 Appender 和多环境配置） -->
+    <include resource="logs-common.xml"/>
+
+    <!-- 3. 日志级别控制（可选：覆盖公共配置的级别，无需重复定义 <root>） -->
+    <logger name="org.apache.seata" level="DEBUG" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
+    </logger>
+    <logger name="io.seata" level="DEBUG" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
+    </logger>
+    <logger name="io.seata.rm" level="DEBUG" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
+    </logger>
+    <logger name="io.seata.tm" level="DEBUG" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
+    </logger>
+    <logger name="org.rail.orderservice.mapper" level="DEBUG" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
+    </logger>
+</configuration>
