@@ -9,6 +9,7 @@ import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.rail.commonservice.bloomfilter.DistributedBloomFilterManager;
 import org.rail.commonservice.constant.RedisConstants;
+import org.rail.commonservice.result.AggBatchResult;
 import org.rail.commonservice.result.AggCacheResult;
 import org.rail.commonservice.result.PageResult;
 import org.rail.commonservice.result.RedisData;
@@ -18,6 +19,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
 
+import java.lang.reflect.Type;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -1098,6 +1100,143 @@ public class CacheClient {
 
         return data;
     }
+
+    /**
+     * 批量聚合缓存查询（纯空值缓存版：Key由keyGenerator生成，无布隆过滤器）
+     * @param keyGenerator 聚合缓存Key生成器（入参单个DTO，返回对应AggKey，参考queryWithMutex的参数风格）
+     * @param dtos 入参DTO列表（KeyGenerator基于此生成AggKey列表，一一对应）
+     * @param typeRef 单个聚合数据的类型（如TypeReference<SeatClassVO>）
+     * @param dbFallback DB批量查询回调（入参为未命中的DTO列表，返回AggBatchResult，包含Key-数据映射+依赖单表Key）
+     * @param time 正常数据缓存过期时间
+     * @param timeUnit 正常数据缓存时间单位
+     * @return 聚合数据列表（和传入的dtos顺序完全一致，未命中且查库无数据则为null）
+     */
+    public <D, DTO> List<D> batchQueryAggCache(
+            Function<DTO, String> keyGenerator,
+            List<DTO> dtos,
+            TypeReference<D> typeRef,
+            Function<List<DTO>, AggBatchResult<D>> dbFallback,
+            Long time,
+            TimeUnit timeUnit
+    ) {
+        // 1. 入参校验
+        if (keyGenerator == null) {
+            throw new IllegalArgumentException("聚合缓存Key生成器不能为空");
+        }
+        if (CollectionUtil.isEmpty(dtos)) {
+            throw new IllegalArgumentException("DTO列表不能为空");
+        }
+        if (dbFallback == null) {
+            throw new IllegalArgumentException("数据库批量查询回调不能为空");
+        }
+
+        // 核心修改：通过keyGenerator生成aggKeys列表（和dtos一一对应）
+        List<String> aggKeys = dtos.stream()
+                .map(keyGenerator) // 每个DTO对应生成一个AggKey
+                .collect(Collectors.toList());
+
+        // 校验生成的aggKeys：非空 + 无空白Key + 和dtos长度一致
+        if (CollectionUtil.isEmpty(aggKeys) || aggKeys.size() != dtos.size()) {
+            throw new IllegalArgumentException("Key生成器生成的AggKey列表不能为空，且长度必须和DTO列表一致");
+        }
+        for (int i = 0; i < aggKeys.size(); i++) {
+            String aggKey = aggKeys.get(i);
+            if (StrUtil.isBlank(aggKey)) {
+                throw new IllegalArgumentException(String.format("Key生成器为第%d个DTO生成的AggKey为空", i));
+            }
+        }
+
+        // 2. 批量查询聚合缓存（Redis multiGet）
+        List<String> jsonList = stringRedisTemplate.opsForValue().multiGet(aggKeys);
+        Map<String, D> cachedDataMap = new LinkedHashMap<>(); // 保持插入顺序
+        List<String> missAggKeys = new ArrayList<>(); // 缓存未命中的Key
+        List<DTO> missDtos = new ArrayList<>(); // 缓存未命中对应的DTO
+        Type dataType = typeRef.getType();
+
+        for (int i = 0; i < aggKeys.size(); i++) {
+            String aggKey = aggKeys.get(i);
+            String json = jsonList != null && jsonList.size() > i ? jsonList.get(i) : null;
+
+            if (StrUtil.isNotBlank(json)) {
+                try {
+                    D data = JSONUtil.toBean(json, dataType, false);
+                    cachedDataMap.put(aggKey, data);
+                    log.debug("批量聚合缓存策略-命中缓存，AggKey:{}", aggKey);
+                } catch (Exception e) {
+                    log.error("批量聚合缓存反序列化失败，删除损坏缓存，AggKey:{}", aggKey, e);
+                    stringRedisTemplate.delete(aggKey);
+                    missAggKeys.add(aggKey);
+                    missDtos.add(dtos.get(i));
+                }
+            } else {
+                missAggKeys.add(aggKey);
+                missDtos.add(dtos.get(i));
+                log.debug("批量聚合缓存策略-缓存未命中，待查库，AggKey:{}", aggKey);
+            }
+        }
+
+        // 3. 无未命中Key，直接返回缓存结果
+        if (CollectionUtil.isEmpty(missAggKeys)) {
+            return aggKeys.stream().map(cachedDataMap::get).collect(Collectors.toList());
+        }
+
+        // 4. 缓存未命中，批量查询数据库
+        log.debug("批量聚合缓存策略-{}个Key缓存未命中，批量查询数据库", missAggKeys.size());
+        AggBatchResult<D> aggBatchResult = dbFallback.apply(missDtos);
+        Map<String, D> dbDataMap = aggBatchResult.getDataMap() == null ? new HashMap<>() : aggBatchResult.getDataMap();
+        List<String> dependSingleKeys = aggBatchResult.getDependSingleKeys() == null ? new ArrayList<>() : aggBatchResult.getDependSingleKeys();
+
+        // 5. 处理查库结果：空值缓存 + 正常数据缓存
+        List<String> nullAggKeys = new ArrayList<>();
+        Map<String, D> normalDataMap = new HashMap<>();
+
+        for (String missAggKey : missAggKeys) {
+            D dbData = dbDataMap.get(missAggKey);
+            if (dbData == null || (dbData instanceof PageResult && ((PageResult<?>) dbData).getTotal() == 0)) {
+                nullAggKeys.add(missAggKey);
+                log.debug("批量聚合缓存策略-数据库无数据，待缓存空值，AggKey:{}", missAggKey);
+            } else {
+                normalDataMap.put(missAggKey, dbData);
+            }
+        }
+
+        // 5.1 批量缓存空值（短TTL）
+        if (CollectionUtil.isNotEmpty(nullAggKeys)) {
+            Map<String, String> nullValueMap = nullAggKeys.stream()
+                    .collect(Collectors.toMap(key -> key, key -> ""));
+            stringRedisTemplate.opsForValue().multiSet(nullValueMap);
+            nullAggKeys.forEach(key -> stringRedisTemplate.expire(key, CACHE_NULL_TTL, TimeUnit.MINUTES));
+            log.debug("批量聚合缓存策略-批量缓存空值，共{}个Key，TTL:{}分钟", nullAggKeys.size(), CACHE_NULL_TTL);
+        }
+
+        // 5.2 批量缓存正常数据 + 记录依赖关系
+        if (CollectionUtil.isNotEmpty(normalDataMap)) {
+            Map<String, String> normalValueMap = normalDataMap.entrySet().stream()
+                    .collect(Collectors.toMap(
+                            Map.Entry::getKey,
+                            entry -> JSONUtil.toJsonStr(entry.getValue())
+                    ));
+            stringRedisTemplate.opsForValue().multiSet(normalValueMap);
+            normalDataMap.keySet().forEach(key -> stringRedisTemplate.expire(key, time, timeUnit));
+            log.debug("批量聚合缓存策略-批量缓存正常数据，共{}个Key，TTL:{} {}", normalDataMap.size(), time, timeUnit);
+
+            if (CollectionUtil.isNotEmpty(dependSingleKeys)) {
+                for (String singleKey : dependSingleKeys) {
+                    String depSetKey = buildDepSetKey(singleKey);
+                    stringRedisTemplate.opsForSet().add(depSetKey, normalDataMap.keySet().toArray(new String[0]));
+                    log.debug("批量聚合缓存策略-批量记录依赖关系，SingleKey:{}, 关联AggKey数量:{}", singleKey, normalDataMap.size());
+                }
+            }
+        }
+
+        // 6. 合并结果并返回（和dtos顺序一致）
+        Map<String, D> finalDataMap = new LinkedHashMap<>(cachedDataMap);
+        finalDataMap.putAll(normalDataMap);
+        nullAggKeys.forEach(key -> finalDataMap.put(key, null));
+
+        return aggKeys.stream().map(finalDataMap::get).collect(Collectors.toList());
+    }
+
 
     /**
      * 自动清理聚合缓存（供切面调用）

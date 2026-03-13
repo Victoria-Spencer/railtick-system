@@ -9,7 +9,7 @@ public class SeatClassVO {
 
     // 列车ID
     private Long trainId;
-    // 席别类型
+    // 席别类型ID
     private Long seatClassId;
     // 席别类型
     private Integer seatType;

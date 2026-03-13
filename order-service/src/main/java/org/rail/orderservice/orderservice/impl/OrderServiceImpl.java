@@ -577,7 +577,7 @@ public class OrderServiceImpl implements OrderService {
      * @return
      */
     private String buildOrderPageCacheKey(OrderPageQueryDTO dto) {
-        String prefix = RedisConstants.RAIL_ORDER_PAGE_USER_PREFIX + dto.getUserId() + ":";
+        String prefix = RedisConstants.RAIL_AGG_ORDER_PAGE_USER_PREFIX + dto.getUserId() + ":";
 
         // 拼接所有非空的查询条件和分页参数
         String conditions = Stream.of(

@@ -1,6 +1,7 @@
 package org.rail.ticketservice.mapper;
 
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.rail.ticketservice.pojo.dto.StationPageQueryDTO;
 import org.rail.ticketservice.pojo.dto.TicketQueryDTO;
@@ -9,6 +10,7 @@ import org.rail.ticketservice.pojo.vo.StationPageQueryVO;
 import org.rail.ticketservice.pojo.vo.TrainDetailVO;
 import org.rail.ticketservice.pojo.vo.TrainStopStationVO;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @Mapper
@@ -33,7 +35,19 @@ public interface StationMapper {
      * @param ticketQueryDTO
      * @return
      */
-    List<TrainDetailVO> getTrainDetailsByDTO(TicketQueryDTO ticketQueryDTO);
+//    List<TrainDetailVO> getTrainDetailsByDTO(TicketQueryDTO ticketQueryDTO);
+
+    /**
+     * 根据起始站和日期查询列车详情
+     * @param departureDate
+     * @param depCode
+     * @param arrCode
+     */
+    List<TrainDetailVO> getTrainDetailsByRouteAndDate(
+            @Param("departureDate") LocalDate departureDate,
+            @Param("depCode") String depCode,
+            @Param("arrCode") String arrCode
+    );
 
     /**
      * 查询所有站点
@@ -41,4 +55,5 @@ public interface StationMapper {
      */
     @Select("select * from station")
     List<Station> selectAllStations();
+
 }

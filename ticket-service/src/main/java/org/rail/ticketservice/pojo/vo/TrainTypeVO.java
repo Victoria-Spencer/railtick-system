@@ -6,7 +6,7 @@ import lombok.Data;
 public class TrainTypeVO {
 
     // 类型ID
-    private Long typeId;
+    private Integer typeId;
     // 类型名称
     private String typeName;
     // 类型编码

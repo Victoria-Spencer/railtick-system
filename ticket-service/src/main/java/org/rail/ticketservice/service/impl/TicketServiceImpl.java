@@ -2,10 +2,17 @@ package org.rail.ticketservice.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.bean.copier.CopyOptions;
+import cn.hutool.core.lang.TypeReference;
 import com.alibaba.nacos.common.utils.CollectionUtils;
+import com.github.pagehelper.PageHelper;
+import org.apache.commons.lang.StringUtils;
 import org.rail.commonapi.constant.OrderTypeConstants;
 import org.rail.commonapi.dto.*;
+import org.rail.commonservice.constant.RedisConstants;
 import org.rail.commonservice.exception.BusinessException;
+import org.rail.commonservice.result.AggBatchResult;
+import org.rail.commonservice.result.AggCacheResult;
+import org.rail.commonservice.result.PageResult;
 import org.rail.commonservice.utils.BeanUtils;
 import org.rail.commonservice.utils.CacheClient;
 import org.rail.ticketservice.constant.SeatStatusConstants;
@@ -20,11 +27,13 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -52,11 +61,11 @@ public class TicketServiceImpl implements TicketService {
     private Integer preOrderExpireMinutes;
 
     /**
-     * 查询购票列表
+     * 查询购票列表（old）
      * @param ticketQueryDTO
      * @return
      */
-    public List<TicketQueryVO> queryTicket(TicketQueryDTO ticketQueryDTO) {
+    /*public List<TicketQueryVO> queryTicket(TicketQueryDTO ticketQueryDTO) {
 
         // 1.逻辑下沉到 SQL，用批量查询替代循环查询，直接通过一次数据库查询获取所有结果，MyBatis自动封装为List<TrainDetailVO>
         List<TrainDetailVO> trainDetailVOList = stationMapper.getTrainDetailsByDTO(ticketQueryDTO);
@@ -120,6 +129,277 @@ public class TicketServiceImpl implements TicketService {
 
         // 封装返回
         return resultList;
+    }*/
+
+    /**
+     * 查询购票列表（新增分层次缓存）
+     * @param ticketQueryDTO
+     * @return
+     */
+    public List<TicketQueryVO> queryTicket(TicketQueryDTO ticketQueryDTO) {
+        // 查询车次基础信息
+        List<TrainDetailVO> trainDetailVOList = getTrainDetailVOS(ticketQueryDTO);
+
+        // 查询余票数量
+        List<SeatClassVO> seatClassVOList = querySeatClassData(trainDetailVOList);
+
+        // 构建最终返回的vo
+        return buildTicketQueryVO(trainDetailVOList, seatClassVOList, ticketQueryDTO);
+    }
+
+    /**
+     * 查询席别信息
+     * @param trainDetailVOList
+     * @return
+     */
+    private List<SeatClassVO> querySeatClassData(List<TrainDetailVO> trainDetailVOList) {
+        // 1. 转换入参：TrainDetailVO -> SeatQueryDTO
+        List<SeatQueryDTO> seatQueryDTOList = BeanUtil.copyToList(trainDetailVOList, SeatQueryDTO.class);
+
+        // 2. 定义【聚合缓存Key生成器】：为每个SeatQueryDTO生成唯一缓存Key
+        // Key规则：rail:agg:seat_class:列车ID:出发站序:到达站序（确保唯一性）
+        Function<SeatQueryDTO, String> keyGenerator = dto ->
+                String.format("%s%d:%d:%d",
+                        RedisConstants.RAIL_AGG_SEAT_CLASS,
+                        dto.getTrainId(),
+                        dto.getStartSequence(),
+                        dto.getEndSequence());
+
+        // 3. 核心：构建「trainId → SeatQueryDTO列表」的映射（仅一次遍历，预处理）
+        // 目的：后续通过VO的trainId快速拿到对应DTO
+        Map<Long, List<SeatQueryDTO>> trainId2DtosMap = seatQueryDTOList.stream()
+                .collect(Collectors.groupingBy(SeatQueryDTO::getTrainId)); // 按trainId分组
+
+        // 4. 定义返回类型（单个SeatClassVO）
+        TypeReference<SeatClassVO> typeRef = new TypeReference<SeatClassVO>() {};
+
+        // 5. 调用缓存工具类
+        return cacheClient.batchQueryAggCache(
+                keyGenerator,
+                seatQueryDTOList,
+                typeRef,
+                missDtos -> {
+                    // 用【缓存未命中的DTO列表】查询数据库（而非全量 seatQueryDTOList）
+                    List<SeatClassVO> seatClassVOList = seatClassMapper.batchQuerySeatInfoByDTOList(missDtos);
+
+                    // 构建 aggKey -> SeatClassVO 的映射
+                    Map<String, SeatClassVO> dataMap = new HashMap<>();
+                    for (SeatClassVO vo : seatClassVOList) {
+                        // 从预处理的映射中，根据VO的trainId取对应的DTO列表
+                        List<SeatQueryDTO> dtos = trainId2DtosMap.get(vo.getTrainId());
+                        if (dtos != null && !dtos.isEmpty()) {
+                            // 取第一个匹配的DTO
+                            SeatQueryDTO matchDto = dtos.getFirst();
+                            String aggKey = keyGenerator.apply(matchDto);
+                            dataMap.put(aggKey, vo);
+                        }
+                    }
+
+                    // 组装所有依赖的单表Key
+                    List<String> dependSingleKeys = new ArrayList<>();
+                    for (SeatClassVO seatClassVO : seatClassVOList) {
+                        // trainSeatClassKey（列车席别关联Key）
+                        String trainSeatClassKey = RedisConstants.RAIL_TRAIN_SEAT_CLASS_PREFIX
+                                + seatClassVO.getTrainId()
+                                + ":"
+                                + seatClassVO.getSeatClassId();
+                        dependSingleKeys.add(trainSeatClassKey);
+
+                        // seatClassKey（席别key)
+                        String seatClassKey = RedisConstants.RAIL_SEAT_CLASS_PREFIX +  seatClassVO.getSeatClassId();
+                        dependSingleKeys.add(seatClassKey);
+                    }
+
+                    return AggBatchResult.of(dataMap, dependSingleKeys);
+                },
+                RedisConstants.RAIL_AGG_SEAT_CLASS_CACHE_TTL_SECONDS,
+                TimeUnit.SECONDS
+        );
+    }
+
+    /**
+     * 构建购票列表返回条件
+     * @param trainDetailVOList
+     * @param seatClassVOList
+     * @return
+     */
+    private List<TicketQueryVO> buildTicketQueryVO(List<TrainDetailVO> trainDetailVOList,
+                                                   List<SeatClassVO> seatClassVOList,
+                                                   TicketQueryDTO ticketQueryDTO) {
+        List<TicketQueryVO> resultList = new ArrayList<>();
+
+        // 按trainId分组,映射到Map里面
+        Map<Long, List<SeatClassVO>> seatGroupByTrainId = seatClassVOList.stream()
+                .collect(Collectors.groupingBy(SeatClassVO::getTrainId));
+
+        // 提前提取席别筛选条件，避免多次调用
+        List<Integer> targetSeatTypes = ticketQueryDTO.getSeatTypes();
+        boolean needFilterSeat = targetSeatTypes != null && !targetSeatTypes.isEmpty();
+
+        for (TrainDetailVO trainDetailVO : trainDetailVOList) {
+            TicketQueryVO result = new TicketQueryVO();
+
+            // 拷贝列车属性
+            Train train = new Train();
+            BeanUtil.copyProperties(
+                    trainDetailVO,
+                    train,
+                    CopyOptions.create()
+                            .setFieldMapping(new HashMap<String, String>(){{
+                                put("trainId", "id");
+                            }})
+            );
+            result.setTrain(train);
+
+            // 取出列车id
+            Long trainId = trainDetailVO.getTrainId();
+
+            // 拷贝席别信息
+            // 从Map中取该列车的席别列表（未过滤）
+            List<SeatClassVO> seatVOs = seatGroupByTrainId.getOrDefault(trainId, new ArrayList<>());
+
+            // ===================== 核心修改：按席别类型筛选 =====================
+            boolean isTrainMatch = true; // 默认匹配（无席别筛选条件时）
+            if (needFilterSeat) {
+                // 判定：该列车是否有至少一个席别匹配seatTypes
+                isTrainMatch = seatVOs.stream()
+                        .anyMatch(seatVO -> {
+                            // 防护：seatTypeId为空时不匹配
+                            return seatVO.getSeatType() != null
+                                    && targetSeatTypes.contains(seatVO.getSeatType());
+                        });
+            }
+
+            // 如果列车不匹配（无席别符合条件），直接跳过该列车
+            if (!isTrainMatch) {
+                continue;
+            }
+            // ==================================================================
+            List<SeatClassFrontVO> frontVOs = BeanUtil.copyToList(seatVOs, SeatClassFrontVO.class);
+            result.setSeatClassFrontVOList(frontVOs);
+
+            // 拷贝列车类型信息
+            List<TrainTypeVO> trainTypeVOList = trainDetailVO.getTrainTypeVOList();
+            result.setTrainTypeVOList(trainTypeVOList);
+
+            // 3.3.拷贝其它属性
+            BeanUtil.copyProperties(trainDetailVO, result);
+
+            // 3.4.计算历经时间
+            Integer duration = calculateDurationInMinutes(result.getDepartureTime(), result.getArrivalTime());
+            result.setDuration(duration);
+
+            // 3.5.始发站和终点站判断
+            Integer departureStationId = trainDetailVO.getDepartureStationId();
+            boolean isDeparture = checkDepartureStation(trainId, departureStationId);
+            Integer arrivalStationId = trainDetailVO.getArrivalStationId();
+            boolean isArrival = checkTerminalStation(trainId, arrivalStationId);
+            result.setDepartureFlag(isDeparture);
+            result.setArrivalFlag(isArrival);
+
+            resultList.add(result);
+        }
+
+        return resultList;
+    }
+
+    private List<TrainDetailVO> getTrainDetailVOS(TicketQueryDTO ticketQueryDTO) {
+        // ========== 构造缓存Key的核心维度 ==========
+        LocalDate departureDate = ticketQueryDTO.getDepartureDate(); // 日期
+        List<String> departureCodes = ticketQueryDTO.getDepartureCodes(); // 出发站编码
+        List<String> arrivalCodes = ticketQueryDTO.getArrivalCodes(); // 到达站编码
+
+        // ========== 先查缓存，缓存命中则内存筛选 ==========
+        List<TrainDetailVO> trainDetailVOList = new ArrayList<>();
+        // 遍历所有出发/到达站组合（适配多站点查询）
+        for (String depCode : departureCodes) {
+            for (String arrCode : arrivalCodes) {
+                // 构建基础车次缓存Key
+                String aggKey = buildTrainBaseKey(departureDate, depCode, arrCode);
+                if (StringUtils.isEmpty(aggKey)) {
+                    continue; // 避免空Key导致缓存操作失败
+                }
+                // 缓存订单分页查询信息
+                TypeReference<List<TrainDetailVO>> typeRef = new TypeReference<List<TrainDetailVO>>() {};
+                List<TrainDetailVO> detailVOS = cacheClient.queryAggCache(
+                        aggKey,
+                        typeRef,
+                        // 缓存未命中时，查库
+                        dto -> {
+                            List<TrainDetailVO> trainDetailVOS = stationMapper.getTrainDetailsByRouteAndDate(departureDate, depCode, arrCode);
+
+                            // 组装所有依赖的单表Key
+                            List<String> dependSingleKeys = new ArrayList<>();
+                            for (TrainDetailVO trainDetailVO : trainDetailVOS) {
+                                // trainKey
+                                String trainKey = RedisConstants.RAIL_TRAIN_PREFIX + trainDetailVO.getTrainId();
+                                dependSingleKeys.add(trainKey);
+
+                                // stationKey
+                                String depKey = RedisConstants.RAIL_STATION_PREFIX + trainDetailVO.getDepartureCode();
+                                String arrKey = RedisConstants.RAIL_STATION_PREFIX + trainDetailVO.getArrivalCode();
+                                dependSingleKeys.add(depKey);
+                                dependSingleKeys.add(arrKey);
+
+                                // trainStopStationKey
+                                String stopStationKey = RedisConstants.RAIL_TRAIN_STOP_STATION_PREFIX + trainDetailVO.getTrainId();
+                                dependSingleKeys.add(stopStationKey);
+
+
+                                // trainTypeKeys
+                                List<TrainTypeVO> trainTypeVOList = trainDetailVO.getTrainTypeVOList();
+                                List<String> trainTypeKeys = trainTypeVOList.stream()
+                                        .filter(typeVO -> typeVO.getTypeId() != null) // 防护：typeId为空跳过
+                                        .map(trainTypeVO -> RedisConstants.RAIL_TRAIN_TRAIN_TYPE_PREFIX +
+                                                trainDetailVO.getTrainId() +
+                                                ":" +
+                                                trainTypeVO.getTypeId())
+                                        .toList();
+                                dependSingleKeys.addAll(trainTypeKeys);
+                            }
+
+                            return AggCacheResult.of(trainDetailVOS, dependSingleKeys);
+                        },
+                        ticketQueryDTO,
+                        RedisConstants.RAIL_TRAIN_BASE_CACHE_TTL,
+                        TimeUnit.MINUTES
+                );
+
+                trainDetailVOList.addAll(detailVOS);
+            }
+        }
+
+        // ========== 内存筛选列车类型 ==========
+        // 筛选列车类型（trainTypeIds）
+        if (ticketQueryDTO.getTrainTypeIds() != null && !ticketQueryDTO.getTrainTypeIds().isEmpty()) {
+            trainDetailVOList = trainDetailVOList.stream()
+                    .filter(vo -> {
+                        List<TrainTypeVO> typeVOList = vo.getTrainTypeVOList();
+                        if (typeVOList == null || typeVOList.isEmpty()) {
+                            return false;
+                        }
+                        return typeVOList.stream()
+                                .anyMatch(typeVO -> ticketQueryDTO.getTrainTypeIds().contains(typeVO.getTypeId()));
+                    })
+                    .collect(Collectors.toList());
+        }
+        return trainDetailVOList;
+    }
+
+    private String buildTrainBaseKey(LocalDate departureDate, String depCode, String arrCode) {
+        // 防护：日期为空直接返回null
+        if (departureDate == null) {
+            return null;
+        }
+        // 空值替换为占位符（_），避免连续分隔符
+        String safeDepCode = depCode == null ? "_" : depCode;
+        String safeArrCode = arrCode == null ? "_" : arrCode;
+        // 构建key：格式统一为「前缀:日期:出发站:到达站」
+        return String.format("%s%s:%s:%s",
+                RedisConstants.RAIL_AGG_TRAIN_BASE_INFO_PREFIX,
+                departureDate,
+                safeDepCode,
+                safeArrCode);
     }
 
     /**
@@ -146,7 +426,7 @@ public class TicketServiceImpl implements TicketService {
         seatQueryDTO.setStartSequence(stopInfoDTO.getDepartureSequence());
         seatQueryDTO.setEndSequence(stopInfoDTO.getArrivalSequence());
         seatQueryDTOList.add(seatQueryDTO);
-        List<SeatClassVO> seatClassVOList = querySeatClassData(seatQueryDTOList);
+        List<SeatClassVO> seatClassVOList = listSeatClassByTrainInterval(seatQueryDTOList);
         List<SeatClassFrontVO> frontVOs = BeanUtil.copyToList(seatClassVOList, SeatClassFrontVO.class);
         ticketQueryVO.setSeatClassFrontVOList(frontVOs);
 
@@ -167,6 +447,10 @@ public class TicketServiceImpl implements TicketService {
         ticketQueryVO.setArrivalFlag(isArrival);
 
         return ticketQueryVO;
+    }
+
+    private List<SeatClassVO> listSeatClassByTrainInterval(List<SeatQueryDTO> seatQueryDTOList) {
+        return seatClassMapper.batchQuerySeatInfoByDTOList(seatQueryDTOList);
     }
 
     /**
@@ -354,18 +638,6 @@ public class TicketServiceImpl implements TicketService {
                                 Function.identity(), // key：seatType本身
                                 Collectors.summingInt(e -> 1) // value：出现次数（每次+1）
                         ));
-    }
-
-
-    /**
-     * 查询席别信息
-     * @param seatQueryDTOList
-     * @return
-     */
-    private List<SeatClassVO> querySeatClassData(List<SeatQueryDTO> seatQueryDTOList) {
-        // 逻辑下沉到 SQL，根据列车id，出发站站序和到达站站序，查询席别数据（类型等）--- List
-        List<SeatClassVO> seatClassVOList = seatClassMapper.batchQuerySeatInfoByDTOList(seatQueryDTOList);
-        return seatClassVOList;
     }
 
 
