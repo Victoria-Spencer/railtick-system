@@ -18,9 +18,9 @@ public class TicketQueryDTO {
     private List<String> departureCodes;
     // 到达车站编码
     private List<String> arrivalCodes;
-    // 列车类型
+    // 列车类型（可选）
     private List<Integer> trainTypeIds;
-    // 席别类型
+    // 席别类型（可选）
     private List<Integer> seatTypes;
     // 出发日
     private LocalDate departureDate;

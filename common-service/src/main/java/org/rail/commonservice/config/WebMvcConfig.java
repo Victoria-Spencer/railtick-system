@@ -3,6 +3,7 @@ package org.rail.commonservice.config;
 import org.rail.commonservice.interceptor.CommonRequestInterceptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
@@ -13,6 +14,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
     @Autowired
     private CommonRequestInterceptor commonRequestInterceptor;
 
+    // ========== 拦截器配置 ==========
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(commonRequestInterceptor)
                 .addPathPatterns("/**")
@@ -22,4 +24,5 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "/error" // 排除错误页面请求
                 );
     }
+
 }
