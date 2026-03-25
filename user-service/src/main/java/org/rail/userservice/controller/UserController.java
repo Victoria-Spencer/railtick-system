@@ -1,7 +1,7 @@
 package org.rail.userservice.controller;
 
-import org.rail.commonapi.dto.UserIdCardDTO;
-import org.rail.commonservice.result.Result;
+import org.rail.api.dto.UserIdCardDTO;
+import org.rail.common.core.result.Result;
 import org.rail.userservice.pojo.dto.UserLoginDTO;
 import org.rail.userservice.pojo.dto.UserRegisterDTO;
 import org.rail.userservice.pojo.dto.UserUpdateInfoDTO;

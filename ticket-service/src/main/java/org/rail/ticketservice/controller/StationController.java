@@ -1,7 +1,7 @@
 package org.rail.ticketservice.controller;
 
-import org.rail.commonservice.result.PageResult;
-import org.rail.commonservice.result.Result;
+import org.rail.common.core.result.PageResult;
+import org.rail.common.core.result.Result;
 import org.rail.ticketservice.pojo.dto.StationPageQueryDTO;
 import org.rail.ticketservice.pojo.vo.StationPageQueryVO;
 import org.rail.ticketservice.pojo.vo.TrainStopStationVO;

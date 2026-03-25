@@ -1,9 +1,7 @@
 package org.rail.ticketservice.mapper;
 
 import org.apache.ibatis.annotations.Mapper;
-import org.apache.ibatis.annotations.Param;
-import org.rail.commonapi.dto.SeatIntervalOccupyUpdateDTO;
-import org.rail.commonapi.dto.UpdateSeatStatusDTO;
+import org.rail.api.dto.UpdateSeatStatusDTO;
 import org.rail.ticketservice.pojo.dto.IntervalOccupyDTO;
 import org.rail.ticketservice.pojo.dto.SeatIntervalOccupyModifyDTO;
 import org.rail.ticketservice.pojo.entity.SeatIntervalOccupy;

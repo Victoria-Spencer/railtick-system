@@ -1,8 +1,8 @@
 package org.rail.ticketservice.mapper;
 
 import org.apache.ibatis.annotations.Mapper;
-import org.rail.commonapi.dto.AvailableSeatDTO;
-import org.rail.commonapi.dto.SeatTypeQueryDTO;
+import org.rail.api.dto.AvailableSeatDTO;
+import org.rail.api.dto.SeatTypeQueryDTO;
 import org.rail.ticketservice.pojo.dto.SeatQueryDTO;
 import org.rail.ticketservice.pojo.vo.SeatClassVO;
 

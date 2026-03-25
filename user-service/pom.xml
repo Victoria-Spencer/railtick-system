@@ -24,7 +24,7 @@
 		<!-- 引入common模块 -->
 		<dependency>
 			<groupId>org.rail</groupId>
-			<artifactId>common-service</artifactId>
+			<artifactId>common</artifactId>
 			<version>0.0.1-SNAPSHOT</version>
 		</dependency>
 		<dependency>
@@ -52,7 +52,7 @@
 		</dependency>
 		<dependency>
 			<groupId>org.rail</groupId>
-			<artifactId>common-api</artifactId>
+			<artifactId>api</artifactId>
 			<version>0.0.1-SNAPSHOT</version>
 		</dependency>
 
@@ -63,7 +63,7 @@
 
 		<dependency>
 			<groupId>org.rail</groupId>
-			<artifactId>common-service</artifactId>
+			<artifactId>common</artifactId>
 			<version>0.0.1-SNAPSHOT</version>
 		</dependency>
 	</dependencies>

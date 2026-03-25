@@ -1,7 +1,7 @@
 package org.rail.orderservice.controller;
 
-import org.rail.commonservice.result.PageResult;
-import org.rail.commonservice.result.Result;
+import org.rail.common.core.result.PageResult;
+import org.rail.common.core.result.Result;
 import org.rail.orderservice.orderservice.OrderService;
 import org.rail.orderservice.pojo.dto.CreateOrderDTO;
 import org.rail.orderservice.pojo.dto.CreatePreOrderDTO;

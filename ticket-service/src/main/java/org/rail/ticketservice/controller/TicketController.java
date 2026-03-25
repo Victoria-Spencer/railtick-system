@@ -1,8 +1,10 @@
 package org.rail.ticketservice.controller;
 
 import lombok.extern.slf4j.Slf4j;
-import org.rail.commonapi.dto.*;
-import org.rail.commonservice.result.Result;
+import org.rail.api.dto.AvailableSeatDTO;
+import org.rail.api.dto.RandomSeatQueryDTO;
+import org.rail.api.dto.SeatIntervalOccupyDTO;
+import org.rail.common.core.result.Result;
 import org.rail.ticketservice.pojo.dto.PlannedTicketQueryDTO;
 import org.rail.ticketservice.pojo.dto.TicketQueryDTO;
 import org.rail.ticketservice.pojo.vo.TicketQueryVO;
@@ -10,7 +12,6 @@ import org.rail.ticketservice.service.TicketService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.ArrayList;
 import java.util.List;
 
 @RestController

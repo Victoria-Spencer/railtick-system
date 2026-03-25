@@ -62,8 +62,8 @@
         GROUP BY tsc.train_id, tsc.seat_class_id
     </select>
 
-    <select id="getAvailableSeatsBySeatTypeQueryDTO" resultType="org.rail.commonapi.dto.AvailableSeatDTO"
-            parameterType="org.rail.commonapi.dto.SeatTypeQueryDTO">
+    <select id="getAvailableSeatsBySeatTypeQueryDTO" resultType="org.rail.api.dto.AvailableSeatDTO"
+            parameterType="org.rail.api.dto.SeatTypeQueryDTO">
         SELECT
             sc.type AS seatType,
             tsc.carriage_number AS carriageNumber,

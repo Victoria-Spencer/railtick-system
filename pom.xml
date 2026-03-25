@@ -21,7 +21,7 @@
 
     <!-- 声明子模块 -->
     <modules>
-        <module>common-service</module>
+        <module>common</module>
         <module>gateway-service</module>
         <module>order-service</module>
         <module>pay-service</module>

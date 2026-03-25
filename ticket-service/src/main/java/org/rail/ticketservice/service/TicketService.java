@@ -1,6 +1,8 @@
 package org.rail.ticketservice.service;
 
-import org.rail.commonapi.dto.*;
+import org.rail.api.dto.AvailableSeatDTO;
+import org.rail.api.dto.RandomSeatQueryDTO;
+import org.rail.api.dto.SeatIntervalOccupyDTO;
 import org.rail.ticketservice.pojo.dto.PlannedTicketQueryDTO;
 import org.rail.ticketservice.pojo.dto.TicketQueryDTO;
 import org.rail.ticketservice.pojo.vo.TicketQueryVO;

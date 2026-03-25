@@ -1,7 +1,7 @@
 package org.rail.orderservice.pojo.dto;
 
 import lombok.Data;
-import org.rail.commonservice.pageQuery.PageQuery;
+import org.rail.common.core.pageQuery.PageQuery;
 
 import java.time.LocalDate;
 

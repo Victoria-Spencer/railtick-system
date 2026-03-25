@@ -2,15 +2,12 @@ package org.rail.userservice.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.lang.TypeReference;
-import com.fasterxml.jackson.databind.EnumNamingStrategies;
 import com.github.pagehelper.PageHelper;
 import lombok.extern.slf4j.Slf4j;
-import lombok.val;
-import org.rail.commonservice.annotation.AutoClearAggCache;
-import org.rail.commonservice.constant.RedisConstants;
-import org.rail.commonservice.result.PageResult;
-import org.rail.commonservice.utils.CacheClient;
-import org.rail.commonservice.utils.ThreadLocalUtils;
+import org.rail.common.redis.constant.RedisConstants;
+import org.rail.common.core.result.PageResult;
+import org.rail.common.redis.util.CacheClient;
+import org.rail.common.core.util.ThreadLocalUtils;
 import org.rail.userservice.constant.VerifyStatusConstants;
 import org.rail.userservice.mapper.PassengerMapper;
 import org.rail.userservice.pojo.dto.PsgrPageQueryDTO;
@@ -18,8 +15,6 @@ import org.rail.userservice.pojo.dto.PsgrUpdateDTO;
 import org.rail.userservice.pojo.entity.Passenger;
 import org.rail.userservice.service.PassengerService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.cache.CacheProperties;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;

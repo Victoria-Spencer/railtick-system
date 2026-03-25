@@ -3,7 +3,7 @@ package org.rail.userservice.pojo.dto;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.rail.commonservice.pageQuery.PageQuery;
+import org.rail.common.core.pageQuery.PageQuery;
 
 @Data
 @NoArgsConstructor

@@ -1,9 +1,9 @@
 package org.rail.userservice.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
-import org.rail.commonapi.dto.UserIdCardDTO;
-import org.rail.commonservice.exception.BusinessException;
-import org.rail.commonservice.utils.BeanUtils;
+import org.rail.api.dto.UserIdCardDTO;
+import org.rail.common.core.exception.BusinessException;
+import org.rail.common.core.util.BeanUtils;
 import org.rail.userservice.mapper.UserMapper;
 import org.rail.userservice.pojo.dto.UserLoginDTO;
 import org.rail.userservice.pojo.dto.UserRegisterDTO;
@@ -11,8 +11,8 @@ import org.rail.userservice.pojo.dto.UserUpdateInfoDTO;
 import org.rail.userservice.pojo.entity.User;
 import org.rail.userservice.pojo.vo.UserVO;
 import org.rail.userservice.service.UserService;
-import org.rail.userservice.utils.JwtTokenUtil;
-import org.rail.userservice.utils.MD5Util;
+import org.rail.userservice.util.JwtTokenUtil;
+import org.rail.userservice.util.MD5Util;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 

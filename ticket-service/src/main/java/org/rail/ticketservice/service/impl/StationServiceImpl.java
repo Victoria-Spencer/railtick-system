@@ -1,14 +1,7 @@
 package org.rail.ticketservice.service.impl;
 
-import cn.hutool.core.convert.Convert;
-import cn.hutool.json.JSONUtil;
-import com.github.pagehelper.PageHelper;
 import lombok.extern.slf4j.Slf4j;
-import lombok.val;
-import org.rail.commonservice.constant.RedisConstants;
-import org.rail.commonservice.pageQuery.PageQuery;
-import org.rail.commonservice.result.PageResult;
-import org.rail.commonservice.utils.CacheClient;
+import org.rail.common.core.result.PageResult;
 import org.rail.ticketservice.mapper.StationMapper;
 import org.rail.ticketservice.pojo.dto.StationPageQueryDTO;
 import org.rail.ticketservice.pojo.entity.Station;
@@ -23,8 +16,6 @@ import org.springframework.util.StringUtils;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
