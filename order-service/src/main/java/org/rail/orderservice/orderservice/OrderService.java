@@ -13,35 +13,35 @@ public interface OrderService {
 
     /**
      * 创建预订单，临时锁定座位
-     * @param createPreOrderDTO
-     * @return
+     * @param createPreOrderDTO 预订单信息
+     * @return 预订单号
      */
     String createPreOrder(CreatePreOrderDTO createPreOrderDTO);
 
     /**
      * 创建订单，并返回订单数据
-     * @param createOrderDTO
-     * @return
+     * @param createOrderDTO 订单信息
+     * @return 订单数据
      */
     CreateOrderVO createOrder(CreateOrderDTO createOrderDTO);
 
     /**
      * 分页查询订单
-     * @param orderPageQueryDTO
-     * @return
+     * @param orderPageQueryDTO 订单分页查询信息
+     * @return 订单分页查询结果
      */
     PageResult<OrderPageQueryVO> orderPageQuery(OrderPageQueryDTO orderPageQueryDTO);
 
     /**
      * 分页查询本人车票
-     * @param frontSelfTicketPageDTO
-     * @return
+     * @param frontSelfTicketPageDTO 本人车票分页查询信息
+     * @return 本人车票分页查询结果
      */
     PageResult<SelfTicketPageVO> selfTicketPageQuery(FrontSelfTicketPageDTO frontSelfTicketPageDTO);
 
     /**
      * 取消车票订单
-     * @param orderSn
+     * @param orderSn 订单号
      */
     void cancelOrder(String orderSn);
 }

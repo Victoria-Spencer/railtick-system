@@ -122,21 +122,17 @@ public class TicketServiceImpl implements TicketService {
     ) {
         // 用【缓存未命中的DTO列表】查询数据库（而非全量 seatQueryDTOList）
         List<SeatClassVO> seatClassVOList = seatClassMapper.batchQuerySeatInfoByDTOList(missDtos);
-
         // 构建 aggKey -> SeatClassVO 的映射
-        Map<String, SeatClassVO> dataMap = new HashMap<>();
-        for (SeatClassVO vo : seatClassVOList) {
-            // 从预处理的映射中，根据VO的trainId取对应的DTO列表
-            List<SeatQueryDTO> dtos = trainId2DtosMap.get(vo.getTrainId());
-            if (dtos != null && !dtos.isEmpty()) {
-                // 取第一个匹配的DTO
-                SeatQueryDTO matchDto = dtos.getFirst();
-                String aggKey = keyGenerator.apply(matchDto);
-                dataMap.put(aggKey, vo);
-            }
-        }
-
+        Map<String, SeatClassVO> dataMap = getSeatClassVOMap(keyGenerator, trainId2DtosMap, seatClassVOList);
         // 组装所有依赖的单表Key
+        List<String> dependSingleKeys = buildSeatClassDependencyKeys(seatClassVOList);
+        return AggBatchResult.of(dataMap, dependSingleKeys);
+    }
+
+    /**
+     * 构建席别相关的聚合缓存依赖单表Key
+     */
+    private List<String> buildSeatClassDependencyKeys(List<SeatClassVO> seatClassVOList) {
         List<String> dependSingleKeys = new ArrayList<>();
         for (SeatClassVO seatClassVO : seatClassVOList) {
             // trainSeatClassKey（列车席别关联Key）
@@ -150,8 +146,21 @@ public class TicketServiceImpl implements TicketService {
             String seatClassKey = RedisConstants.RAIL_SEAT_CLASS_PREFIX +  seatClassVO.getSeatClassId();
             dependSingleKeys.add(seatClassKey);
         }
+        return dependSingleKeys;
+    }
 
-        return AggBatchResult.of(dataMap, dependSingleKeys);
+    private Map<String, SeatClassVO> getSeatClassVOMap(Function<SeatQueryDTO, String> keyGenerator, Map<Long, List<SeatQueryDTO>> trainId2DtosMap, List<SeatClassVO> seatClassVOList) {
+        Map<String, SeatClassVO> dataMap = new HashMap<>();
+        for (SeatClassVO vo : seatClassVOList) {
+            // 从预处理的映射中，根据VO的trainId取对应的DTO列表
+            List<SeatQueryDTO> dtos = trainId2DtosMap.get(vo.getTrainId());
+            if (dtos != null && !dtos.isEmpty()) {
+                SeatQueryDTO matchDto = dtos.getFirst();
+                String aggKey = keyGenerator.apply(matchDto);
+                dataMap.put(aggKey, vo);
+            }
+        }
+        return dataMap;
     }
 
     /**
@@ -306,6 +315,16 @@ public class TicketServiceImpl implements TicketService {
         List<TrainDetailVO> trainDetailVOS = stationMapper.getTrainDetailsByRouteAndDate(departureDate, depCode, arrCode);
 
         // 组装所有依赖的单表Key
+        List<String> dependSingleKeys = buildTrainDetailDependencyKeys(trainDetailVOS);
+
+        return AggCacheResult.of(trainDetailVOS, dependSingleKeys);
+    }
+
+
+    /**
+     * 构建车次详情相关的聚合缓存依赖单表Key
+     */
+    private List<String> buildTrainDetailDependencyKeys(List<TrainDetailVO> trainDetailVOS) {
         List<String> dependSingleKeys = new ArrayList<>();
         for (TrainDetailVO trainDetailVO : trainDetailVOS) {
             // trainKey
@@ -334,8 +353,7 @@ public class TicketServiceImpl implements TicketService {
                     .toList();
             dependSingleKeys.addAll(trainTypeKeys);
         }
-
-        return AggCacheResult.of(trainDetailVOS, dependSingleKeys);
+        return dependSingleKeys;
     }
 
     private String buildTrainBaseKey(LocalDate departureDate, String depCode, String arrCode) {
