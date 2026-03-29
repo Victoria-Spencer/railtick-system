@@ -176,43 +176,56 @@ public class TicketServiceImpl implements TicketService {
                 keyGenerator,
                 seatQueryDTOList,
                 typeRef,
-                missDtos -> {
-                    // 用【缓存未命中的DTO列表】查询数据库（而非全量 seatQueryDTOList）
-                    List<SeatClassVO> seatClassVOList = seatClassMapper.batchQuerySeatInfoByDTOList(missDtos);
-
-                    // 构建 aggKey -> SeatClassVO 的映射
-                    Map<String, SeatClassVO> dataMap = new HashMap<>();
-                    for (SeatClassVO vo : seatClassVOList) {
-                        // 从预处理的映射中，根据VO的trainId取对应的DTO列表
-                        List<SeatQueryDTO> dtos = trainId2DtosMap.get(vo.getTrainId());
-                        if (dtos != null && !dtos.isEmpty()) {
-                            // 取第一个匹配的DTO
-                            SeatQueryDTO matchDto = dtos.getFirst();
-                            String aggKey = keyGenerator.apply(matchDto);
-                            dataMap.put(aggKey, vo);
-                        }
-                    }
-
-                    // 组装所有依赖的单表Key
-                    List<String> dependSingleKeys = new ArrayList<>();
-                    for (SeatClassVO seatClassVO : seatClassVOList) {
-                        // trainSeatClassKey（列车席别关联Key）
-                        String trainSeatClassKey = RedisConstants.RAIL_TRAIN_SEAT_CLASS_PREFIX
-                                + seatClassVO.getTrainId()
-                                + ":"
-                                + seatClassVO.getSeatClassId();
-                        dependSingleKeys.add(trainSeatClassKey);
-
-                        // seatClassKey（席别key)
-                        String seatClassKey = RedisConstants.RAIL_SEAT_CLASS_PREFIX +  seatClassVO.getSeatClassId();
-                        dependSingleKeys.add(seatClassKey);
-                    }
-
-                    return AggBatchResult.of(dataMap, dependSingleKeys);
-                },
+                missDtos -> querySeatClassDb(missDtos, keyGenerator, trainId2DtosMap),
                 RedisConstants.RAIL_AGG_SEAT_CLASS_CACHE_TTL_SECONDS,
                 TimeUnit.SECONDS
         );
+    }
+
+    /**
+     * 缓存未命中时：批量查询席别数据库 + 构建聚合缓存结果
+     * @param missDtos 未命中缓存的DTO列表
+     * @param keyGenerator 缓存Key生成器
+     * @param trainId2DtosMap trainId->DTO映射
+     * @return 聚合缓存批量结果
+     */
+    private AggBatchResult<SeatClassVO> querySeatClassDb(
+            List<SeatQueryDTO> missDtos,
+            Function<SeatQueryDTO, String> keyGenerator,
+            Map<Long, List<SeatQueryDTO>> trainId2DtosMap
+    ) {
+        // 用【缓存未命中的DTO列表】查询数据库（而非全量 seatQueryDTOList）
+        List<SeatClassVO> seatClassVOList = seatClassMapper.batchQuerySeatInfoByDTOList(missDtos);
+
+        // 构建 aggKey -> SeatClassVO 的映射
+        Map<String, SeatClassVO> dataMap = new HashMap<>();
+        for (SeatClassVO vo : seatClassVOList) {
+            // 从预处理的映射中，根据VO的trainId取对应的DTO列表
+            List<SeatQueryDTO> dtos = trainId2DtosMap.get(vo.getTrainId());
+            if (dtos != null && !dtos.isEmpty()) {
+                // 取第一个匹配的DTO
+                SeatQueryDTO matchDto = dtos.getFirst();
+                String aggKey = keyGenerator.apply(matchDto);
+                dataMap.put(aggKey, vo);
+            }
+        }
+
+        // 组装所有依赖的单表Key
+        List<String> dependSingleKeys = new ArrayList<>();
+        for (SeatClassVO seatClassVO : seatClassVOList) {
+            // trainSeatClassKey（列车席别关联Key）
+            String trainSeatClassKey = RedisConstants.RAIL_TRAIN_SEAT_CLASS_PREFIX
+                    + seatClassVO.getTrainId()
+                    + ":"
+                    + seatClassVO.getSeatClassId();
+            dependSingleKeys.add(trainSeatClassKey);
+
+            // seatClassKey（席别key)
+            String seatClassKey = RedisConstants.RAIL_SEAT_CLASS_PREFIX +  seatClassVO.getSeatClassId();
+            dependSingleKeys.add(seatClassKey);
+        }
+
+        return AggBatchResult.of(dataMap, dependSingleKeys);
     }
 
     /**
@@ -323,41 +336,7 @@ public class TicketServiceImpl implements TicketService {
                         aggKey,
                         typeRef,
                         // 缓存未命中时，查库
-                        dto -> {
-                            List<TrainDetailVO> trainDetailVOS = stationMapper.getTrainDetailsByRouteAndDate(departureDate, depCode, arrCode);
-
-                            // 组装所有依赖的单表Key
-                            List<String> dependSingleKeys = new ArrayList<>();
-                            for (TrainDetailVO trainDetailVO : trainDetailVOS) {
-                                // trainKey
-                                String trainKey = RedisConstants.RAIL_TRAIN_PREFIX + trainDetailVO.getTrainId();
-                                dependSingleKeys.add(trainKey);
-
-                                // stationKey
-                                String depKey = RedisConstants.RAIL_STATION_PREFIX + trainDetailVO.getDepartureCode();
-                                String arrKey = RedisConstants.RAIL_STATION_PREFIX + trainDetailVO.getArrivalCode();
-                                dependSingleKeys.add(depKey);
-                                dependSingleKeys.add(arrKey);
-
-                                // trainStopStationKey
-                                String stopStationKey = RedisConstants.RAIL_TRAIN_STOP_STATION_PREFIX + trainDetailVO.getTrainId();
-                                dependSingleKeys.add(stopStationKey);
-
-
-                                // trainTypeKeys
-                                List<TrainTypeVO> trainTypeVOList = trainDetailVO.getTrainTypeVOList();
-                                List<String> trainTypeKeys = trainTypeVOList.stream()
-                                        .filter(typeVO -> typeVO.getTypeId() != null) // 防护：typeId为空跳过
-                                        .map(trainTypeVO -> RedisConstants.RAIL_TRAIN_TRAIN_TYPE_PREFIX +
-                                                trainDetailVO.getTrainId() +
-                                                ":" +
-                                                trainTypeVO.getTypeId())
-                                        .toList();
-                                dependSingleKeys.addAll(trainTypeKeys);
-                            }
-
-                            return AggCacheResult.of(trainDetailVOS, dependSingleKeys);
-                        },
+                        dto -> queryTrainDetailDb(dto, departureDate, depCode, arrCode),
                         ticketQueryDTO,
                         RedisConstants.RAIL_TRAIN_BASE_CACHE_TTL,
                         TimeUnit.MINUTES
@@ -382,6 +361,55 @@ public class TicketServiceImpl implements TicketService {
                     .collect(Collectors.toList());
         }
         return trainDetailVOList;
+    }
+
+    /**
+     * 缓存未命中时：查询车次详情数据库 + 构建聚合缓存依赖Key
+     * @param dto 查询参数DTO
+     * @param departureDate 出发日期
+     * @param depCode 出发站编码
+     * @param arrCode 到达站编码
+     * @return 聚合缓存结果（数据+依赖单表Key）
+     */
+    private AggCacheResult<List<TrainDetailVO>> queryTrainDetailDb(
+            TicketQueryDTO dto,
+            LocalDate departureDate,
+            String depCode,
+            String arrCode
+    ) {
+        List<TrainDetailVO> trainDetailVOS = stationMapper.getTrainDetailsByRouteAndDate(departureDate, depCode, arrCode);
+
+        // 组装所有依赖的单表Key
+        List<String> dependSingleKeys = new ArrayList<>();
+        for (TrainDetailVO trainDetailVO : trainDetailVOS) {
+            // trainKey
+            String trainKey = RedisConstants.RAIL_TRAIN_PREFIX + trainDetailVO.getTrainId();
+            dependSingleKeys.add(trainKey);
+
+            // stationKey
+            String depKey = RedisConstants.RAIL_STATION_PREFIX + trainDetailVO.getDepartureCode();
+            String arrKey = RedisConstants.RAIL_STATION_PREFIX + trainDetailVO.getArrivalCode();
+            dependSingleKeys.add(depKey);
+            dependSingleKeys.add(arrKey);
+
+            // trainStopStationKey
+            String stopStationKey = RedisConstants.RAIL_TRAIN_STOP_STATION_PREFIX + trainDetailVO.getTrainId();
+            dependSingleKeys.add(stopStationKey);
+
+
+            // trainTypeKeys
+            List<TrainTypeVO> trainTypeVOList = trainDetailVO.getTrainTypeVOList();
+            List<String> trainTypeKeys = trainTypeVOList.stream()
+                    .filter(typeVO -> typeVO.getTypeId() != null) // 防护：typeId为空跳过
+                    .map(trainTypeVO -> RedisConstants.RAIL_TRAIN_TRAIN_TYPE_PREFIX +
+                            trainDetailVO.getTrainId() +
+                            ":" +
+                            trainTypeVO.getTypeId())
+                    .toList();
+            dependSingleKeys.addAll(trainTypeKeys);
+        }
+
+        return AggCacheResult.of(trainDetailVOS, dependSingleKeys);
     }
 
     private String buildTrainBaseKey(LocalDate departureDate, String depCode, String arrCode) {

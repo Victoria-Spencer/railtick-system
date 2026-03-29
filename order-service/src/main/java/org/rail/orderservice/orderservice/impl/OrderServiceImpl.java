@@ -537,29 +537,7 @@ public class OrderServiceImpl implements OrderService {
                 aggKey,
                 typeRef,
                 // 缓存未命中时，查库
-                dto -> {
-                    // 分页必须放在dbFallback内部（PageHelper线程绑定）
-                    PageHelper.startPage(dto.getPageNumber(), dto.getPageSize());
-                    List<OrderPageQueryVO> orderPageQueryVOList = orderMapper.getOrderPageByQueryDTO(dto);
-
-                    // 组装所有依赖的单表Key
-                    List<String> dependSingleKeys = new ArrayList<>();
-                    for (OrderPageQueryVO orderPageQueryVO : orderPageQueryVOList) {
-                        // orderKey
-                        String orderKey = RedisConstants.RAIL_ORDER_PREFIX + orderPageQueryVO.getOrderSn();
-                        dependSingleKeys.add(orderKey);
-
-                        // detailKeys
-                        List<OrderDetailsVO> detailsVOList = orderPageQueryVO.getOrderDetailsVOList();
-                        List<String> detailKeys = detailsVOList.stream()
-                                .map(detail -> RedisConstants.RAIL_ORDER_DETAILS_PREFIX + detail.getId())
-                                .toList();
-                        dependSingleKeys.addAll(detailKeys);
-                    }
-
-//                    return new PageResult<>(orderPageQueryVOList);
-                    return AggCacheResult.of(new PageResult<>(orderPageQueryVOList), dependSingleKeys);
-                },
+                this::queryOrderPageDb,
                 orderPageQueryDTO,
                 RedisConstants.RAIL_DEFAULT_TTL,
                 TimeUnit.MINUTES
@@ -568,6 +546,35 @@ public class OrderServiceImpl implements OrderService {
         /*PageHelper.startPage(orderPageQueryDTO.getPageNumber(), orderPageQueryDTO.getPageSize());
         List<OrderPageQueryVO> orderPageQueryVOList = orderMapper.getOrderPageByQueryDTO(orderPageQueryDTO);
         return new PageResult<>(orderPageQueryVOList);*/
+    }
+
+    /**
+     * 订单分页缓存未命中时：数据库查询 + 构建聚合缓存依赖Key
+     * @param dto 订单分页查询参数
+     * @return 聚合缓存结果（分页数据 + 依赖单表Key）
+     */
+    private AggCacheResult<PageResult<OrderPageQueryVO>> queryOrderPageDb(OrderPageQueryDTO dto) {
+        // 分页必须放在dbFallback内部（PageHelper线程绑定）
+        PageHelper.startPage(dto.getPageNumber(), dto.getPageSize());
+        List<OrderPageQueryVO> orderPageQueryVOList = orderMapper.getOrderPageByQueryDTO(dto);
+
+        // 组装所有依赖的单表Key
+        List<String> dependSingleKeys = new ArrayList<>();
+        for (OrderPageQueryVO orderPageQueryVO : orderPageQueryVOList) {
+            // orderKey
+            String orderKey = RedisConstants.RAIL_ORDER_PREFIX + orderPageQueryVO.getOrderSn();
+            dependSingleKeys.add(orderKey);
+
+            // detailKeys
+            List<OrderDetailsVO> detailsVOList = orderPageQueryVO.getOrderDetailsVOList();
+            List<String> detailKeys = detailsVOList.stream()
+                    .map(detail -> RedisConstants.RAIL_ORDER_DETAILS_PREFIX + detail.getId())
+                    .toList();
+            dependSingleKeys.addAll(detailKeys);
+        }
+
+//                    return new PageResult<>(orderPageQueryVOList);
+        return AggCacheResult.of(new PageResult<>(orderPageQueryVOList), dependSingleKeys);
     }
 
     /**
