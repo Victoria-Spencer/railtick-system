@@ -42,23 +42,23 @@ public interface TrainStopStationMapper {
 
     /**
      * 查询站点信息
-     * @param plannedTicketQueryDTO
-     * @return
+     * @param plannedTicketQueryDTO 查询条件
+     * @return 站点信息
      */
     StopInfoDTO getStopInfoByQueryDTO(PlannedTicketQueryDTO plannedTicketQueryDTO);
 
     /**
      * 查询终点站站序
-     * @param trainId
-     * @return
+     * @param trainId 列车ID
+     * @return 终点站站序
      */
     @Select("select max(sequence) from train_stop_station where train_id = #{trainId}")
     Integer getTerminalSequence(Long trainId);
 
     /**
      * 查询出发站站序和到达站站序
-     * @param sequenceQueryDTO
-     * @return
+     * @param sequenceQueryDTO 查询条件
+     * @return 出发站站序和到达站站序
      */
     SequenceDTO getSequenceInfo(SequenceQueryDTO sequenceQueryDTO);
 }

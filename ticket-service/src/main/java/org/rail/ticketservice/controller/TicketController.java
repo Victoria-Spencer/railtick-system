@@ -1,6 +1,7 @@
 package org.rail.ticketservice.controller;
 
 import lombok.extern.slf4j.Slf4j;
+import org.apache.ibatis.jdbc.Null;
 import org.rail.api.dto.AvailableSeatDTO;
 import org.rail.api.dto.RandomSeatQueryDTO;
 import org.rail.api.dto.SeatIntervalOccupyDTO;
@@ -24,8 +25,8 @@ public class TicketController {
 
     /**
      * 查询购票列表
-     * @param ticketQueryDTO
-     * @return
+     * @param ticketQueryDTO 购票查询条件
+     * @return 购票列表
      */
     @GetMapping("/query")
     public Result<List<TicketQueryVO>> queryTicket(@RequestBody TicketQueryDTO ticketQueryDTO) {
@@ -35,8 +36,8 @@ public class TicketController {
 
     /**
      * 查询拟购票信息
-     * @param plannedTicketQueryDTO
-     * @return
+     * @param plannedTicketQueryDTO 拟购票查询条件
+     * @return 拟购票信息
      */
     @GetMapping("/planned-tickets/query")
     public Result<TicketQueryVO>  queryPlannedTicket(@RequestBody PlannedTicketQueryDTO plannedTicketQueryDTO) {
@@ -51,7 +52,7 @@ public class TicketController {
     }
 
     @PutMapping("/seat-status/update")
-    public Result updateSeatStatus(@RequestBody SeatIntervalOccupyDTO sioDTO) {
+    public Result<Null> updateSeatStatus(@RequestBody SeatIntervalOccupyDTO sioDTO) {
         ticketService.updateSeatStatus(sioDTO);
         return Result.success();
     }

@@ -15,7 +15,6 @@ import org.springframework.util.StringUtils;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -31,16 +30,10 @@ public class StationServiceImpl implements StationService {
 
     /**
      * 根据查询类型或名称分页查询站点列表
-     * @param dto
-     * @return
+     * @param dto 站点分页查询参数（包含queryType、keyword、pageNumber、pageSize）
+     * @return 分页结果（包含总记录数和当前页数据列表）
      */
     public PageResult<StationPageQueryVO> pageQueryStations(StationPageQueryDTO dto) {
-        /*// 开始分页
-        PageHelper.startPage(dto.getPageNumber(), dto.getPageSize());
-        // 查询站点列表
-        List<StationPageQueryVO> list = stationMapper.pageQuery(dto);
-        return new PageResult<>(list);*/
-
         // 1. 从本地缓存获取全量站点数据
         List<Station> allStations = stationLocalCacheManager.getAllStations();
         if (allStations.isEmpty()) {
@@ -49,18 +42,7 @@ public class StationServiceImpl implements StationService {
         }
 
         // 2. 内存中模糊过滤（名称/拼音包含关键词）
-        Integer queryType = dto.getQueryType();
-        String keyword = dto.getKeyword();
-        List<Station> filteredStations = new ArrayList<>();
-        if (queryType != null) {
-            filteredStations = allStations.stream()
-                    .filter(station -> filterStationByQueryType(station, queryType))
-                    .collect(Collectors.toList());
-        } else {
-            filteredStations = allStations.stream()
-                    .filter(station -> filterStationByKeyword(station, keyword))
-                    .collect(Collectors.toList());
-        }
+        List<Station> filteredStations = getFilteredStations(dto, allStations);
         long total = filteredStations.size();
 
         // 3. 内存中分页
@@ -73,6 +55,28 @@ public class StationServiceImpl implements StationService {
 
         return new PageResult<>(total, voList, dto.getPageSize());
       }
+
+    /**
+     * 根据查询类型或关键词过滤站点列表
+     * @param dto 站点分页查询参数
+     * @param allStations 全量站点列表
+     * @return 过滤后的站点列表
+     */
+    private List<Station> getFilteredStations(StationPageQueryDTO dto, List<Station> allStations) {
+        Integer queryType = dto.getQueryType();
+        String keyword = dto.getKeyword();
+        List<Station> filteredStations;
+        if (queryType != null) {
+            filteredStations = allStations.stream()
+                    .filter(station -> filterStationByQueryType(station, queryType))
+                    .collect(Collectors.toList());
+        } else {
+            filteredStations = allStations.stream()
+                    .filter(station -> filterStationByKeyword(station, keyword))
+                    .collect(Collectors.toList());
+        }
+        return filteredStations;
+    }
 
     /**
      * 按queryType分组过滤
@@ -110,7 +114,7 @@ public class StationServiceImpl implements StationService {
 
     /**
      * 根据列车id查询列车经停站信息
-     * @return
+     * @return 列车经停站信息列表
      */
     public List<TrainStopStationVO> getStopsByTrainId(Long trainId) {
         // 获取列车经停站列表
@@ -121,11 +125,10 @@ public class StationServiceImpl implements StationService {
             LocalDateTime departureTime = trainStopStationVO.getDepartureTime();
 
             // 计算两个时间的差值（分钟）
-            Long stopoverMinutes = 0L;
+            long stopoverMinutes = 0L;
             if(arrivalTime!=null && departureTime!=null) {
                 stopoverMinutes = Duration.between(arrivalTime, departureTime).toMinutes();
             }
-            // 赋值（假设 stopoverTime 是 Long 或 long 类型）
             trainStopStationVO.setStopoverTime(stopoverMinutes);
         }
 

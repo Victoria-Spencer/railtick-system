@@ -13,15 +13,15 @@ public interface SeatClassMapper {
 
     /**
      * 批量查询席别信息
-     * @param seatQueryDTOList
-     * @return
+     * @param seatQueryDTOList 席别查询条件列表
+     * @return 席别信息列表
      */
     List<SeatClassVO> batchQuerySeatInfoByDTOList(List<SeatQueryDTO> seatQueryDTOList);
 
     /**
      * 查询可用座位
-     * @param seatTypeQueryDTO
-     * @return
+     * @param seatTypeQueryDTO 可用座位查询条件
+     * @return 可用座位列表
      */
     List<AvailableSeatDTO> getAvailableSeatsBySeatTypeQueryDTO(SeatTypeQueryDTO seatTypeQueryDTO);
 }

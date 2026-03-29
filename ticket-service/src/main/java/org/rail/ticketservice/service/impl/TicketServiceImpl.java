@@ -27,10 +27,7 @@ import org.springframework.stereotype.Service;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -59,80 +56,9 @@ public class TicketServiceImpl implements TicketService {
     private Integer preOrderExpireMinutes;
 
     /**
-     * 查询购票列表（old）
-     * @param ticketQueryDTO
-     * @return
-     */
-    /*public List<TicketQueryVO> queryTicket(TicketQueryDTO ticketQueryDTO) {
-
-        // 1.逻辑下沉到 SQL，用批量查询替代循环查询，直接通过一次数据库查询获取所有结果，MyBatis自动封装为List<TrainDetailVO>
-        List<TrainDetailVO> trainDetailVOList = stationMapper.getTrainDetailsByDTO(ticketQueryDTO);
-
-        List<TicketQueryVO> resultList = new ArrayList<>();
-
-        // 2.根据列车id，查询席别数据（类型等）--- List
-        List<SeatQueryDTO> seatQueryDTOList = BeanUtil.copyToList(trainDetailVOList, SeatQueryDTO.class);
-        List<SeatClassVO> seatClassVOList = querySeatClassData(seatQueryDTOList);
-        // 按trainId分组,映射到Map里面
-        Map<Long, List<SeatClassVO>> seatGroupByTrainId = seatClassVOList.stream()
-                .collect(Collectors.groupingBy(SeatClassVO::getTrainId));
-
-
-        // 3.拷贝属性
-        for (TrainDetailVO trainDetailVO : trainDetailVOList) {
-            TicketQueryVO ticketQueryVO = new TicketQueryVO();
-
-            // 3.1.拷贝列车属性
-            Train train = new Train();
-            BeanUtil.copyProperties(
-                    trainDetailVO,
-                    train,
-                    CopyOptions.create()
-                            .setFieldMapping(new HashMap<String, String>(){{
-                                put("trainId", "id");
-                            }})
-            );
-            ticketQueryVO.setTrain(train);
-
-            // 取出列车id
-            Long trainId = trainDetailVO.getTrainId();
-
-            // 3.2.拷贝席别信息
-            // 从Map中取该列车的席别列表
-            List<SeatClassVO> seatVOs = seatGroupByTrainId.getOrDefault(trainId, new ArrayList<>());
-            List<SeatClassFrontVO> frontVOs = BeanUtil.copyToList(seatVOs, SeatClassFrontVO.class);
-            ticketQueryVO.setSeatClassFrontVOList(frontVOs);
-
-            // 3.3.拷贝列车类型信息
-            List<TrainTypeVO> trainTypeVOList = trainDetailVO.getTrainTypeVOList();
-            ticketQueryVO.setTrainTypeVOList(trainTypeVOList);
-
-            // 3.3.拷贝其它属性
-            BeanUtil.copyProperties(trainDetailVO, ticketQueryVO);
-
-            // 3.4.计算历经时间
-            Integer duration = calculateDurationInMinutes(ticketQueryVO.getDepartureTime(), ticketQueryVO.getArrivalTime());
-            ticketQueryVO.setDuration(duration);
-
-            // 3.5.始发站和终点站判断
-            Integer departureStationId = trainDetailVO.getDepartureStationId();
-            boolean isDeparture = checkDepartureStation(trainId, departureStationId);
-            Integer arrivalStationId = trainDetailVO.getArrivalStationId();
-            boolean isArrival = checkTerminalStation(trainId, arrivalStationId);
-            ticketQueryVO.setDepartureFlag(isDeparture);
-            ticketQueryVO.setArrivalFlag(isArrival);
-
-            resultList.add(ticketQueryVO);
-        }
-
-        // 封装返回
-        return resultList;
-    }*/
-
-    /**
      * 查询购票列表（新增分层次缓存）
-     * @param ticketQueryDTO
-     * @return
+     * @param ticketQueryDTO 购票查询参数DTO
+     * @return 购票列表VO
      */
     public List<TicketQueryVO> queryTicket(TicketQueryDTO ticketQueryDTO) {
         // 查询车次基础信息
@@ -147,8 +73,8 @@ public class TicketServiceImpl implements TicketService {
 
     /**
      * 查询席别信息
-     * @param trainDetailVOList
-     * @return
+     * @param trainDetailVOList 车次详情列表（包含trainId等核心查询维度）
+     * @return 席别信息列表
      */
     private List<SeatClassVO> querySeatClassData(List<TrainDetailVO> trainDetailVOList) {
         // 1. 转换入参：TrainDetailVO -> SeatQueryDTO
@@ -169,7 +95,7 @@ public class TicketServiceImpl implements TicketService {
                 .collect(Collectors.groupingBy(SeatQueryDTO::getTrainId)); // 按trainId分组
 
         // 4. 定义返回类型（单个SeatClassVO）
-        TypeReference<SeatClassVO> typeRef = new TypeReference<SeatClassVO>() {};
+        TypeReference<SeatClassVO> typeRef = new TypeReference<>() {};
 
         // 5. 调用缓存工具类
         return cacheClient.batchQueryAggCache(
@@ -230,9 +156,9 @@ public class TicketServiceImpl implements TicketService {
 
     /**
      * 构建购票列表返回条件
-     * @param trainDetailVOList
-     * @param seatClassVOList
-     * @return
+     * @param trainDetailVOList 车次详情列表
+     * @param seatClassVOList 席别信息列表
+     * @return 购票列表VO
      */
     private List<TicketQueryVO> buildTicketQueryVO(List<TrainDetailVO> trainDetailVOList,
                                                    List<SeatClassVO> seatClassVOList,
@@ -256,7 +182,7 @@ public class TicketServiceImpl implements TicketService {
                     trainDetailVO,
                     train,
                     CopyOptions.create()
-                            .setFieldMapping(new HashMap<String, String>(){{
+                            .setFieldMapping(new HashMap<>(){{
                                 put("trainId", "id");
                             }})
             );
@@ -331,7 +257,7 @@ public class TicketServiceImpl implements TicketService {
                     continue; // 避免空Key导致缓存操作失败
                 }
                 // 缓存订单分页查询信息
-                TypeReference<List<TrainDetailVO>> typeRef = new TypeReference<List<TrainDetailVO>>() {};
+                TypeReference<List<TrainDetailVO>> typeRef = new TypeReference<>() {};
                 List<TrainDetailVO> detailVOS = cacheClient.queryAggCache(
                         aggKey,
                         typeRef,
@@ -430,8 +356,8 @@ public class TicketServiceImpl implements TicketService {
 
     /**
      * 查询拟购票信息
-     * @param plannedTicketQueryDTO
-     * @return
+     * @param plannedTicketQueryDTO 拟购票查询参数DTO
+     * @return 拟购票信息VO
      */
     public TicketQueryVO queryPlannedTicket(PlannedTicketQueryDTO plannedTicketQueryDTO) {
         TicketQueryVO ticketQueryVO = new TicketQueryVO();
@@ -481,8 +407,8 @@ public class TicketServiceImpl implements TicketService {
 
     /**
      * 查询可用座位
-     * @param randomSeatQueryDTO
-     * @return
+     * @param randomSeatQueryDTO 随机选座查询参数DTO
+     * @return 可用座位列表DTO
      */
     public List<AvailableSeatDTO> getAvailableSeats(RandomSeatQueryDTO randomSeatQueryDTO) {
         List<AvailableSeatDTO> availableSeatDTOList = new ArrayList<>();
@@ -516,7 +442,9 @@ public class TicketServiceImpl implements TicketService {
 
     /**
      * 更新座位占用区间，并同步新的座位状态
-     * @param sioDTO
+     * @param sioDTO 座区间占用变动DTO，包含新增和更新的占用记录列表
+      *               - insertDTOList：新增的占用记录列表
+     *                - updateDTOList：更新的占用记录列表
      */
     public void updateSeatStatus(SeatIntervalOccupyDTO sioDTO) {
         List<SeatIntervalOccupyInsertDTO> insertDTOList = sioDTO.getInsertDTOList();
@@ -578,7 +506,7 @@ public class TicketServiceImpl implements TicketService {
             seatIntervalOccupy.setStartSequence(seqs.getStartSequence());
             seatIntervalOccupy.setEndSequence(seqs.getEndSequence());
             seatIntervalOccupy.setCreateTime(LocalDateTime.now());
-            if (seatIntervalOccupy.getOrderType() == OrderTypeConstants.PREORDER) {
+            if (OrderTypeConstants.PREORDER.equals(seatIntervalOccupy.getOrderType())) {
                 seatIntervalOccupy.setExpireTime(calculateExpireTime());
             }
         }
@@ -589,8 +517,8 @@ public class TicketServiceImpl implements TicketService {
 
     /**
      * 查看区间状态
-     * @param updateSeatStatusDTOList
-     * @return
+     * @param updateSeatStatusDTOList 待更新座位状态的DTO列表（包含trainId、seatId、startSequence、endSequence等核心查询维度）
+     * @return 座位状态更新条件DTO列表（包含trainId、seatId、startSequence、endSequence、status等属性）
      */
     private List<SeatStatusUpdateConditionDTO> checkSeatIntervalOccupationStatus(List<UpdateSeatStatusDTO> updateSeatStatusDTOList) {
         // 查询列车下指定的席别类型下的指定座位的占用区间
@@ -601,7 +529,7 @@ public class TicketServiceImpl implements TicketService {
         }
 
         // 返回的状态集合
-        Long trainId = intervalOccupyDTOList.get(0).getTrainId();
+        Long trainId = intervalOccupyDTOList.getFirst().getTrainId();
         List<SeatStatusUpdateConditionDTO> seatStatusUpdateConditionDTOList = BeanUtil
                         .copyToList(intervalOccupyDTOList, SeatStatusUpdateConditionDTO.class);
 
@@ -618,9 +546,9 @@ public class TicketServiceImpl implements TicketService {
 
     /**
      * 判断座位状态
-     * @param intervalList
-     * @param trainId
-     * @return
+     * @param intervalList 座位占用区间列表（包含startSequence、endSequence等属性）
+     * @param trainId 列车ID（用于查询终点站站序，判断是否完全占用）
+     * @return 座位状态（0-无占用，1-部分占用，2-完全占用）
      */
     private Integer getSeatStatus(List<SequenceDTO> intervalList, Long trainId) {
         // 无占用
@@ -633,7 +561,7 @@ public class TicketServiceImpl implements TicketService {
         Integer beginSeq = 1;
         Integer terminalSeq = trainStopStationMapper.getTerminalSequence(trainId);
         // 开始站序不是起点站序或最后站序不是终点站序，则部分占用
-        if(intervalList.getFirst().getStartSequence() != beginSeq || intervalList.getLast().getEndSequence() != terminalSeq) {
+        if(!beginSeq.equals(intervalList.getFirst().getStartSequence()) || !terminalSeq.equals(intervalList.getLast().getEndSequence())) {
             return SeatStatusConstants.PARTIALLY_OCCUPIED;
         }
 
@@ -652,14 +580,14 @@ public class TicketServiceImpl implements TicketService {
 
     /**
      * 按seatType对seatTypes进行分类
-     * @param seatTypes
-     * @return
+     * @param seatTypes 席别类型列表（可能包含重复的seatType，表示需要的该类型座位数量）
+     * @return Map<seatType, count>，key为seatType，value为该类型出现的次数（即需要的座位数量）
      */
     private Map<Integer, Integer> countSeatTypes(List<Integer> seatTypes) {
         // 处理null列表（返回空Map），非空则统计
         return seatTypes == null ? new HashMap<>() :
                 seatTypes.stream()
-                        .filter(seatType -> seatType != null) // 过滤null（可选）
+                        .filter(Objects::nonNull) // 过滤null（可选）
                         .collect(Collectors.groupingBy(
                                 Function.identity(), // key：seatType本身
                                 Collectors.summingInt(e -> 1) // value：出现次数（每次+1）
@@ -689,7 +617,7 @@ public class TicketServiceImpl implements TicketService {
         long minutesLong = Duration.between(departureTime, arrivalTime).toMinutes();
 
         // 转为整形返回
-        Integer minutesInteger;
+        int minutesInteger;
         if (minutesLong > Integer.MAX_VALUE) {
             // 超出最大值，按业务需求处理（如取最大值）
             minutesInteger = Integer.MAX_VALUE;
@@ -705,7 +633,7 @@ public class TicketServiceImpl implements TicketService {
 
     /**
      * 计算过期时间
-     * @return
+     * @return 过期时间（当前时间 + 预订单有效期分钟数）
      */
     public LocalDateTime calculateExpireTime() {
         // 1. 获取当前时间
@@ -715,8 +643,6 @@ public class TicketServiceImpl implements TicketService {
         int minutes = (preOrderExpireMinutes != null) ? preOrderExpireMinutes : 15;
 
         // 3. 计算过期时间：当前时间 + 过期分钟数
-        LocalDateTime expireTime = now.plusMinutes(minutes);
-
-        return expireTime;
+        return now.plusMinutes(minutes);
     }
 }

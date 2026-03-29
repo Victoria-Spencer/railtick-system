@@ -202,8 +202,8 @@ public class OrderServiceImpl implements OrderService {
      *      2.2.TODO 退出选座界面：立即释放座位
      *      2.3.TODO 定时任务清理过期预订单
      *  ）
-     * @param createPreOrderDTO
-     * @return
+     * @param createPreOrderDTO 预订单创建参数（包含用户ID、列车ID、乘客信息、选座信息等）
+     * @return 预订单号（唯一标识预订单，格式：PRE + 雪花ID）
      */
     // 全局事务
     @GlobalTransactional
@@ -279,7 +279,7 @@ public class OrderServiceImpl implements OrderService {
 
         // 6. 远程调用票务服务释放座位锁（捕获异常，保证分布式事务能感知失败并回滚）
         try {
-            if (releaseDTO != null && !releaseDTO.isEmpty()) { // 非空校验：避免空调用
+            if (!releaseDTO.isEmpty()) { // 非空校验：避免空调用
                 ticketFeignClient.updateSeatStatus(releaseDTO);
             }
         } catch (Exception e) {
@@ -347,15 +347,15 @@ public class OrderServiceImpl implements OrderService {
 
         // 远程调用锁定新座位
         sioDTO.setInsertDTOList(insertDTOList);
-        if (sioDTO != null && !sioDTO.isEmpty()) {
+        if (!sioDTO.isEmpty()) {
             ticketFeignClient.updateSeatStatus(sioDTO);
         }
     }
 
     /**
      * 创建订单，并返回订单数据
-     * @param createOrderDTO
-     * @return
+     * @param createOrderDTO 订单创建参数（包含预订单号、支付信息等）
+     * @return 订单数据（订单号、订单明细等）
      */
     // 全局事务
     @GlobalTransactional
@@ -404,7 +404,7 @@ public class OrderServiceImpl implements OrderService {
         SeatIntervalOccupyDTO sioDTO = new SeatIntervalOccupyDTO();
 
         // 4.判断座位是否为空，若为空，则随机分配
-        String seatNo = orderDetailsList.get(0).getSeatNo();
+        String seatNo = orderDetailsList.getFirst().getSeatNo();
         if (seatNo == null) {
             Map<Integer, List<SeatDTO>> seatTypeToSeatsMap = getSeatTypeToSeatsMap(order, orderDetailsList);
 
@@ -467,7 +467,7 @@ public class OrderServiceImpl implements OrderService {
         markPreOrderStatus2(preOrderId);
 
         // 远程调用，修改区间和更新座位的状态
-        if (sioDTO != null && !sioDTO.isEmpty()) {
+        if (!sioDTO.isEmpty()) {
             ticketFeignClient.updateSeatStatus(sioDTO);
         }
 
@@ -493,8 +493,8 @@ public class OrderServiceImpl implements OrderService {
                 .map(OrderDetails::getSeatType)
                 .collect(Collectors.toList());
         randomSeatQueryDTO.setSeatTypes(seatTypes);
-        randomSeatQueryDTO.setDepartureCode(orderDetailsList.get(0).getDepartureCode());
-        randomSeatQueryDTO.setArrivalCode(orderDetailsList.get(0).getArrivalCode());
+        randomSeatQueryDTO.setDepartureCode(orderDetailsList.getFirst().getDepartureCode());
+        randomSeatQueryDTO.setArrivalCode(orderDetailsList.getFirst().getArrivalCode());
 
         // 远程调用
         Result<List<AvailableSeatDTO>> feignResult = ticketFeignClient.getAvailableSeats(randomSeatQueryDTO);
@@ -526,13 +526,13 @@ public class OrderServiceImpl implements OrderService {
 
     /**
      * 分页查询订单
-     * @param orderPageQueryDTO
-     * @return
+     * @param orderPageQueryDTO 订单分页查询参数（包含用户ID、订单状态、订单类型、日期范围、车次等查询条件，以及分页参数）
+     * @return 订单分页数据（分页结果 + 依赖的单表Key列表，用于构建聚合缓存）
      */
     public PageResult<OrderPageQueryVO> orderPageQuery(OrderPageQueryDTO orderPageQueryDTO) {
         String aggKey = buildOrderPageCacheKey(orderPageQueryDTO);
         // 缓存订单分页查询信息
-        TypeReference<PageResult<OrderPageQueryVO>> typeRef = new TypeReference<PageResult<OrderPageQueryVO>>() {};
+        TypeReference<PageResult<OrderPageQueryVO>> typeRef = new TypeReference<>() {};
         return cacheClient.queryAggCache(
                 aggKey,
                 typeRef,
@@ -579,8 +579,8 @@ public class OrderServiceImpl implements OrderService {
 
     /**
      * 生成订单唯一的缓存Key
-     * @param dto
-     * @return
+     * @param dto 订单分页查询参数（包含用户ID、订单状态、订单类型、日期范围、车次等查询条件，以及分页参数）
+     * @return 订单分页查询的唯一缓存Key（格式：前缀 + 用户ID + : + 各查询条件 + 分页参数，确保同一用户相同查询条件的请求命中同一缓存）
      */
     private String buildOrderPageCacheKey(OrderPageQueryDTO dto) {
         String prefix = RedisConstants.RAIL_AGG_ORDER_PAGE_USER_PREFIX + dto.getUserId() + ":";
@@ -603,17 +603,17 @@ public class OrderServiceImpl implements OrderService {
 
     /**
      * 分页查询本人车票
-     * @param frontSelfTicketPageDTO
-     * @return
+     * @param frontSelfTicketPageDTO 本人车票分页查询参数（包含用户ID、车票状态、日期范围、车次等查询条件，以及分页参数）
+     * @return 本人车票分页数据（分页结果 + 依赖的单表Key列表）
      */
     @GlobalTransactional
     public PageResult<SelfTicketPageVO> selfTicketPageQuery(FrontSelfTicketPageDTO frontSelfTicketPageDTO) {
         String aggKey = buildSelfTicketCacheKey(frontSelfTicketPageDTO);
-        TypeReference<PageResult<SelfTicketPageVO>> typeRef = new TypeReference<PageResult<SelfTicketPageVO>>() {};
+        TypeReference<PageResult<SelfTicketPageVO>> typeRef = new TypeReference<>() {};
         return cacheClient.queryAggCache(
                 aggKey,
                 typeRef,
-                dto -> loadSelfTicketFromDb(dto),
+                this::loadSelfTicketFromDb,
                 frontSelfTicketPageDTO,
                 RedisConstants.RAIL_DEFAULT_TTL,
                 TimeUnit.MINUTES
@@ -678,7 +678,7 @@ public class OrderServiceImpl implements OrderService {
 
     /**
      * 取消车票订单
-     * @param orderSn
+     * @param orderSn 订单号
      */
     public void cancelOrder(String orderSn) {
         orderMapper.updateOrderByOrderSn(orderSn);
@@ -688,7 +688,7 @@ public class OrderServiceImpl implements OrderService {
 
     /**
      * 标记预订单为已转为正式订单
-     * @param preOrderId
+     * @param preOrderId 预订单ID
      */
     private void markPreOrderStatus2(Long preOrderId) {
         /**        标记预订单为已转为正式订单        **/
@@ -700,8 +700,8 @@ public class OrderServiceImpl implements OrderService {
 
     /**
      * 重新生成新的预订单
-     * @param createPreOrderDTO
-     * @return
+     * @param createPreOrderDTO 预订单创建参数（包含用户ID、列车ID、乘客信息、选座信息等）
+     * @return 新预订单号（唯一标识预订单，格式：PRE + 雪花ID）
      */
     private String createNewPreOrder(CreatePreOrderDTO createPreOrderDTO) {
         // 1.生成预订单对象
@@ -785,7 +785,7 @@ public class OrderServiceImpl implements OrderService {
         orderMapper.batchInsertPreOrderDetails(preOrderDetailsList);
 
         sioDTO.setInsertDTOList(insertDTOList);
-        if(sioDTO != null && !sioDTO.isEmpty()) {
+        if(!sioDTO.isEmpty()) {
             // 5.远程调用，新增新的占用区间，并更新座位的状态
             ticketFeignClient.updateSeatStatus(sioDTO);
         }
@@ -795,7 +795,7 @@ public class OrderServiceImpl implements OrderService {
 
     /**
      * 计算过期时间
-     * @return
+     * @return 过期时间（当前时间 + 预设的过期分钟数，默认15分钟）
      */
     public LocalDateTime calculateExpireTime() {
         // 1. 获取当前时间
@@ -805,8 +805,6 @@ public class OrderServiceImpl implements OrderService {
         int minutes = (preOrderExpireMinutes != null) ? preOrderExpireMinutes : 15;
 
         // 3. 计算过期时间：当前时间 + 过期分钟数
-        LocalDateTime expireTime = now.plusMinutes(minutes);
-
-        return expireTime;
+        return now.plusMinutes(minutes);
     }
 }
