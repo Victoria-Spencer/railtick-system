@@ -5,7 +5,6 @@ package org.rail.gatewayservice.exception;
  */
 public class UnauthorizedException extends RuntimeException { // 继承RuntimeException，非受检异常
 
-    
     public UnauthorizedException() {
         super();
     }
