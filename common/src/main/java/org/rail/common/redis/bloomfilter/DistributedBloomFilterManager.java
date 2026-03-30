@@ -38,7 +38,7 @@ public class DistributedBloomFilterManager {
         String bloomKey = buildBloomKey(bizType);
 
         Boolean exists = stringRedisTemplate.hasKey(bloomKey);
-        if (Boolean.TRUE.equals(exists)) {
+        if (exists) {
             log.debug("布隆过滤器已存在，无需重复初始化 | BizType:{}", bizType);
             return;
         }
@@ -58,7 +58,7 @@ public class DistributedBloomFilterManager {
                     bizType, expectedInsertions, fpp);
         } catch (Exception e) {
             log.warn("RedisBloom模块未加载（BF.RESERVE指令失败），将在首次添加元素时自动创建过滤器 | BizType:{}", bizType);
-            log.debug("初始化失败详情", e);
+            throw new RuntimeException("RedisBloom模块未加载异常：" + e.getMessage(), e);
         }
     }
 
@@ -83,6 +83,7 @@ public class DistributedBloomFilterManager {
                     bizType, key, Boolean.TRUE.equals(success) ? "成功" : "已存在");
         } catch (Exception e) {
             log.error("布隆过滤器添加元素失败 | BizType:{}, Key:{}", bizType, key, e);
+            throw new RuntimeException("布隆过滤器添加元素失败：" + e.getMessage(), e);
         }
     }
 
@@ -107,6 +108,8 @@ public class DistributedBloomFilterManager {
             log.debug("布隆过滤器批量添加成功 | BizType:{}, Key数量:{}", bizType, keys.size());
         } catch (Exception e) {
             log.error("布隆过滤器批量添加失败 | BizType:{}, Key数量:{}", bizType, keys.size(), e);
+            // 抛出运行时异常，调用方无需强制捕获
+            throw new RuntimeException("布隆过滤器批量添加异常：" + e.getMessage(), e);
         }
     }
 
@@ -132,7 +135,7 @@ public class DistributedBloomFilterManager {
             return mightContain;
         } catch (Exception e) {
             log.error("布隆过滤器判断失败 | BizType:{}, Key:{}", bizType, key, e);
-            return true;
+            throw new RuntimeException("布隆过滤器判断失败：" + e.getMessage(), e);
         }
     }
 
