@@ -3,6 +3,7 @@ package org.rail.orderservice.orderservice.impl;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.bean.copier.CopyOptions;
 import cn.hutool.core.lang.TypeReference;
+import cn.hutool.core.util.ObjectUtil;
 import com.github.pagehelper.PageHelper;
 import io.seata.spring.annotation.GlobalTransactional;
 import lombok.extern.slf4j.Slf4j;
@@ -66,142 +67,6 @@ public class OrderServiceImpl implements OrderService {
      *      2.2.TODO 退出选座界面：立即释放座位
      *      2.3.TODO 定时任务清理过期预订单
      *  ）
-     * @param createPreOrderDTO
-     * @return
-    // 全局事务
-    @GlobalTransactional
-    public String createPreOrder(CreatePreOrderDTO createPreOrderDTO) {
-        // 1.根据用户ID和列车ID，查询是否已存在预订单
-        PreOrder preOrder = orderMapper.getByPreOrderUserIdAndTrainId(createPreOrderDTO.getUserId(), createPreOrderDTO.getTrainId());
-        // 2.若已经存在，则直接修改
-        if(preOrder != null) {
-            // TODO 订单明细不同，创建新订单
-            // 获取旧预订单的明细
-            List<PreOrderDetails> oldDetails = orderMapper.getTempSeatInfoByPreOrderId(preOrder.getId());
-            // 获取新提交的明细（乘客+选座）
-            List<PassengerOrderDetailDTO> newPassengers = createPreOrderDTO.getPassengerOrderDetailDTOList();
-            List<ChooseSeatDTO> newSeats = createPreOrderDTO.getChooseSeats();
-
-            // 判断明细是否不同（乘客数量/信息、选座信息不一致）
-            boolean isDetailsDifferent = checkPreOrderDetailsDifferent(oldDetails, newPassengers, newSeats);
-
-            // 若明细不同 → 先删除旧预订单（释放座位锁），再创建新订单
-            if (isDetailsDifferent) {
-                // ===== 删除旧预订单前，先释放关联的座位锁 =====
-                releaseOldPreOrderSeatLock(preOrder, oldDetails);
-                // ===== 删除旧预订单的明细和主记录 =====
-                deleteOldPreOrder(preOrder.getId());
-                // 创建新预订单
-                return createNewPreOrder(createPreOrderDTO);
-            }
-
-            // 重新生成过期时间和预订单状态
-            preOrder.setExpireTime(calculateExpireTime());
-            preOrder.setStatus(PreOrderStatusConstants.VALID);
-            preOrder.setCreateTime(LocalDateTime.now());
-            orderMapper.updatePreOrder(preOrder);
-
-            // 修改临时座位信息
-            Long preOrderId = preOrder.getId();
-            List<PreOrderDetails> preOrderDetailsList = orderMapper.getTempSeatInfoByPreOrderId(preOrderId);
-            List<ChooseSeatDTO> chooseSeats = createPreOrderDTO.getChooseSeats();
-
-            // 校验预订单详情列表不为空（必须有乘客信息）
-            if (preOrderDetailsList == null || preOrderDetailsList.isEmpty()) {
-                throw new IllegalArgumentException("预订单详情列表不能为空");
-            }
-
-            // 构建远程调用的条件，【先前的座位信息，标记为已释放】
-            SeatIntervalOccupyDTO sioDTO = new SeatIntervalOccupyDTO();
-            if (preOrderDetailsList.get(0).getTempSeatNo() != null) {
-                List<SeatIntervalOccupyUpdateDTO> updateDTOList = new ArrayList<>();
-                updateDTOList = BeanUtil.copyToList(
-                        preOrderDetailsList,
-                        SeatIntervalOccupyUpdateDTO.class,
-                        CopyOptions
-                                .create()
-                                .setFieldMapping(new HashMap<>() {{
-                                    put("preOrderId", "orderId");
-                                    put("tempSeatNo", "seatNo");
-                                }})
-                );
-
-                Long trainId = preOrder.getTrainId(); // 列车ID
-                for (SeatIntervalOccupyUpdateDTO updateDTO : updateDTOList) {
-                    updateDTO.setTrainId(trainId);
-                    updateDTO.setOrderType(OrderTypeConstants.PREORDER); // 订单类型为预订单
-                    updateDTO.setStatus(SeatIntervalStatusConstants.RELEASED); // 座位占用已释放
-                }
-                sioDTO.setUpdateDTOList(updateDTOList);
-            }
-
-            // 处理“取消选座”场景（chooseSeats为空）
-            if (chooseSeats == null || chooseSeats.isEmpty()) {
-                // 清空所有座位信息
-                for (PreOrderDetails details : preOrderDetailsList) {
-                    details.setCarriageNumber(null);
-                    details.setTempSeatNo(null);
-                }
-            } else {
-                // 处理“选座”场景（校验数量匹配后更新）
-                if (preOrderDetailsList.size() != chooseSeats.size()) {
-                    throw new IllegalArgumentException("预订单详情列表与座位数量不匹配");
-                }
-
-                List<SeatIntervalOccupyInsertDTO> insertDTOList = new ArrayList<>();
-
-                for (int i = 0; i < preOrderDetailsList.size(); i++) {
-                    PreOrderDetails details = preOrderDetailsList.get(i);
-                    ChooseSeatDTO seat = chooseSeats.get(i);
-                    details.setCarriageNumber(seat.getCarriageNumber());
-                    details.setTempSeatNo(seat.getTempSeatNo());
-
-                    // 构建远程调用的条件，【现在的座位信息，新增占用记录】
-                    SeatIntervalOccupyInsertDTO insertDTO = new SeatIntervalOccupyInsertDTO();
-                    BeanUtil.copyProperties(
-                            details,
-                            insertDTO,
-                            CopyOptions
-                                    .create()
-                                    .setFieldMapping(new HashMap<>() {{
-                                        put("preOrderId", "orderId");
-                                        put("tempSeatNo", "seatNo");
-                                    }})
-                    );
-                    insertDTO.setTrainId(preOrder.getTrainId());
-                    insertDTO.setDepartureCode(createPreOrderDTO.getDepartureCode());
-                    insertDTO.setArrivalCode(createPreOrderDTO.getArrivalCode());
-                    insertDTO.setOrderType(OrderTypeConstants.PREORDER); // 订单类型为预订单
-                    insertDTO.setStatus(SeatIntervalStatusConstants.LOCKED); // 座位锁定中
-                    insertDTOList.add(insertDTO);
-                }
-
-                sioDTO.setInsertDTOList(insertDTOList);
-            }
-
-            // 执行更新
-            orderMapper.updatePreOrderDetailsList(preOrderDetailsList);
-
-            // 远程调用，修改占用区间与更新座位状态
-            if (sioDTO != null && !sioDTO.isEmpty()){
-                ticketFeignClient.updateSeatStatus(sioDTO);
-            }
-
-            return preOrder.getPreOrderSn();
-        }
-
-        // 3.未存在，则重新生成
-        return createNewPreOrder(createPreOrderDTO);
-    }*/
-
-    /**
-     * 1.创建预订单，临时锁定座位
-     * 2.避免造成长期锁座现象
-     * （
-     *      2.1.同一用户 + 同一车次的预订单 “覆盖机制”
-     *      2.2.TODO 退出选座界面：立即释放座位
-     *      2.3.TODO 定时任务清理过期预订单
-     *  ）
      * @param createPreOrderDTO 预订单创建参数（包含用户ID、列车ID、乘客信息、选座信息等）
      * @return 预订单号（唯一标识预订单，格式：PRE + 雪花ID）
      */
@@ -211,33 +76,47 @@ public class OrderServiceImpl implements OrderService {
         // 1. 根据用户ID和列车ID，查询是否已存在预订单
         PreOrder preOrder = orderMapper.getByPreOrderUserIdAndTrainId(createPreOrderDTO.getUserId(), createPreOrderDTO.getTrainId());
 
-        if(preOrder != null) {
-            // 2. 有旧预订单：保留主记录，仅替换明细
-            // 2.1 释放旧明细关联的座位锁
-            List<PreOrderDetails> oldDetails = orderMapper.getTempSeatInfoByPreOrderId(preOrder.getId());
-            releaseOldPreOrderSeatLock(preOrder, oldDetails);
-
-            // 2.2 删除旧明细（仅删明细，不删主记录）
-            orderMapper.deletePreOrderDetailsByPreOrderId(preOrder.getId());
-
-            // 2.3 更新预订单主记录（重置过期时间、状态）
-            // 修复：新增总金额计算并更新
-            Double newTotalAmount = createPreOrderDTO.getPassengerOrderDetailDTOList().stream()
-                    .map(PassengerOrderDetailDTO::getAmount)
-                    .reduce(0.0, Double::sum);
-            preOrder.setTotalAmount(newTotalAmount);
-            preOrder.setExpireTime(calculateExpireTime());
-            preOrder.setStatus(PreOrderStatusConstants.VALID);
-            orderMapper.updatePreOrder(preOrder);
-
-            // 2.4 插入新明细
-            insertNewPreOrderDetails(preOrder.getId(), createPreOrderDTO);
-
-            return preOrder.getPreOrderSn(); // 预订单号不变
+        if(ObjectUtil.isNotNull(preOrder)) {
+            // 2. 存在旧预订单：更新逻辑
+            return updateExistPreOrder(createPreOrderDTO, preOrder);
         } else {
             // 3. 无旧预订单：创建新预订单+新明细
             return createNewPreOrder(createPreOrderDTO);
         }
+    }
+
+    /**
+     * 更新已存在的预订单，保留主记录，仅替换明细
+     */
+    private String updateExistPreOrder(CreatePreOrderDTO createPreOrderDTO, PreOrder preOrder) {
+        // 1 释放旧明细关联的座位锁
+        List<PreOrderDetails> oldDetails = orderMapper.getTempSeatInfoByPreOrderId(preOrder.getId());
+        releaseOldPreOrderSeatLock(preOrder, oldDetails);
+
+        // 2 删除旧明细（仅删明细，不删主记录）
+        orderMapper.deletePreOrderDetailsByPreOrderId(preOrder.getId());
+
+        // 3 更新预订单主记录（重置过期时间、状态）
+        updatePreOrderMainInfo(createPreOrderDTO, preOrder);
+
+        // 4 插入新明细
+        insertNewPreOrderDetails(preOrder.getId(), createPreOrderDTO);
+
+        log.info("预订单更新成功，预订单号：{}", preOrder.getPreOrderSn());
+        return preOrder.getPreOrderSn();
+    }
+
+    /**
+     * 更新预订单主表信息
+     */
+    private void updatePreOrderMainInfo(CreatePreOrderDTO createPreOrderDTO, PreOrder preOrder) {
+        Double newTotalAmount = createPreOrderDTO.getPassengerOrderDetailDTOList().stream()
+                .map(PassengerOrderDetailDTO::getAmount)
+                .reduce(0.0, Double::sum);
+        preOrder.setTotalAmount(newTotalAmount);
+        preOrder.setExpireTime(calculateExpireTime());
+        preOrder.setStatus(PreOrderStatusConstants.VALID);
+        orderMapper.updatePreOrder(preOrder);
     }
 
     /**
@@ -246,16 +125,27 @@ public class OrderServiceImpl implements OrderService {
      * @param oldDetails  旧预订单明细（包含需要释放的座位信息）
      */
     private void releaseOldPreOrderSeatLock(PreOrder oldPreOrder, List<PreOrderDetails> oldDetails) {
-        // 1. 空值校验：无旧明细则无需释放座位锁，直接返回
-        if (oldDetails == null || oldDetails.isEmpty()) {
+        if (ObjectUtil.isEmpty(oldDetails)) {
             return;
         }
 
-        // 2. 构建座位锁释放的核心DTO（用于远程调用票务服务更新座位状态）
-        SeatIntervalOccupyDTO releaseDTO = new SeatIntervalOccupyDTO();
+        SeatIntervalOccupyDTO releaseDTO = buildSeatReleaseDto(oldPreOrder, oldDetails);
+        try {
+            if (!releaseDTO.isEmpty()) {
+                ticketFeignClient.updateSeatStatus(releaseDTO);
+            }
+        } catch (Exception e) {
+            log.error("释放预订单座位锁失败，预订单ID：{}", oldPreOrder.getId(), e);
+            // 抛出业务异常，触发Seata全局事务回滚（避免「预订单已删但座位未释放」的脏数据）
+            throw new OpenFeignException("释放旧预订单座位锁失败：" + e.getMessage());
+        }
+    }
 
-        // 3. 将旧预订单明细转换为座位状态更新DTO列表
-        // 字段映射：preOrderId → orderId（票务服务统一用orderId标识订单/预订单）、tempSeatNo → seatNo
+    /**
+     * 构建座位释放DTO
+     */
+    private SeatIntervalOccupyDTO buildSeatReleaseDto(PreOrder oldPreOrder, List<PreOrderDetails> oldDetails) {
+        SeatIntervalOccupyDTO releaseDTO = new SeatIntervalOccupyDTO();
         List<SeatIntervalOccupyUpdateDTO> updateDTOList = BeanUtil.copyToList(
                 oldDetails,
                 SeatIntervalOccupyUpdateDTO.class,
@@ -266,26 +156,16 @@ public class OrderServiceImpl implements OrderService {
                         }})
         );
 
-        // 4. 为每个更新DTO补充必要的业务字段（保证票务服务能正确识别并释放对应座位）
-        Long trainId = oldPreOrder.getTrainId(); // 从旧预订单获取列车ID
+        // 填充公共字段
+        Long trainId = oldPreOrder.getTrainId();
         for (SeatIntervalOccupyUpdateDTO updateDTO : updateDTOList) {
-            updateDTO.setTrainId(trainId);                          // 绑定列车ID，避免跨车次释放座位
+            updateDTO.setTrainId(trainId);
             updateDTO.setOrderType(OrderTypeConstants.PREORDER);    // 标记为预订单类型（区分正式订单）
-            updateDTO.setStatus(SeatIntervalStatusConstants.RELEASED); // 座位状态改为「已释放」
+            updateDTO.setStatus(SeatIntervalStatusConstants.RELEASED);
         }
 
-        // 5. 将更新列表设置到核心DTO中
         releaseDTO.setUpdateDTOList(updateDTOList);
-
-        // 6. 远程调用票务服务释放座位锁（捕获异常，保证分布式事务能感知失败并回滚）
-        try {
-            if (!releaseDTO.isEmpty()) { // 非空校验：避免空调用
-                ticketFeignClient.updateSeatStatus(releaseDTO);
-            }
-        } catch (Exception e) {
-            // 抛出业务异常，触发Seata全局事务回滚（避免「预订单已删但座位未释放」的脏数据）
-            throw new OpenFeignException("释放旧预订单座位锁失败：" + e.getMessage());
-        }
+        return releaseDTO;
     }
 
     /**
@@ -294,62 +174,67 @@ public class OrderServiceImpl implements OrderService {
      * @param createPreOrderDTO 入参
      */
     private void insertNewPreOrderDetails(Long preOrderId, CreatePreOrderDTO createPreOrderDTO) {
-        List<PassengerOrderDetailDTO> passengerOrderDetailDTOList = createPreOrderDTO.getPassengerOrderDetailDTOList();
+        List<PassengerOrderDetailDTO> passengerList = createPreOrderDTO.getPassengerOrderDetailDTOList();
         List<ChooseSeatDTO> chooseSeats = createPreOrderDTO.getChooseSeats();
 
-        // 校验乘客明细不能为空
-        if (passengerOrderDetailDTOList == null || passengerOrderDetailDTOList.isEmpty()) {
-            throw new IllegalArgumentException("预订单详情列表不能为空");
+        if (ObjectUtil.isEmpty(passengerList)) {
+            throw new IllegalArgumentException("乘客信息不能为空");
         }
 
-        // 构建新明细列表
-        List<PreOrderDetails> preOrderDetailsList = new ArrayList<>();
+        List<PreOrderDetails> detailsList = new ArrayList<>();
         SeatIntervalOccupyDTO sioDTO = new SeatIntervalOccupyDTO();
         List<SeatIntervalOccupyInsertDTO> insertDTOList = new ArrayList<>();
 
-        for (int i = 0; i < passengerOrderDetailDTOList.size(); i++) {
-            // 默认不选座
-            PassengerOrderDetailDTO passengerDTO = passengerOrderDetailDTOList.get(i);
-            PreOrderDetails preOrderDetails = BeanUtil.copyProperties(passengerDTO, PreOrderDetails.class);
-            preOrderDetails.setPreOrderId(preOrderId);
-            preOrderDetails.setCarriageNumber(null);
-            preOrderDetails.setTempSeatNo(null);
-
-            // 处理选座逻辑
-            if (chooseSeats != null && !chooseSeats.isEmpty() && i < chooseSeats.size()) {
-                ChooseSeatDTO seat = chooseSeats.get(i);
-                preOrderDetails.setCarriageNumber(seat.getCarriageNumber());
-                preOrderDetails.setTempSeatNo(seat.getTempSeatNo());
-
-                // 构建座位锁定DTO
-                SeatIntervalOccupyInsertDTO insertDTO = new SeatIntervalOccupyInsertDTO();
-                BeanUtil.copyProperties(
-                        preOrderDetails,
-                        insertDTO,
-                        CopyOptions.create().setFieldMapping(new HashMap<>() {{
-                            put("preOrderId", "orderId");
-                            put("tempSeatNo", "seatNo");
-                        }})
-                );
-                insertDTO.setTrainId(createPreOrderDTO.getTrainId());
-                insertDTO.setDepartureCode(createPreOrderDTO.getDepartureCode());
-                insertDTO.setArrivalCode(createPreOrderDTO.getArrivalCode());
-                insertDTO.setOrderType(OrderTypeConstants.PREORDER);
-                insertDTO.setStatus(SeatIntervalStatusConstants.LOCKED);
-                insertDTOList.add(insertDTO);
-            }
-
-            preOrderDetailsList.add(preOrderDetails);
+        // 构建新明细
+        for (int i = 0; i < passengerList.size(); i++) {
+            PreOrderDetails preOrderDetails = buildPreOrderDetail(preOrderId, passengerList.get(i));
+            // 处理选座
+            handleChooseSeat(createPreOrderDTO, chooseSeats, i, preOrderDetails, insertDTOList);
+            detailsList.add(preOrderDetails);
         }
 
-        // 插入新明细
-        orderMapper.batchInsertPreOrderDetails(preOrderDetailsList);
+        // 批量插入
+        orderMapper.batchInsertPreOrderDetails(detailsList);
 
-        // 远程调用锁定新座位
-        sioDTO.setInsertDTOList(insertDTOList);
-        if (!sioDTO.isEmpty()) {
+        // 锁定新座位
+        if (ObjectUtil.isNotEmpty(insertDTOList)) {
+            sioDTO.setInsertDTOList(insertDTOList);
             ticketFeignClient.updateSeatStatus(sioDTO);
         }
+    }
+
+    private static void handleChooseSeat(CreatePreOrderDTO createPreOrderDTO, List<ChooseSeatDTO> chooseSeats, int i, PreOrderDetails preOrderDetails, List<SeatIntervalOccupyInsertDTO> insertDTOList) {
+        if (chooseSeats != null && !chooseSeats.isEmpty() && i < chooseSeats.size()) {
+            ChooseSeatDTO seat = chooseSeats.get(i);
+            preOrderDetails.setCarriageNumber(seat.getCarriageNumber());
+            preOrderDetails.setTempSeatNo(seat.getTempSeatNo());
+
+            // 构建座位锁定DTO
+            SeatIntervalOccupyInsertDTO insertDTO = new SeatIntervalOccupyInsertDTO();
+            BeanUtil.copyProperties(
+                    preOrderDetails,
+                    insertDTO,
+                    CopyOptions.create().setFieldMapping(new HashMap<>() {{
+                        put("preOrderId", "orderId");
+                        put("tempSeatNo", "seatNo");
+                    }})
+            );
+            insertDTO.setTrainId(createPreOrderDTO.getTrainId());
+            insertDTO.setDepartureCode(createPreOrderDTO.getDepartureCode());
+            insertDTO.setArrivalCode(createPreOrderDTO.getArrivalCode());
+            insertDTO.setOrderType(OrderTypeConstants.PREORDER);
+            insertDTO.setStatus(SeatIntervalStatusConstants.LOCKED);
+            insertDTOList.add(insertDTO);
+        }
+    }
+
+    private static PreOrderDetails buildPreOrderDetail(Long preOrderId, PassengerOrderDetailDTO passengerDTO) {
+        // 默认不选座
+        PreOrderDetails preOrderDetails = BeanUtil.copyProperties(passengerDTO, PreOrderDetails.class);
+        preOrderDetails.setPreOrderId(preOrderId);
+        preOrderDetails.setCarriageNumber(null);
+        preOrderDetails.setTempSeatNo(null);
+        return preOrderDetails;
     }
 
     /**
@@ -738,14 +623,7 @@ public class OrderServiceImpl implements OrderService {
         List<SeatIntervalOccupyInsertDTO> insertDTOList = new ArrayList<>();
 
         for (int i = 0; i < passengerOrderDetailDTOList.size(); i++) {
-            PassengerOrderDetailDTO passengerDTO = passengerOrderDetailDTOList.get(i); // 第i个乘客
-            // 拷贝乘客基本信息到预订单明细（姓名、证件等）
-            PreOrderDetails preOrderDetails = BeanUtil.copyProperties(passengerDTO, PreOrderDetails.class);
-            // 设置外键，车厢号和座位号
-            preOrderDetails.setPreOrderId(preOrderId);
-            // 初始化座位信息为null（默认不选座）
-            preOrderDetails.setCarriageNumber(null);
-            preOrderDetails.setTempSeatNo(null);
+            PreOrderDetails preOrderDetails = buildPreOrderDetail(preOrderId, passengerOrderDetailDTOList.get(i));
 
             // 若选座且座位列表不为空，补充座位信息
             if (chooseSeats != null && !chooseSeats.isEmpty()) {
