@@ -172,81 +172,85 @@ public class TicketServiceImpl implements TicketService {
     private List<TicketQueryVO> buildTicketQueryVO(List<TrainDetailVO> trainDetailVOList,
                                                    List<SeatClassVO> seatClassVOList,
                                                    TicketQueryDTO ticketQueryDTO) {
-        List<TicketQueryVO> resultList = new ArrayList<>();
+        if (CollectionUtils.isEmpty(trainDetailVOList)) {
+            return Collections.emptyList();
+        }
 
         // 按trainId分组,映射到Map里面
         Map<Long, List<SeatClassVO>> seatGroupByTrainId = seatClassVOList.stream()
                 .collect(Collectors.groupingBy(SeatClassVO::getTrainId));
-
         // 提前提取席别筛选条件，避免多次调用
         List<Integer> targetSeatTypes = ticketQueryDTO.getSeatTypes();
         boolean needFilterSeat = targetSeatTypes != null && !targetSeatTypes.isEmpty();
 
-        for (TrainDetailVO trainDetailVO : trainDetailVOList) {
-            TicketQueryVO result = new TicketQueryVO();
-
-            // 拷贝列车属性
-            Train train = new Train();
-            BeanUtil.copyProperties(
-                    trainDetailVO,
-                    train,
-                    CopyOptions.create()
-                            .setFieldMapping(new HashMap<>(){{
-                                put("trainId", "id");
-                            }})
-            );
-            result.setTrain(train);
-
-            // 取出列车id
-            Long trainId = trainDetailVO.getTrainId();
-
-            // 拷贝席别信息
-            // 从Map中取该列车的席别列表（未过滤）
-            List<SeatClassVO> seatVOs = seatGroupByTrainId.getOrDefault(trainId, new ArrayList<>());
-
-            // ===================== 核心修改：按席别类型筛选 =====================
-            boolean isTrainMatch = true; // 默认匹配（无席别筛选条件时）
-            if (needFilterSeat) {
-                // 判定：该列车是否有至少一个席别匹配seatTypes
-                isTrainMatch = seatVOs.stream()
-                        .anyMatch(seatVO -> {
-                            // 防护：seatTypeId为空时不匹配
-                            return seatVO.getSeatType() != null
-                                    && targetSeatTypes.contains(seatVO.getSeatType());
-                        });
-            }
-
-            // 如果列车不匹配（无席别符合条件），直接跳过该列车
-            if (!isTrainMatch) {
+        List<TicketQueryVO> resultList = new ArrayList<>();
+        for (TrainDetailVO detailVO : trainDetailVOList) {
+            // 1. 筛选列车（席别条件）
+            if (!isTrainMatchSeatType(seatGroupByTrainId, detailVO.getTrainId(), targetSeatTypes, needFilterSeat)) {
                 continue;
             }
-            // ==================================================================
-            List<SeatClassFrontVO> frontVOs = BeanUtil.copyToList(seatVOs, SeatClassFrontVO.class);
-            result.setSeatClassFrontVOList(frontVOs);
-
-            // 拷贝列车类型信息
-            List<TrainTypeVO> trainTypeVOList = trainDetailVO.getTrainTypeVOList();
-            result.setTrainTypeVOList(trainTypeVOList);
-
-            // 3.3.拷贝其它属性
-            BeanUtil.copyProperties(trainDetailVO, result);
-
-            // 3.4.计算历经时间
-            Integer duration = calculateDurationInMinutes(result.getDepartureTime(), result.getArrivalTime());
-            result.setDuration(duration);
-
-            // 3.5.始发站和终点站判断
-            Integer departureStationId = trainDetailVO.getDepartureStationId();
-            boolean isDeparture = checkDepartureStation(trainId, departureStationId);
-            Integer arrivalStationId = trainDetailVO.getArrivalStationId();
-            boolean isArrival = checkTerminalStation(trainId, arrivalStationId);
-            result.setDepartureFlag(isDeparture);
-            result.setArrivalFlag(isArrival);
-
-            resultList.add(result);
+            // 2. 构建单个VO
+            TicketQueryVO vo = buildSingleTicketQueryVO(detailVO, seatGroupByTrainId);
+            resultList.add(vo);
         }
 
         return resultList;
+    }
+
+    /**
+     * 列车席别匹配校验
+     */
+    private boolean isTrainMatchSeatType(
+            Map<Long, List<SeatClassVO>> seatGroupMap,
+            Long trainId,
+            List<Integer> targetSeatTypes,
+            boolean needFilter
+    ) {
+        if (!needFilter) {
+            return true;
+        }
+        List<SeatClassVO> seatVOs = seatGroupMap.getOrDefault(trainId, Collections.emptyList());
+        return seatVOs.stream()
+                .anyMatch(seat -> Objects.nonNull(seat.getSeatType()) && targetSeatTypes.contains(seat.getSeatType()));
+    }
+
+    /**
+     * 构建单个TicketQueryVO
+     */
+    private TicketQueryVO buildSingleTicketQueryVO(TrainDetailVO detailVO, Map<Long, List<SeatClassVO>> seatGroupMap) {
+        TicketQueryVO result = new TicketQueryVO();
+        Long trainId = detailVO.getTrainId();
+
+        // 1. 拷贝列车基础信息
+        result.setTrain(copyTrainFromDetailVO(detailVO));
+        // 2. 拷贝席别信息
+        List<SeatClassVO> seatVOs = seatGroupMap.getOrDefault(trainId, Collections.emptyList());
+        result.setSeatClassFrontVOList(copySeatClassVO(seatVOs));
+        // 3. 拷贝列车类型
+        result.setTrainTypeVOList(detailVO.getTrainTypeVOList());
+        // 4. 拷贝公共属性
+        BeanUtil.copyProperties(detailVO, result);
+        // 5. 计算历经时间
+        Integer duration = calculateDurationInMinutes(result.getDepartureTime(), result.getArrivalTime());
+        result.setDuration(duration);
+        // 6. 始发站和终点站判断
+        Integer departureStationId = detailVO.getDepartureStationId();
+        result.setDepartureFlag(checkDepartureStation(trainId, departureStationId));
+        Integer arrivalStationId = detailVO.getArrivalStationId();
+        result.setArrivalFlag(checkTerminalStation(trainId, arrivalStationId));
+        return result;
+    }
+
+    private List<SeatClassFrontVO> copySeatClassVO(List<SeatClassVO> seatVOs) {
+        return BeanUtil.copyToList(seatVOs, SeatClassFrontVO.class);
+    }
+
+    private Train copyTrainFromDetailVO(TrainDetailVO detailVO) {
+        // 拷贝列车属性
+        Train train = new Train();
+        CopyOptions copyOptions = CopyOptions.create().setFieldMapping(Collections.singletonMap("trainId", "id"));
+        BeanUtil.copyProperties(detailVO, train, copyOptions);
+        return train;
     }
 
     private List<TrainDetailVO> getTrainDetailVOS(TicketQueryDTO ticketQueryDTO) {
