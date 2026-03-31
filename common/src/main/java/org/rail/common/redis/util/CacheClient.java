@@ -2,36 +2,33 @@ package org.rail.common.redis.util;
 
 import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.lang.TypeReference;
-import cn.hutool.core.util.BooleanUtil;
+import cn.hutool.core.map.MapUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.rail.common.redis.bloomfilter.DistributedBloomFilterManager;
+import org.rail.common.redis.exception.CacheException;
 import org.rail.common.redis.result.AggBatchResult;
 import org.rail.common.redis.result.AggCacheResult;
 import org.rail.common.core.result.PageResult;
 import org.rail.common.redis.result.RedisData;
+import org.redisson.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
 
-import java.lang.reflect.Type;
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static org.rail.common.redis.constant.RedisConstants.AGG_CACHE_ORDER_BIZ_TYPE;
 
 /**
- * 缓存客户端工具类（纯 TypeReference 版）
+ * 缓存客户端工具类
  * 特性：
  * 1. 仅支持 TypeReference 泛型（彻底解决 List<实体> 反序列化问题，无类型推断歧义）
  * 2. 可配置化（通过配置文件注入参数，避免硬编码）
@@ -45,7 +42,7 @@ import static org.rail.common.redis.constant.RedisConstants.AGG_CACHE_ORDER_BIZ_
 public class CacheClient {
 
     @Autowired
-    private StringRedisTemplate stringRedisTemplate;
+    private RedissonClient redissonClient;
 
     // 注入分布式布隆过滤器管理器
     @Autowired
@@ -83,7 +80,7 @@ public class CacheClient {
     // ========== 线程池（可配置 + 优雅关闭） ==========
     private ExecutorService CACHE_REBUILD_EXECUTOR;
 
-    // 初始化线程池（基于配置参数）
+    // 初始化线程池
     @Autowired
     public void initThreadPool() {
         CACHE_REBUILD_EXECUTOR = new ThreadPoolExecutor(
@@ -129,57 +126,245 @@ public class CacheClient {
         log.info("聚合缓存布隆过滤器初始化完成 | BizType:{}", AGG_CACHE_ORDER_BIZ_TYPE);
     }
 
-    // ========== 基础方法（仅 TypeReference 支持） ==========
+    // =============================== String类型缓存操作封装 ===================================
 
     /**
-     * 设置缓存（通用版，仅支持 TypeReference 反序列化）
+     * 设置缓存
      */
-    public <T> void set(String key, T value, Long expireTime, TimeUnit timeUnit) {
-        if (StrUtil.isBlank(key)) {
-            log.warn("缓存Key为空，跳过设置");
-            return;
-        }
-        if (value == null) {
-            log.warn("缓存Value为空，Key:{}", key);
-            value = (T) ""; // 空值统一存空字符串
-        }
+    public <T> void set(String key, T value) {
+        if (StrUtil.isBlank(key)) return;
         try {
-            stringRedisTemplate.opsForValue().set(key, JSONUtil.toJsonStr(value), expireTime, timeUnit);
-            log.debug("缓存设置成功，Key:{}, 过期时间:{} {}", key, expireTime, timeUnit);
+            RBucket<T> bucket = redissonClient.getBucket(key);
+            bucket.set(value == null ? (T) "" : value);
         } catch (Exception e) {
-            log.error("缓存设置失败，Key:{}", key, e);
-            throw new RuntimeException("缓存设置失败", e);
+            throw new CacheException("缓存设置失败", e);
+        }
+    }
+
+    public <T> void set(String key, T value, Long expireTime, TimeUnit timeUnit) {
+        if (StrUtil.isBlank(key)) return;
+        try {
+            RBucket<T> bucket = redissonClient.getBucket(key);
+            bucket.set(value == null ? (T) "" : value, expireTime, timeUnit);
+        } catch (Exception e) {
+            throw new CacheException("缓存设置失败", e);
         }
     }
 
     /**
-     * 设置逻辑过期缓存（通用版，仅 TypeReference）
+     * 设置逻辑过期缓存
      */
     public <T> void setWithLogicalExpire(String key, T value, Long expireTime, TimeUnit timeUnit) {
-        if (StrUtil.isBlank(key)) {
-            log.warn("缓存Key为空，跳过设置逻辑过期缓存");
-            return;
-        }
-        if (value == null) {
-            log.warn("缓存Value为空，Key:{}", key);
-            return;
-        }
+        if (StrUtil.isBlank(key) || value == null) return;
         try {
             RedisData<T> redisData = new RedisData<>();
             redisData.setData(value);
             redisData.setExpireTime(LocalDateTime.now().plusSeconds(timeUnit.toSeconds(expireTime)));
-            stringRedisTemplate.opsForValue().set(key, JSONUtil.toJsonStr(redisData));
-            log.debug("逻辑过期缓存设置成功，Key:{}, 逻辑过期时间:{}", key, redisData.getExpireTime());
+            RBucket<RedisData<T>> bucket = redissonClient.getBucket(key);
+            bucket.set(redisData);
         } catch (Exception e) {
-            log.error("逻辑过期缓存设置失败，Key:{}", key, e);
-            throw new RuntimeException("逻辑过期缓存设置失败", e);
+            throw new CacheException("逻辑过期缓存设置失败", e);
         }
     }
 
-    // ========== 缓存穿透（PassThrough）- 仅 TypeReference 版 ==========
+    /**
+     * 批量设置缓存（无过期时间）
+     */
+    public <T> void batchSet(Map<String, T> keyValueMap) {
+        if (MapUtil.isEmpty(keyValueMap)) {
+            return;
+        }
+        try {
+            RBuckets buckets = redissonClient.getBuckets();
+            // 统一处理null值为""，和单条set逻辑保持一致
+            Map<String, T> finalMap = handleNullValue(keyValueMap);
+            buckets.set(finalMap);
+        } catch (Exception e) {
+            throw new CacheException("批量缓存设置失败", e);
+        }
+    }
 
     /**
-     * 缓存穿透（简化版：keyPrefix + id 生成Key，仅 TypeReference）
+     * 批量设置缓存（带统一过期时间）
+     * 与单条set逻辑完全一致：空值转""、过滤空key、统一异常
+     * 用RBatch批量执行，仅1次网络往返，性能远高于循环单个set
+     */
+    public <T> void batchSet(Map<String, T> keyValueMap, Long expireTime, TimeUnit timeUnit) {
+        // 防御性校验：空Map、无效过期时间直接返回
+        if (MapUtil.isEmpty(keyValueMap) || expireTime == null || expireTime <= 0 || timeUnit == null) {
+            return;
+        }
+        try {
+            // 1. 预处理：空值转""、过滤空key，和单条set逻辑100%一致
+            Map<String, T> finalMap = handleNullValue(keyValueMap);
+            if (MapUtil.isEmpty(finalMap)) {
+                return;
+            }
+
+            // 2. 创建RBatch批量操作对象（一次性打包所有命令，仅1次网络IO）
+            RBatch batch = redissonClient.createBatch();
+
+            // 3. 遍历Map，批量添加set命令（每个key独立设置过期时间，原子性保证）
+            for (Map.Entry<String, T> entry : finalMap.entrySet()) {
+                String key = entry.getKey();
+                T value = entry.getValue();
+                // 直接调用RBucket的setAsync，和单条set的逻辑完全一致
+                batch.getBucket(key).setAsync(value, expireTime, timeUnit);
+            }
+
+            // 4. 执行批量命令（一次性发送所有请求到Redis，同步阻塞直到完成）
+            batch.execute();
+            log.debug("批量缓存设置成功，共{}个key，过期时间：{} {}", finalMap.size(), expireTime, timeUnit);
+        } catch (Exception e) {
+            throw new CacheException("批量缓存设置失败", e);
+        }
+    }
+
+    /**
+     * 批量获取缓存
+     * 底层：Redisson RBuckets 批量get，性能极高
+     */
+    public <T> Map<String, T> batchGet(Collection<String> keys) {
+        if (CollectionUtil.isEmpty(keys)) {
+            return Collections.emptyMap();
+        }
+        try {
+            // 统一过滤有效key
+            List<String> validKeys = filterValidKeys(keys);
+            if (CollectionUtil.isEmpty(validKeys)) {
+                return Collections.emptyMap();
+            }
+
+            // 核心批量获取：List转数组适配API
+            RBuckets buckets = redissonClient.getBuckets();
+            String[] keyArray = validKeys.toArray(String[]::new);
+            // 泛型返回，和单条get逻辑一致
+            return buckets.<T>get(keyArray);
+        } catch (Exception e) {
+            throw new CacheException("批量缓存获取失败", e);
+        }
+    }
+
+    /**
+     * 统一处理null值：和单条set逻辑一致，value为null时转为空字符串
+     */
+    private <T> Map<String, T> handleNullValue(Map<String, T> keyValueMap) {
+        return keyValueMap.entrySet().stream()
+                .filter(entry -> StrUtil.isNotBlank(entry.getKey()))
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        entry -> entry.getValue() == null ? (T) "" : entry.getValue()
+                ));
+    }
+
+    // =============================== Set类型缓存操作封装 ===================================
+    /**
+     * 向Set缓存添加单个成员（对应原stringRedisTemplate.opsForSet().add）
+     */
+    public <T> void addSetMember(String key, T value) {
+        if (StrUtil.isBlank(key) || value == null) {
+            return;
+        }
+        try {
+            RSet<T> set = redissonClient.getSet(key);
+            set.add(value);
+            log.debug("Set缓存添加成员成功，key:{}, value:{}", key, value);
+        } catch (Exception e) {
+            throw new CacheException("Set缓存添加成员失败", e);
+        }
+    }
+
+    /**
+     * 向Set缓存批量添加成员（对应原stringRedisTemplate.opsForSet().add(数组)）
+     * 【核心特性：追加，不覆盖，自动去重】
+     */
+    public <T> void addSetMembers(String key, Collection<T> values) {
+        if (StrUtil.isBlank(key) || CollectionUtil.isEmpty(values)) {
+            return;
+        }
+        try {
+            RSet<T> set = redissonClient.getSet(key);
+            set.addAll(values);
+            log.debug("Set缓存批量添加成员成功，key:{}, 成员数:{}", key, values.size());
+        } catch (Exception e) {
+            throw new CacheException("Set缓存批量添加成员失败", e);
+        }
+    }
+
+    /**
+     * 获取Set缓存所有成员（对应原stringRedisTemplate.opsForSet().members）
+     */
+    public <T> Set<T> getSetMembers(String key) {
+        if (StrUtil.isBlank(key)) {
+            return Collections.emptySet();
+        }
+        try {
+            RSet<T> set = redissonClient.getSet(key);
+            return set.readAll();
+        } catch (Exception e) {
+            throw new CacheException("获取Set缓存成员失败", e);
+        }
+    }
+
+    // ========================== 缓存删除封装（String、Set通用） =========================
+    /**
+     * 删除缓存
+     */
+    public void delete(String key) {
+        if (StrUtil.isBlank(key)) return;
+        try {
+            RBucket<Object> bucket = redissonClient.getBucket(key);
+            bucket.delete();
+        } catch (Exception e) {
+            throw new CacheException("缓存删除失败", e);
+        }
+    }
+
+    /**
+     * 批量删除缓存
+     * 底层用RBatch批量执行deleteAsync，仅1次网络往返，性能远高于循环单个删除
+     */
+    public void batchDelete(Collection<String> keys) {
+        if (CollectionUtil.isEmpty(keys)) return;
+        try {
+            // 过滤空key
+            List<String> validKeys = filterValidKeys(keys);
+            if (CollectionUtil.isEmpty(validKeys)) {
+                return;
+            }
+
+            // 1. 创建RBatch批量操作对象
+            RBatch batch = redissonClient.createBatch();
+
+            // 2. 遍历有效key，批量添加deleteAsync命令
+            for (String key : validKeys) {
+                batch.getBucket(key).deleteAsync();
+            }
+
+            // 3. 执行批量命令（一次性发送所有请求，同步阻塞直到完成）
+            batch.execute();
+            log.debug("批量缓存删除成功，共{}个有效key", validKeys.size());
+        } catch (Exception e) {
+            throw new CacheException("批量缓存删除失败", e);
+        }
+    }
+
+    /**
+     * 统一过滤有效key：移除空/空白key，与handleNullValue逻辑对应
+     */
+    private List<String> filterValidKeys(Collection<String> keys) {
+        if (CollectionUtil.isEmpty(keys)) {
+            return Collections.emptyList();
+        }
+        return keys.stream()
+                .filter(StrUtil::isNotBlank)
+                .collect(Collectors.toList());
+    }
+
+    // ========================== 缓存穿透 ================================
+
+    /**
+     * 缓存穿透（keyPrefix + id 生成Key）
      */
     public <D, ID> D queryWithPassThrough(
             String keyPrefix,
@@ -200,7 +385,7 @@ public class CacheClient {
     }
 
     /**
-     * 缓存穿透（核心版：自定义Key生成器，仅 TypeReference）
+     * 缓存穿透（自定义Key生成器）
      */
     public <D, DTO> D queryWithPassThrough(
             Function<DTO, String> keyGenerator,
@@ -210,52 +395,36 @@ public class CacheClient {
             Long time,
             TimeUnit timeUnit
     ) {
-        // 1. 入参校验
-        validateParams(keyGenerator, dto, dbFallback);
-
-        // 2. 生成Key
         String key = keyGenerator.apply(dto);
         if (StrUtil.isBlank(key)) {
             throw new IllegalArgumentException("生成的缓存Key不能为空");
         }
 
-        // 3. 查询缓存
-        String json = stringRedisTemplate.opsForValue().get(key);
-        if (StrUtil.isNotBlank(json)) {
-            try {
-                D data = JSONUtil.toBean(json, typeRef.getType(), false);
-                log.debug("缓存穿透策略-命中缓存，Key:{}", key);
-                return data;
-            } catch (Exception e) {
-                log.error("缓存反序列化失败，删除损坏缓存，Key:{}", key, e);
-                stringRedisTemplate.delete(key);
-            }
+        // 查询缓存
+        RBucket<D> bucket = redissonClient.getBucket(key);
+        D data = bucket.get();
+        if (data != null) {
+            log.debug("缓存命中 key:{}", key);
+            return data;
         }
+        if (bucket.isExists()) return null;
 
-        // 4. 缓存为空字符串（标记数据库无数据）
-        if (json != null) {
-            log.debug("缓存穿透策略-命中空值缓存，Key:{}", key);
-            return null;
-        }
+        // 缓存未命中，查询数据库
+        data = dbFallback.apply(dto);
 
-        // 5. 缓存未命中，查询数据库
-        log.debug("缓存穿透策略-缓存未命中，查询数据库，Key:{}", key);
-        D data = dbFallback.apply(dto);
-
-        // 6. 数据库无数据，缓存空值
+        // 数据库无数据，缓存空值
         if (data == null) {
-            set(key, "", CACHE_NULL_TTL, TimeUnit.MINUTES);
-            log.debug("缓存穿透策略-数据库无数据，缓存空值，Key:{}", key);
+            set(key, (D) "", CACHE_NULL_TTL, TimeUnit.MINUTES);
             return null;
         }
 
-        // 7. 数据库有数据，写入缓存
+        // 数据库有数据，写入缓存
         set(key, data, time, timeUnit);
         return data;
     }
 
     /**
-     * 批量缓存穿透（仅 TypeReference 版）
+     * 批量缓存穿透
      */
     public <D, DTO> Map<DTO, D> batchQueryWithPassThrough(
             Function<DTO, String> keyGenerator,
@@ -265,13 +434,7 @@ public class CacheClient {
             Long time,
             TimeUnit timeUnit
     ) {
-        // 1. 入参校验
-        if (CollectionUtil.isEmpty(dtos)) {
-            throw new IllegalArgumentException("批量查询的DTO列表不能为空");
-        }
-        validateBatchParams(keyGenerator, batchDbFallback);
-
-        // 2. 构建DTO-Key映射
+        // 1. 构建DTO-Key映射
         Map<DTO, String> dtoKeyMap = new HashMap<>();
         List<String> keys = new ArrayList<>();
         for (DTO dto : dtos) {
@@ -283,55 +446,60 @@ public class CacheClient {
             keys.add(key);
         }
 
-        // 3. 批量查询缓存
-        List<String> jsonList = stringRedisTemplate.opsForValue().multiGet(keys);
-        Map<String, D> cacheMap = new HashMap<>();
-        for (int i = 0; i < keys.size(); i++) {
-            String key = keys.get(i);
-            String json = jsonList.get(i);
-            if (StrUtil.isNotBlank(json)) {
-                try {
-                    cacheMap.put(key, JSONUtil.toBean(json, typeRef.getType(), false));
-                } catch (Exception e) {
-                    log.error("批量缓存反序列化失败，删除损坏缓存，Key:{}", key, e);
-                    stringRedisTemplate.delete(key);
-                }
-            } else if (json != null) {
-                cacheMap.put(key, null); // 空值标记
-            }
-        }
+        // 2. 批量查询缓存
+        Map<String, D> cacheMap = batchGet(keys);
 
-        // 4. 筛选未命中的DTO
+        // 3. 筛选未命中的DTO
         List<DTO> missDtos = dtos.stream()
                 .filter(dto -> !cacheMap.containsKey(dtoKeyMap.get(dto)))
                 .collect(Collectors.toList());
+
         if (CollectionUtil.isEmpty(missDtos)) {
             log.debug("批量缓存穿透策略-全部命中缓存，命中数:{}", dtos.size());
             return buildResultMap(dtos, dtoKeyMap, cacheMap);
         }
 
-        // 5. 批量查询数据库
+        // 4. 批量查询数据库
         log.debug("批量缓存穿透策略-缓存未命中数:{}，查询数据库", missDtos.size());
         Map<DTO, D> dbMap = batchDbFallback.apply(missDtos);
 
-        // 6. 批量写入缓存
+        // 5. 批量写入缓存（空值+正常数据）
+        Map<String, D> writeMap = new HashMap<>();
         for (DTO dto : missDtos) {
             String key = dtoKeyMap.get(dto);
             D data = dbMap.get(dto);
             if (data == null) {
-                set(key, "", CACHE_NULL_TTL, TimeUnit.MINUTES);
-                cacheMap.put(key, null);
+                writeMap.put(key, (D) "");
             } else {
-                set(key, data, time, timeUnit);
-                cacheMap.put(key, data);
+                writeMap.put(key, data);
             }
         }
 
-        // 7. 组装结果
+        // 批量设置：空值用短TTL，正常数据用业务TTL
+        Map<String, D> nullMap = new HashMap<>();
+        Map<String, D> normalMap = new HashMap<>();
+        writeMap.forEach((k, v) -> {
+            if ("".equals(v)) {
+                nullMap.put(k, v);
+            } else {
+                normalMap.put(k, v);
+            }
+        });
+
+        if (MapUtil.isNotEmpty(nullMap)) {
+            batchSet(nullMap, CACHE_NULL_TTL, TimeUnit.MINUTES);
+        }
+        if (MapUtil.isNotEmpty(normalMap)) {
+            batchSet(normalMap, time, timeUnit);
+        }
+
+        // 合并缓存结果
+        cacheMap.putAll(writeMap);
+        // 6. 组装结果
         return buildResultMap(dtos, dtoKeyMap, cacheMap);
     }
 
-    // ========== 互斥锁（Mutex）- 仅 TypeReference 版 ==========
+    // ========================== 互斥锁（Mutex）=========================
 
     /**
      * 互斥锁（简化版：keyPrefix + id，默认重试次数，仅 TypeReference）
@@ -356,7 +524,7 @@ public class CacheClient {
     }
 
     /**
-     * 互斥锁（核心版：自定义Key生成器，指定重试次数，仅 TypeReference）
+     * 互斥锁（自定义Key生成器，指定重试次数）
      */
     public <D, DTO> D queryWithMutex(
             Function<DTO, String> keyGenerator,
@@ -367,98 +535,52 @@ public class CacheClient {
             TimeUnit timeUnit,
             int retryCount
     ) {
-        // 1. 入参校验
-        validateParams(keyGenerator, dto, dbFallback);
-
-        // 2. 生成Key
         String key = keyGenerator.apply(dto);
         if (StrUtil.isBlank(key)) {
             throw new IllegalArgumentException("生成的缓存Key不能为空");
         }
 
-        // 3. 查询缓存
-        String json = stringRedisTemplate.opsForValue().get(key);
-        if (StrUtil.isNotBlank(json)) {
-            try {
-                D data = JSONUtil.toBean(json, typeRef.getType(), false);
-                log.debug("互斥锁策略-命中缓存，Key:{}", key);
-                return data;
-            } catch (Exception e) {
-                log.error("缓存反序列化失败，删除损坏缓存，Key:{}", key, e);
-                stringRedisTemplate.delete(key);
-            }
-        }
+        RBucket<D> bucket = redissonClient.getBucket(key);
+        D data = bucket.get();
 
-        // 4. 缓存为空字符串
-        if (json != null) {
-            log.debug("互斥锁策略-命中空值缓存，Key:{}", key);
-            return null;
-        }
+        if (data != null) return data;
+        if (bucket.isExists()) return null;
 
-        // 5. 缓存未命中，加锁重建
+        // 缓存未命中，加锁重建
         String lockKey = LOCK_PREFIX + key;
-        String lockValue = UUID.randomUUID().toString();
-        AtomicReference<Future<?>> renewalFutureRef = new AtomicReference<>();
-        D data = null;
+        RLock lock = redissonClient.getLock(lockKey);
 
         try {
-            // 5.1 获取锁（重试机制）
-            boolean isLock = false;
-            while (retryCount >= 0 && !isLock) {
-                isLock = tryLock(lockKey, lockValue);
-                if (!isLock) {
-                    retryCount--;
-                    if (retryCount < 0) {
-                        log.error("获取互斥锁失败，重试次数用尽，Key:{}", lockKey);
-                        throw new RuntimeException("获取锁失败，请稍后重试");
-                    }
-                    Thread.sleep(RETRY_INTERVAL);
-                    log.debug("获取互斥锁失败，重试次数剩余:{}，Key:{}", retryCount, lockKey);
-                }
+            boolean locked = lock.tryLock(0, LOCK_TTL, TimeUnit.SECONDS);
+            if (!locked) {
+                Thread.sleep(RETRY_INTERVAL);
+                return queryWithMutex(keyGenerator, dto, typeRef, dbFallback, time, timeUnit, retryCount - 1);
             }
 
-            // 5.2 启动锁续期
-            renewalFutureRef.set(startLockRenewal(lockKey, lockValue));
+            // 二次检查
+            data = bucket.get();
+            if (data != null) return data;
+            if (bucket.isExists()) return null;
 
-            // 5.3 双重检查缓存
-            json = stringRedisTemplate.opsForValue().get(key);
-            if (StrUtil.isNotBlank(json)) {
-                D doubleCheckData = JSONUtil.toBean(json, typeRef, false);
-                log.debug("互斥锁策略-双重检查命中缓存，Key:{}", key);
-                return doubleCheckData;
-            }
-
-            // 5.4 查询数据库
-            log.debug("互斥锁策略-查询数据库，Key:{}", key);
-            data = dbFallback.apply(dto);
-
-            // 5.5 处理数据库结果
-            if (data == null) {
-                set(key, "", CACHE_NULL_TTL, TimeUnit.MINUTES);
-                log.debug("互斥锁策略-数据库无数据，缓存空值，Key:{}", key);
+            D dbData = dbFallback.apply(dto);
+            if (dbData == null) {
+                set(key, (D) "", CACHE_NULL_TTL, TimeUnit.MINUTES);
                 return null;
             }
-
-            // 5.6 写入缓存
-            set(key, data, time, timeUnit);
+            set(key, dbData, time, timeUnit);
+            return dbData;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            log.error("获取互斥锁时线程中断，Key:{}", lockKey, e);
             throw new RuntimeException("线程中断", e);
         } finally {
-            // 6. 释放锁 + 取消续期
-            unlock(lockKey, lockValue);
-            Future<?> renewalFuture = renewalFutureRef.get();
-            if (renewalFuture != null && !renewalFuture.isCancelled()) {
-                renewalFuture.cancel(true);
+            if (lock.isHeldByCurrentThread()) {
+                lock.unlock();
             }
         }
-
-        return data;
     }
 
     /**
-     * 批量互斥锁（仅 TypeReference 版）
+     * 批量互斥锁（纯 Redisson 极简版）
      */
     public <D, DTO> Map<DTO, D> batchQueryWithMutex(
             Function<DTO, String> keyGenerator,
@@ -469,13 +591,7 @@ public class CacheClient {
             TimeUnit timeUnit,
             int retryCount
     ) {
-        // 1. 入参校验
-        if (CollectionUtil.isEmpty(dtos)) {
-            throw new IllegalArgumentException("批量查询的DTO列表不能为空");
-        }
-        validateBatchParams(keyGenerator, batchDbFallback);
-
-        // 2. 构建DTO-Key映射
+        // 1. 构建DTO-Key映射
         Map<DTO, String> dtoKeyMap = new HashMap<>();
         List<String> keys = new ArrayList<>();
         for (DTO dto : dtos) {
@@ -487,108 +603,93 @@ public class CacheClient {
             keys.add(key);
         }
 
-        // 3. 批量查询缓存
-        List<String> jsonList = stringRedisTemplate.opsForValue().multiGet(keys);
-        Map<String, D> cacheMap = new HashMap<>();
-        for (int i = 0; i < keys.size(); i++) {
-            String key = keys.get(i);
-            String json = jsonList.get(i);
-            if (StrUtil.isNotBlank(json)) {
-                try {
-                    cacheMap.put(key, JSONUtil.toBean(json, typeRef.getType(), false));
-                } catch (Exception e) {
-                    log.error("批量缓存反序列化失败，删除损坏缓存，Key:{}", key, e);
-                    stringRedisTemplate.delete(key);
-                }
-            } else if (json != null) {
-                cacheMap.put(key, null);
-            }
-        }
-
-        // 4. 筛选未命中的DTO
+        // 2. 批量查询缓存
+        Map<String, D> cacheMap = batchGet(keys);
+        // 3. 筛选未命中数据
         List<DTO> missDtos = dtos.stream()
                 .filter(dto -> !cacheMap.containsKey(dtoKeyMap.get(dto)))
                 .collect(Collectors.toList());
+
         if (CollectionUtil.isEmpty(missDtos)) {
-            log.debug("批量互斥锁策略-全部命中缓存，命中数:{}", dtos.size());
             return buildResultMap(dtos, dtoKeyMap, cacheMap);
         }
 
-        // 5. 批量加锁
-        Map<DTO, String> dtoLockKeyMap = new HashMap<>();
-        Map<DTO, String> dtoLockValueMap = new HashMap<>();
-        Map<DTO, Future<?>> renewalFutureMap = new HashMap<>();
-        boolean isAllLockSuccess = false;
-
+        // 锁等待时间
+        final long LOCK_WAIT_TIME = 2;
+        Map<DTO, RLock> lockMap = new HashMap<>();
         try {
-            // 5.1 重试获取锁
-            int currentRetry = retryCount;
-            while (currentRetry >= 0 && !isAllLockSuccess) {
-                isAllLockSuccess = true;
-                // 逐个获取锁
+            // 4. 极简批量加锁（纯 Redisson + 重试机制）
+            boolean allLocked = false;
+            int currentRetry = Math.max(retryCount, 1);
+            while (currentRetry-- > 0 && !allLocked) {
+                allLocked = true;
+                lockMap.clear();
+                // 遍历加锁
                 for (DTO dto : missDtos) {
-                    String lockKey = LOCK_PREFIX + dtoKeyMap.get(dto);
-                    String lockValue = UUID.randomUUID().toString();
-                    if (!tryLock(lockKey, lockValue)) {
-                        isAllLockSuccess = false;
-                        releaseBatchLock(missDtos, dtoLockKeyMap, dtoLockValueMap, renewalFutureMap);
-                        currentRetry--;
-                        if (currentRetry < 0) {
-                            log.error("批量获取锁失败，重试次数用尽，未命中数:{}", missDtos.size());
-                            throw new RuntimeException("批量获取锁失败，请稍后重试");
+                    RLock lock = redissonClient.getLock(LOCK_PREFIX + dtoKeyMap.get(dto));
+                    try {
+                        // Redisson 原生 tryLock：等待时间、锁过期时间、单位
+                        if (!lock.tryLock(LOCK_WAIT_TIME, LOCK_TTL, TimeUnit.SECONDS)) {
+                            allLocked = false;
+                            break;
                         }
-                        Thread.sleep(RETRY_INTERVAL);
-                        break;
+                        lockMap.put(dto, lock);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        throw new RuntimeException("批量加锁被中断", e);
                     }
-                    dtoLockKeyMap.put(dto, lockKey);
-                    dtoLockValueMap.put(dto, lockValue);
-                    renewalFutureMap.put(dto, startLockRenewal(lockKey, lockValue));
+                }
+                // 加锁失败 → 释放已获取的锁 → 重试
+                if (!allLocked) {
+                    lockMap.values().forEach(RLock::unlock);
+                    Thread.sleep(RETRY_INTERVAL);
                 }
             }
 
-            // 5.2 双重检查缓存
-            refreshCacheMap(missDtos, dtoKeyMap, cacheMap, typeRef);
+            if (!allLocked) {
+                throw new CacheException("批量获取锁失败，重试次数已耗尽");
+            }
 
-            // 5.3 筛选最终未命中的DTO
-            List<DTO> finalMissDtos = missDtos.stream()
+            // 5. 二次检查缓存（封装好的 batchGet）
+            Map<String, D> doubleCheckMap = batchGet(missDtos.stream().map(dtoKeyMap::get).toList());
+            cacheMap.putAll(doubleCheckMap);
+
+            // 6. 最终未命中 → 查库 + 批量写缓存
+            List<DTO> finalMiss = missDtos.stream()
                     .filter(dto -> !cacheMap.containsKey(dtoKeyMap.get(dto)))
-                    .collect(Collectors.toList());
+                    .toList();
 
-            // 5.4 批量查询数据库
-            if (!CollectionUtil.isEmpty(finalMissDtos)) {
-                log.debug("批量互斥锁策略-最终未命中数:{}，查询数据库", finalMissDtos.size());
-                Map<DTO, D> dbMap = batchDbFallback.apply(finalMissDtos);
-
-                // 5.5 批量写入缓存
-                for (DTO dto : finalMissDtos) {
-                    String key = dtoKeyMap.get(dto);
-                    D data = dbMap.getOrDefault(dto, null);
-                    if (data == null) {
-                        set(key, "", CACHE_NULL_TTL, TimeUnit.MINUTES);
-                        cacheMap.put(key, null);
-                    } else {
-                        set(key, data, time, timeUnit);
-                        cacheMap.put(key, data);
-                    }
+            if (CollectionUtil.isNotEmpty(finalMiss)) {
+                Map<DTO, D> dbMap = batchDbFallback.apply(finalMiss);
+                Map<String, D> writeMap = new HashMap<>();
+                for (DTO dto : finalMiss) {
+                    D data = dbMap.get(dto);
+                    writeMap.put(dtoKeyMap.get(dto), data == null ? (D) "" : data);
                 }
+                // 批量写入缓存
+                batchSet(writeMap, time, timeUnit);
+                cacheMap.putAll(writeMap);
             }
 
-            // 5.6 组装结果
             return buildResultMap(dtos, dtoKeyMap, cacheMap);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            log.error("批量获取锁时线程中断", e);
-            throw new RuntimeException("线程中断", e);
+            throw new RuntimeException("批量互斥锁执行异常", e);
         } finally {
-            // 6. 释放所有锁 + 取消续期
-            releaseBatchLock(missDtos, dtoLockKeyMap, dtoLockValueMap, renewalFutureMap);
+            // 7. 统一释放锁
+            lockMap.values().forEach(lock -> {
+                if (lock.isHeldByCurrentThread()) {
+                    lock.unlock();
+                }
+            });
         }
     }
 
-    // ========== 逻辑过期（LogicalExpire）- 仅 TypeReference 版 ==========
+
+    // =========================== 逻辑过期（LogicalExpire）=============================
 
     /**
-     * 逻辑过期（简化版：keyPrefix + id，仅 TypeReference）
+     * 逻辑过期（简化版：keyPrefix + id）
      */
     public <D, ID> D queryWithLogicalExpire(
             String keyPrefix,
@@ -609,7 +710,7 @@ public class CacheClient {
     }
 
     /**
-     * 逻辑过期（核心版：自定义Key生成器，仅 TypeReference）
+     * 逻辑过期（核心版：自定义Key生成器）
      */
     public <D, DTO> D queryWithLogicalExpire(
             Function<DTO, String> keyGenerator,
@@ -619,104 +720,53 @@ public class CacheClient {
             Long time,
             TimeUnit timeUnit
     ) {
-        // 1. 入参校验
-        validateParams(keyGenerator, dto, dbFallback);
-
-        // 2. 生成Key
         String key = keyGenerator.apply(dto);
         if (StrUtil.isBlank(key)) {
             throw new IllegalArgumentException("生成的缓存Key不能为空");
         }
 
-        // 3. 查询缓存
-        String json = stringRedisTemplate.opsForValue().get(key);
-        if (StrUtil.isBlank(json)) {
-            log.debug("逻辑过期策略-缓存未命中，直接查询数据库，Key:{}", key);
-            D dbData = dbFallback.apply(dto);
-            if (dbData != null) {
-                setWithLogicalExpire(key, dbData, time, timeUnit);
-            }
-            return dbData;
-        }
+        RBucket<RedisData<D>> bucket = redissonClient.getBucket(key);
+        RedisData<D> redisData = bucket.get();
 
-        // 4. 反序列化RedisData（纯 TypeReference 版）
-        TypeReference<RedisData<D>> redisDataRef = new TypeReference<RedisData<D>>() {};
-        RedisData<D> redisData = JSONUtil.toBean(json, redisDataRef.getType(), false);
         if (redisData == null || redisData.getData() == null) {
-            log.error("逻辑过期缓存反序列化失败，删除损坏缓存，Key:{}", key);
-            stringRedisTemplate.delete(key);
             D dbData = dbFallback.apply(dto);
-            if (dbData != null) {
-                setWithLogicalExpire(key, dbData, time, timeUnit);
-            }
+            if (dbData != null) setWithLogicalExpire(key, dbData, time, timeUnit);
             return dbData;
         }
 
         D data = redisData.getData();
-        LocalDateTime expireTime = redisData.getExpireTime();
+        // 缓存未过期，直接返回
+        if (redisData.getExpireTime().isAfter(LocalDateTime.now())) return data;
 
-        // 5. 缓存未过期，直接返回
-        if (expireTime.isAfter(LocalDateTime.now())) {
-            log.debug("逻辑过期策略-缓存未过期，直接返回，Key:{}", key);
-            return data;
-        }
-
-        // 6. 缓存过期，加锁异步重建
         String lockKey = LOCK_PREFIX + key;
-        String lockValue = UUID.randomUUID().toString();
-        AtomicReference<Future<?>> renewalFutureRef = new AtomicReference<>();
-        boolean isLock = tryLock(lockKey, lockValue);
+        RLock lock = redissonClient.getLock(lockKey);
 
-        if (isLock) {
-            renewalFutureRef.set(startLockRenewal(lockKey, lockValue));
-            // 6.1 二次校验缓存
-            String newJson = stringRedisTemplate.opsForValue().get(key);
-            TypeReference<RedisData<D>> newRedisDataRef = new TypeReference<RedisData<D>>() {};
-            RedisData<D> newRedisData = JSONUtil.toBean(newJson, newRedisDataRef.getType(), false);
-            if (newRedisData != null && newRedisData.getExpireTime().isAfter(LocalDateTime.now())) {
-                unlock(lockKey, lockValue);
-                renewalFutureRef.get().cancel(true);
-                return newRedisData.getData();
-            }
-
-            // 6.2 异步重建缓存
-            try {
+        // 缓存过期，加锁，异步重建
+        try {
+            if(lock.tryLock(2, TimeUnit.SECONDS)) {
                 CACHE_REBUILD_EXECUTOR.submit(() -> {
                     try {
                         D dbData = dbFallback.apply(dto);
                         if (dbData != null) {
                             setWithLogicalExpire(key, dbData, time, timeUnit);
-                            log.debug("逻辑过期策略-异步重建缓存成功，Key:{}", key);
                         }
                     } catch (Exception e) {
-                        log.error("逻辑过期策略-异步重建缓存失败，Key:{}", key, e);
+                        throw new RuntimeException("逻辑过期策略-异步重建缓存失败", e);
                     } finally {
-                        unlock(lockKey, lockValue);
-                        Future<?> renewalFuture = renewalFutureRef.get();
-                        if (renewalFuture != null && !renewalFuture.isCancelled()) {
-                            renewalFuture.cancel(true);
-                        }
+                        lock.unlock();
                     }
                 });
-            } catch (RejectedExecutionException e) {
-                // 线程池满，同步重建
-                log.warn("缓存重建线程池满，同步重建缓存，Key:{}", key);
-                D dbData = dbFallback.apply(dto);
-                if (dbData != null) {
-                    setWithLogicalExpire(key, dbData, time, timeUnit);
-                }
-                unlock(lockKey, lockValue);
-                renewalFutureRef.get().cancel(true);
             }
+        } catch (InterruptedException e) {
+            throw new RuntimeException("获取锁失败", e);
         }
 
-        // 7. 返回旧数据
-        log.debug("逻辑过期策略-返回旧数据，异步重建缓存，Key:{}", key);
+        // 返回旧数据
         return data;
     }
 
     /**
-     * 批量逻辑过期（仅 TypeReference 版）
+     * 批量逻辑过期
      */
     public <D, DTO> Map<DTO, D> batchQueryWithLogicalExpire(
             Function<DTO, String> keyGenerator,
@@ -726,21 +776,9 @@ public class CacheClient {
             Long time,
             TimeUnit timeUnit
     ) {
-        // 1. 入参校验
-        if (CollectionUtil.isEmpty(dtos)) {
-            throw new IllegalArgumentException("批量查询的DTO列表不能为空");
-        }
-        validateBatchParams(keyGenerator, batchDbFallback);
-
-        // 2. 构建映射关系
+        // 构建DTO-Key映射
         Map<DTO, String> dtoKeyMap = new HashMap<>();
         List<String> keys = new ArrayList<>();
-        Map<DTO, RedisData<D>> dtoRedisDataMap = new HashMap<>();
-        Map<DTO, D> resultMap = new LinkedHashMap<>();
-        List<DTO> missDtos = new ArrayList<>();
-        List<DTO> expiredDtos = new ArrayList<>();
-
-        // 3. 构建DTO-Key映射
         for (DTO dto : dtos) {
             String key = keyGenerator.apply(dto);
             if (StrUtil.isBlank(key)) {
@@ -750,34 +788,26 @@ public class CacheClient {
             keys.add(key);
         }
 
-        // 4. 批量查询缓存
-        List<String> jsonList = stringRedisTemplate.opsForValue().multiGet(keys);
-        TypeReference<RedisData<D>> redisDataRef = new TypeReference<RedisData<D>>() {};
+        // 结果集合
+        Map<DTO, D> resultMap = new LinkedHashMap<>();
+        List<DTO> missDtos = new ArrayList<>();
+        List<DTO> expiredDtos = new ArrayList<>();
 
-        for (int i = 0; i < dtos.size(); i++) {
-            DTO dto = dtos.get(i);
-            String key = keys.get(i);
-            String json = jsonList.get(i);
+        Map<String, RedisData<D>> cacheMap  =  batchGet(keys);
 
-            if (StrUtil.isBlank(json)) {
-                missDtos.add(dto);
-                continue;
-            }
-
-            // 反序列化RedisData（纯 TypeReference）
-            RedisData<D> redisData = JSONUtil.toBean(json, redisDataRef.getType(), false);
+        // 遍历处理缓存数据
+        for (DTO dto : dtos) {
+            RedisData<D> redisData = cacheMap.get(dtoKeyMap.get(dto));
+            // 缓存未命中
             if (redisData == null || redisData.getData() == null) {
                 missDtos.add(dto);
-                stringRedisTemplate.delete(key);
                 continue;
             }
-            dtoRedisDataMap.put(dto, redisData);
-
-            // 判断过期状态
-            LocalDateTime expireTime = redisData.getExpireTime();
-            if (expireTime.isAfter(LocalDateTime.now())) {
+            // 判断缓存是否过期
+            if (redisData.getExpireTime().isAfter(LocalDateTime.now())) {
                 resultMap.put(dto, redisData.getData());
             } else {
+                // 已过期：返回旧数据，标记异步重建
                 resultMap.put(dto, redisData.getData());
                 expiredDtos.add(dto);
             }
@@ -796,9 +826,9 @@ public class CacheClient {
             }
         }
 
-        // 6. 处理过期的DTO（异步重建）
-        if (!CollectionUtil.isEmpty(expiredDtos)) {
-            rebuildExpiredBatchCache(expiredDtos, dtoKeyMap, typeRef, batchDbFallback, time, timeUnit);
+        // 处理过期的DTO（异步重建）
+        if (CollectionUtil.isNotEmpty(expiredDtos)) {
+            rebuildExpiredBatchCache(expiredDtos, dtoKeyMap, batchDbFallback, time, timeUnit);
         }
 
         return resultMap;
@@ -829,62 +859,30 @@ public class CacheClient {
             Long time,
             TimeUnit timeUnit
     ) {
-        // 1. 入参校验（和原有逻辑一致）
-        if (StrUtil.isBlank(aggKey)) {
-            throw new IllegalArgumentException("聚合缓存Key不能为空");
-        }
-        if (StrUtil.isBlank(bizType)) {
-            throw new IllegalArgumentException("布隆过滤器业务类型不能为空");
-        }
-        if (CollectionUtil.isEmpty(dependSingleKeys)) {
-            log.warn("聚合缓存依赖的单表Key列表为空，AggKey:{}", aggKey);
-        }
-        validateParams((d) -> aggKey, dto, dbFallback);
-
-        // 2. 布隆过滤器前置拦截（判断是否是“可能有数据的Key”）
-        // 布隆返回false → 肯定无数据，直接返回null（替代原空值缓存逻辑）
+        // 布隆过滤器前置拦截
         boolean mightExist = bloomFilterManager.mightContain(bizType, aggKey);
         if (!mightExist) {
-            log.debug("聚合缓存策略-布隆过滤器拦截无效Key，直接返回null | AggKey:{}, BizType:{}", aggKey, bizType);
             return null;
         }
-        // 3. 查询聚合缓存
-        String json = stringRedisTemplate.opsForValue().get(aggKey);
-        if (StrUtil.isNotBlank(json)) {
-            try {
-                D data = JSONUtil.toBean(json, typeRef.getType(), false);
-                log.debug("聚合缓存策略-命中缓存，AggKey:{}", aggKey);
-                return data;
-            } catch (Exception e) {
-                log.error("聚合缓存反序列化失败，删除损坏缓存，AggKey:{}", aggKey, e);
-                stringRedisTemplate.delete(aggKey);
-            }
-        }
 
-        // 4. 缓存未命中，查询数据库
-        log.debug("聚合缓存策略-缓存未命中，查询数据库，AggKey:{}", aggKey);
-        D data = dbFallback.apply(dto);
+        RBucket<D> bucket = redissonClient.getBucket(aggKey);
+        D data = bucket.get();
 
-        // 5. 数据库无数据 → 直接返回null（不再缓存空值，靠布隆拦截后续请求）
-        if (data == null || (data instanceof PageResult && ((PageResult<?>) data).getTotal() == 0)) {
-            log.debug("聚合缓存策略-数据库无数据，直接返回null | AggKey:{}", aggKey);
-            return null;
-        }
+        // 缓存未命中，查询数据库
+        if (data != null) return data;
+        data = dbFallback.apply(dto);
+
+        if (data == null || (data instanceof PageResult<?> pr && pr.getTotal() == 0)) return null;
 
         // 6. 数据库有数据 → ①写入聚合缓存 ②记录依赖 ③将aggKey加入布隆
-        // 6.1 写入聚合缓存
         set(aggKey, data, time, timeUnit);
-        // 6.2 记录单表依赖关系
         if (CollectionUtil.isNotEmpty(dependSingleKeys)) {
             for (String singleKey : dependSingleKeys) {
                 String depSetKey = buildDepSetKey(singleKey);
-                stringRedisTemplate.opsForSet().add(depSetKey, aggKey); // Set自动去重
-                log.debug("聚合缓存策略-记录依赖关系，SingleKey:{}, AggKey:{}", singleKey, aggKey);
+                addSetMember(depSetKey, aggKey);
             }
         }
-        // 6.3 核心：将“有数据的有效aggKey”加入布隆过滤器
         bloomFilterManager.add(bizType, aggKey);
-        log.debug("聚合缓存策略-有效Key加入布隆过滤器 | AggKey:{}, BizType:{}", aggKey, bizType);
 
         return data;
     }
@@ -909,59 +907,33 @@ public class CacheClient {
             Long time,
             TimeUnit timeUnit
     ) {
-        // 1. 入参校验
-        if (StrUtil.isBlank(aggKey)) {
-            throw new IllegalArgumentException("聚合缓存Key不能为空");
-        }
-        if (StrUtil.isBlank(bizType)) {
-            throw new IllegalArgumentException("布隆过滤器业务类型不能为空");
-        }
-        validateParams((d) -> aggKey, dto, dbFallback);
-
-        // 2. 布隆过滤器前置拦截
+        // 布隆过滤器前置拦截
         boolean mightExist = bloomFilterManager.mightContain(bizType, aggKey);
         if (!mightExist) {
-            log.debug("聚合缓存策略-布隆过滤器拦截无效Key，直接返回null | AggKey:{}, BizType:{}", aggKey, bizType);
             return null;
         }
 
-        // 3. 查询聚合缓存
-        String json = stringRedisTemplate.opsForValue().get(aggKey);
-        if (StrUtil.isNotBlank(json)) {
-            try {
-                D data = JSONUtil.toBean(json, typeRef.getType(), false);
-                log.debug("聚合缓存策略-命中缓存，AggKey:{}", aggKey);
-                return data;
-            } catch (Exception e) {
-                log.error("聚合缓存反序列化失败，删除损坏缓存，AggKey:{}", aggKey, e);
-                stringRedisTemplate.delete(aggKey);
-            }
-        }
+        RBucket<D> bucket = redissonClient.getBucket(aggKey);
+        D data = bucket.get();
 
-        // 4. 缓存未命中，查询数据库
-        log.debug("聚合缓存策略-缓存未命中，查询数据库，AggKey:{}", aggKey);
+        if (data != null) return data;
+
+        // 缓存未命中，查询数据库
         AggCacheResult<D> aggResult = dbFallback.apply(dto);
-        D data = aggResult.getData();
+        data = aggResult.getData();
         List<String> dependSingleKeys = aggResult.getDependSingleKeys();
 
-        // 5. 数据库无数据 → 直接返回null（移除空值缓存）
-        if (data == null || (data instanceof PageResult && ((PageResult<?>) data).getTotal() == 0)) {
-            log.debug("聚合缓存策略-数据库无数据，直接返回null | AggKey:{}", aggKey);
-            return null;
-        }
+        if (data == null || (data instanceof PageResult<?> pr && pr.getTotal() == 0)) return null;
 
         // 6. 数据库有数据 → 写入缓存 + 记录依赖 + 加入布隆
         set(aggKey, data, time, timeUnit);
         if (CollectionUtil.isNotEmpty(dependSingleKeys)) {
             for (String singleKey : dependSingleKeys) {
                 String depSetKey = buildDepSetKey(singleKey);
-                stringRedisTemplate.opsForSet().add(depSetKey, aggKey);
-                log.debug("聚合缓存策略-记录依赖关系，SingleKey:{}, AggKey:{}", singleKey, aggKey);
+                addSetMember(depSetKey, aggKey);
             }
         }
-        // 有效Key加入布隆
         bloomFilterManager.add(bizType, aggKey);
-        log.debug("聚合缓存策略-有效Key加入布隆过滤器 | AggKey:{}, BizType:{}", aggKey, bizType);
 
         return data;
     }
@@ -987,48 +959,30 @@ public class CacheClient {
             Long time,
             TimeUnit timeUnit
     ) {
-        // 1. 入参校验
-        if (StrUtil.isBlank(aggKey)) {
-            throw new IllegalArgumentException("聚合缓存Key不能为空");
-        }
-        if (CollectionUtil.isEmpty(dependSingleKeys)) {
-            log.warn("聚合缓存依赖的单表Key列表为空，AggKey:{}", aggKey);
-        }
-        validateParams((d) -> aggKey, dto, dbFallback);
+        // 查询聚合缓存
+        RBucket<D> bucket = redissonClient.getBucket(aggKey);
+        D data = bucket.get();
 
-        // 2. 查询聚合缓存
-        String json = stringRedisTemplate.opsForValue().get(aggKey);
-        if (StrUtil.isNotBlank(json)) {
-            try {
-                D data = JSONUtil.toBean(json, typeRef.getType(), false);
-                log.debug("聚合缓存策略-命中缓存，AggKey:{}", aggKey);
-                return data;
-            } catch (Exception e) {
-                log.error("聚合缓存反序列化失败，删除损坏缓存，AggKey:{}", aggKey, e);
-                stringRedisTemplate.delete(aggKey);
-            }
-        }
+        if (data != null) return data;
+        if (bucket.isExists()) return null;
 
-        // 3. 缓存未命中，查询数据库
+        // 缓存未命中，查询数据库
         log.debug("聚合缓存策略-缓存未命中，查询数据库，AggKey:{}", aggKey);
-        D data = dbFallback.apply(dto);
+        data = dbFallback.apply(dto);
 
-        // 4. 数据库无数据 → 缓存空值（短TTL）+ 返回null
+        // 数据库无数据 → 缓存空值（短TTL）+ 返回null
         if (data == null || (data instanceof PageResult && ((PageResult<?>) data).getTotal() == 0)) {
-            // 缓存空字符串（Redis中null会被视为key不存在，空字符串更易识别空值缓存）
-            stringRedisTemplate.opsForValue().set(aggKey, "", CACHE_NULL_TTL, TimeUnit.MINUTES);
+            set(aggKey, (D) "", CACHE_NULL_TTL, TimeUnit.MINUTES);
             log.debug("聚合缓存策略-数据库无数据，缓存空值（TTL:{}分钟） | AggKey:{}", CACHE_NULL_TTL, aggKey);
             return null;
         }
 
-        // 5. 数据库有数据 → ①写入聚合缓存 ②记录依赖
-        // 5.1 写入聚合缓存
+        // 数据库有数据 → ①写入聚合缓存 ②记录依赖
         set(aggKey, data, time, timeUnit);
-        // 5.2 记录单表依赖关系
         if (CollectionUtil.isNotEmpty(dependSingleKeys)) {
             for (String singleKey : dependSingleKeys) {
                 String depSetKey = buildDepSetKey(singleKey);
-                stringRedisTemplate.opsForSet().add(depSetKey, aggKey); // Set自动去重
+                addSetMember(depSetKey, aggKey);
                 log.debug("聚合缓存策略-记录依赖关系，SingleKey:{}, AggKey:{}", singleKey, aggKey);
             }
         }
@@ -1054,35 +1008,21 @@ public class CacheClient {
             Long time,
             TimeUnit timeUnit
     ) {
-        // 1. 入参校验
-        if (StrUtil.isBlank(aggKey)) {
-            throw new IllegalArgumentException("聚合缓存Key不能为空");
-        }
-        validateParams((d) -> aggKey, dto, dbFallback);
+        RBucket<D> bucket = redissonClient.getBucket(aggKey);
+        D data = bucket.get();
 
-        // 2. 查询聚合缓存
-        String json = stringRedisTemplate.opsForValue().get(aggKey);
-        if (StrUtil.isNotBlank(json)) {
-            try {
-                D data = JSONUtil.toBean(json, typeRef.getType(), false);
-                log.debug("聚合缓存策略-命中缓存，AggKey:{}", aggKey);
-                return data;
-            } catch (Exception e) {
-                log.error("聚合缓存反序列化失败，删除损坏缓存，AggKey:{}", aggKey, e);
-                stringRedisTemplate.delete(aggKey);
-            }
-        }
+        if (data != null) return data;
+        if (bucket.isExists()) return null;
 
-        // 3. 缓存未命中，查询数据库
+        // 缓存未命中，查询数据库
         log.debug("聚合缓存策略-缓存未命中，查询数据库，AggKey:{}", aggKey);
         AggCacheResult<D> aggResult = dbFallback.apply(dto);
-        D data = aggResult.getData();
+        data = aggResult.getData();
         List<String> dependSingleKeys = aggResult.getDependSingleKeys();
 
         // 4. 数据库无数据 → 缓存空值（短TTL）+ 返回null
         if (data == null || (data instanceof PageResult && ((PageResult<?>) data).getTotal() == 0)) {
-            // 缓存空字符串（Redis中null会被视为key不存在，空字符串更易识别空值缓存）
-            stringRedisTemplate.opsForValue().set(aggKey, "", CACHE_NULL_TTL, TimeUnit.MINUTES);
+            set(aggKey, (D) "", CACHE_NULL_TTL, TimeUnit.MINUTES);
             log.debug("聚合缓存策略-数据库无数据，缓存空值（TTL:{}分钟） | AggKey:{}", CACHE_NULL_TTL, aggKey);
             return null;
         }
@@ -1092,7 +1032,7 @@ public class CacheClient {
         if (CollectionUtil.isNotEmpty(dependSingleKeys)) {
             for (String singleKey : dependSingleKeys) {
                 String depSetKey = buildDepSetKey(singleKey);
-                stringRedisTemplate.opsForSet().add(depSetKey, aggKey);
+                addSetMember(depSetKey, aggKey);
                 log.debug("聚合缓存策略-记录依赖关系，SingleKey:{}, AggKey:{}", singleKey, aggKey);
             }
         }
@@ -1118,20 +1058,9 @@ public class CacheClient {
             Long time,
             TimeUnit timeUnit
     ) {
-        // 1. 入参校验
-        if (keyGenerator == null) {
-            throw new IllegalArgumentException("聚合缓存Key生成器不能为空");
-        }
-        if (CollectionUtil.isEmpty(dtos)) {
-            throw new IllegalArgumentException("DTO列表不能为空");
-        }
-        if (dbFallback == null) {
-            throw new IllegalArgumentException("数据库批量查询回调不能为空");
-        }
-
-        // 核心修改：通过keyGenerator生成aggKeys列表（和dtos一一对应）
+        // 通过keyGenerator生成aggKeys列表（和dtos一一对应）
         List<String> aggKeys = dtos.stream()
-                .map(keyGenerator) // 每个DTO对应生成一个AggKey
+                .map(keyGenerator)
                 .collect(Collectors.toList());
 
         // 校验生成的aggKeys：非空 + 无空白Key + 和dtos长度一致
@@ -1145,28 +1074,19 @@ public class CacheClient {
             }
         }
 
-        // 2. 批量查询聚合缓存（Redis multiGet）
-        List<String> jsonList = stringRedisTemplate.opsForValue().multiGet(aggKeys);
-        Map<String, D> cachedDataMap = new LinkedHashMap<>(); // 保持插入顺序
+        // 批量查询聚合缓存
+        Map<String, D> cachedDataMap = batchGet(aggKeys);
+
         List<String> missAggKeys = new ArrayList<>(); // 缓存未命中的Key
         List<DTO> missDtos = new ArrayList<>(); // 缓存未命中对应的DTO
-        Type dataType = typeRef.getType();
 
         for (int i = 0; i < aggKeys.size(); i++) {
             String aggKey = aggKeys.get(i);
-            String json = jsonList != null && jsonList.size() > i ? jsonList.get(i) : null;
+            D data = cachedDataMap.get(aggKey);
 
-            if (StrUtil.isNotBlank(json)) {
-                try {
-                    D data = JSONUtil.toBean(json, dataType, false);
-                    cachedDataMap.put(aggKey, data);
-                    log.debug("批量聚合缓存策略-命中缓存，AggKey:{}", aggKey);
-                } catch (Exception e) {
-                    log.error("批量聚合缓存反序列化失败，删除损坏缓存，AggKey:{}", aggKey, e);
-                    stringRedisTemplate.delete(aggKey);
-                    missAggKeys.add(aggKey);
-                    missDtos.add(dtos.get(i));
-                }
+            if (data != null) {
+                cachedDataMap.put(aggKey, data);
+                log.debug("批量聚合缓存策略-命中缓存，AggKey:{}", aggKey);
             } else {
                 missAggKeys.add(aggKey);
                 missDtos.add(dtos.get(i));
@@ -1174,61 +1094,59 @@ public class CacheClient {
             }
         }
 
-        // 3. 无未命中Key，直接返回缓存结果
+        // 全部命中，直接返回
         if (CollectionUtil.isEmpty(missAggKeys)) {
             return aggKeys.stream().map(cachedDataMap::get).collect(Collectors.toList());
         }
 
-        // 4. 缓存未命中，批量查询数据库
+        // 缓存未命中，批量查询数据库
         log.debug("批量聚合缓存策略-{}个Key缓存未命中，批量查询数据库", missAggKeys.size());
         AggBatchResult<D> aggBatchResult = dbFallback.apply(missDtos);
         Map<String, D> dbDataMap = aggBatchResult.getDataMap() == null ? new HashMap<>() : aggBatchResult.getDataMap();
         List<String> dependSingleKeys = aggBatchResult.getDependSingleKeys() == null ? new ArrayList<>() : aggBatchResult.getDependSingleKeys();
 
-        // 5. 处理查库结果：空值缓存 + 正常数据缓存
+        // 处理查库结果：空值缓存 + 正常数据缓存
         List<String> nullAggKeys = new ArrayList<>();
         Map<String, D> normalDataMap = new HashMap<>();
 
-        for (String missAggKey : missAggKeys) {
-            D dbData = dbDataMap.get(missAggKey);
+        for (String missgKey : missAggKeys) {
+            D dbData = dbDataMap.get(missgKey);
             if (dbData == null || (dbData instanceof PageResult && ((PageResult<?>) dbData).getTotal() == 0)) {
-                nullAggKeys.add(missAggKey);
-                log.debug("批量聚合缓存策略-数据库无数据，待缓存空值，AggKey:{}", missAggKey);
+                nullAggKeys.add(missgKey);
+                log.debug("批量聚合缓存策略-数据库无数据，待缓存空值，AggKey:{}", missgKey);
             } else {
-                normalDataMap.put(missAggKey, dbData);
+                normalDataMap.put(missgKey, dbData);
             }
         }
 
-        // 5.1 批量缓存空值（短TTL）
+        // 批量缓存空值（短TTL）
         if (CollectionUtil.isNotEmpty(nullAggKeys)) {
             Map<String, String> nullValueMap = nullAggKeys.stream()
                     .collect(Collectors.toMap(key -> key, key -> ""));
-            stringRedisTemplate.opsForValue().multiSet(nullValueMap);
-            nullAggKeys.forEach(key -> stringRedisTemplate.expire(key, CACHE_NULL_TTL, TimeUnit.MINUTES));
+            batchSet(nullValueMap, CACHE_NULL_TTL, TimeUnit.MINUTES);
             log.debug("批量聚合缓存策略-批量缓存空值，共{}个Key，TTL:{}分钟", nullAggKeys.size(), CACHE_NULL_TTL);
         }
 
-        // 5.2 批量缓存正常数据 + 记录依赖关系
+        // 批量缓存正常数据 + 记录依赖关系
         if (CollectionUtil.isNotEmpty(normalDataMap)) {
             Map<String, String> normalValueMap = normalDataMap.entrySet().stream()
                     .collect(Collectors.toMap(
                             Map.Entry::getKey,
                             entry -> JSONUtil.toJsonStr(entry.getValue())
                     ));
-            stringRedisTemplate.opsForValue().multiSet(normalValueMap);
-            normalDataMap.keySet().forEach(key -> stringRedisTemplate.expire(key, time, timeUnit));
+            batchSet(normalValueMap, time, timeUnit);
             log.debug("批量聚合缓存策略-批量缓存正常数据，共{}个Key，TTL:{} {}", normalDataMap.size(), time, timeUnit);
 
             if (CollectionUtil.isNotEmpty(dependSingleKeys)) {
                 for (String singleKey : dependSingleKeys) {
                     String depSetKey = buildDepSetKey(singleKey);
-                    stringRedisTemplate.opsForSet().add(depSetKey, normalDataMap.keySet().toArray(new String[0]));
+                    addSetMember(depSetKey, normalDataMap.keySet().toArray(new String[0]));
                     log.debug("批量聚合缓存策略-批量记录依赖关系，SingleKey:{}, 关联AggKey数量:{}", singleKey, normalDataMap.size());
                 }
             }
         }
 
-        // 6. 合并结果并返回（和dtos顺序一致）
+        // 合并结果并返回（和dtos顺序一致）
         Map<String, D> finalDataMap = new LinkedHashMap<>(cachedDataMap);
         finalDataMap.putAll(normalDataMap);
         nullAggKeys.forEach(key -> finalDataMap.put(key, null));
@@ -1244,24 +1162,23 @@ public class CacheClient {
      */
     public void autoClearAggCache(String singleKey) {
         if (StrUtil.isBlank(singleKey)) {
-            log.warn("清理聚合缓存失败：单表Key为空");
-            return;
+            throw new CacheException("清理聚合缓存失败：单表Key为空");
         }
 
         try {
             // 步骤1：删除单表自身缓存
-            stringRedisTemplate.delete(singleKey);
+            delete(singleKey);
             log.debug("清理聚合缓存-删除单表缓存，SingleKey:{}", singleKey);
 
             // 步骤2：读取依赖Set，获取关联的聚合Key
             String depSetKey = buildDepSetKey(singleKey);
-            Set<String> aggKeys = stringRedisTemplate.opsForSet().members(depSetKey);
+            Set<String> aggKeys = getSetMembers(depSetKey);
 
             // 步骤3：批量删除聚合缓存 + 清空依赖Set
             if (aggKeys != null && CollectionUtil.isNotEmpty(aggKeys)) {
-                stringRedisTemplate.delete(aggKeys);
+                batchDelete(aggKeys);
                 log.debug("清理聚合缓存-批量删除聚合Key，数量:{}, SingleKey:{}", aggKeys.size(), singleKey);
-                stringRedisTemplate.delete(depSetKey); // 清空dep Set，减少空间占用
+                delete(depSetKey); // 清空dep Set，减少空间占用
                 log.debug("清理聚合缓存-清空依赖Set，DepSetKey:{}", depSetKey);
             } else {
                 log.debug("清理聚合缓存-无关联聚合Key，SingleKey:{}", singleKey);
@@ -1280,37 +1197,10 @@ public class CacheClient {
     private String buildDepSetKey(String singleKey) {
         return DEP_PREFIX + singleKey;
     }
-    // ========== 辅助方法（纯 TypeReference 适配） ==========
+    // ============================== 辅助方法 ================================
 
     /**
-     * 单条查询入参校验
-     */
-    private <DTO, D> void validateParams(Function<DTO, String> keyGenerator, DTO dto, Function<DTO, D> dbFallback) {
-        if (keyGenerator == null) {
-            throw new IllegalArgumentException("Key生成器不能为空");
-        }
-        if (dto == null) {
-            throw new IllegalArgumentException("DTO参数不能为空");
-        }
-        if (dbFallback == null) {
-            throw new IllegalArgumentException("数据库查询回调不能为空");
-        }
-    }
-
-    /**
-     * 批量查询入参校验
-     */
-    private <DTO, D> void validateBatchParams(Function<DTO, String> keyGenerator, Function<List<DTO>, Map<DTO, D>> batchDbFallback) {
-        if (keyGenerator == null) {
-            throw new IllegalArgumentException("Key生成器不能为空");
-        }
-        if (batchDbFallback == null) {
-            throw new IllegalArgumentException("数据库批量查询回调不能为空");
-        }
-    }
-
-    /**
-     * 构建结果Map（保留入参顺序）
+     * 构建结果Map
      */
     private <DTO, D> Map<DTO, D> buildResultMap(List<DTO> dtos, Map<DTO, String> dtoKeyMap, Map<String, D> cacheMap) {
         return dtos.stream().collect(Collectors.toMap(
@@ -1322,222 +1212,56 @@ public class CacheClient {
     }
 
     /**
-     * 刷新缓存Map（纯 TypeReference 版）
-     */
-    private <D, DTO> void refreshCacheMap(
-            List<DTO> missDtos,
-            Map<DTO, String> dtoKeyMap,
-            Map<String, D> cacheMap,
-            TypeReference<D> typeRef
-    ) {
-        List<String> checkKeys = missDtos.stream()
-                .map(dto -> dtoKeyMap.get(dto))
-                .collect(Collectors.toList());
-        List<String> jsonList = stringRedisTemplate.opsForValue().multiGet(checkKeys);
-
-        for (int i = 0; i < missDtos.size(); i++) {
-            DTO dto = missDtos.get(i);
-            String key = checkKeys.get(i);
-            String json = jsonList.get(i);
-
-            if (StrUtil.isNotBlank(json)) {
-                try {
-                    cacheMap.put(key, JSONUtil.toBean(json, typeRef.getType(), false));
-                } catch (Exception e) {
-                    log.error("双重检查缓存反序列化失败，删除损坏缓存，Key:{}", key, e);
-                    stringRedisTemplate.delete(key);
-                }
-            } else if (json != null) {
-                cacheMap.put(key, null);
-            }
-        }
-    }
-
-    /**
-     * 批量释放锁 + 取消续期
-     */
-    private <DTO> void releaseBatchLock(
-            List<DTO> dtos,
-            Map<DTO, String> dtoLockKeyMap,
-            Map<DTO, String> dtoLockValueMap,
-            Map<DTO, Future<?>> renewalFutureMap
-    ) {
-        for (DTO dto : dtos) {
-            // 取消续期
-            Future<?> future = renewalFutureMap.get(dto);
-            if (future != null && !future.isCancelled()) {
-                future.cancel(true);
-            }
-            // 释放锁
-            String lockKey = dtoLockKeyMap.get(dto);
-            String lockValue = dtoLockValueMap.get(dto);
-            if (StrUtil.isNotBlank(lockKey) && StrUtil.isNotBlank(lockValue)) {
-                unlock(lockKey, lockValue);
-            }
-        }
-    }
-
-    /**
-     * 批量重建过期缓存（纯 TypeReference 版）
+     * 批量重建过期缓存
      */
     private <D, DTO> void rebuildExpiredBatchCache(
             List<DTO> expiredDtos,
             Map<DTO, String> dtoKeyMap,
-            TypeReference<D> typeRef,
             Function<List<DTO>, Map<DTO, D>> batchDbFallback,
             Long time,
             TimeUnit timeUnit
     ) {
-        // 构建锁映射
-        Map<DTO, String> dtoLockKeyMap = new HashMap<>();
-        Map<DTO, String> dtoLockValueMap = new HashMap<>();
-        Map<DTO, Future<?>> renewalFutureMap = new HashMap<>();
-
-        // 批量获取锁
-        for (DTO dto : expiredDtos) {
-            String key = dtoKeyMap.get(dto);
-            String lockKey = LOCK_PREFIX + key;
-            String lockValue = UUID.randomUUID().toString();
-            if (tryLock(lockKey, lockValue)) {
-                dtoLockKeyMap.put(dto, lockKey);
-                dtoLockValueMap.put(dto, lockValue);
-                renewalFutureMap.put(dto, startLockRenewal(lockKey, lockValue));
-            }
-        }
-
-        // 筛选成功获取锁的DTO
-        List<DTO> lockSuccessDtos = expiredDtos.stream()
-                .filter(dto -> renewalFutureMap.containsKey(dto))
-                .collect(Collectors.toList());
-        if (CollectionUtil.isEmpty(lockSuccessDtos)) {
-            return;
-        }
-
-        // 异步重建
         try {
+            // 线程池异步重建缓存
             CACHE_REBUILD_EXECUTOR.submit(() -> {
-                try {
-                    // 双重检查缓存
-                    List<DTO> finalRebuildDtos = new ArrayList<>();
-                    List<String> checkKeys = lockSuccessDtos.stream()
-                            .map(dto -> dtoKeyMap.get(dto))
-                            .collect(Collectors.toList());
-                    List<String> jsonList = stringRedisTemplate.opsForValue().multiGet(checkKeys);
-                    TypeReference<RedisData<D>> redisDataRef = new TypeReference<RedisData<D>>() {};
+                // 1. 二次检查缓存
+                List<String> checkKeys = expiredDtos.stream()
+                        .map(dtoKeyMap::get)
+                        .toList();
+                Map<String, RedisData<D>> doubleCheckMap = batchGet(checkKeys);
 
-                    for (int i = 0; i < lockSuccessDtos.size(); i++) {
-                        DTO dto = lockSuccessDtos.get(i);
-                        String json = jsonList.get(i);
-                        RedisData<D> redisData = JSONUtil.toBean(json, redisDataRef.getType(), false);
-                        if (redisData == null || redisData.getExpireTime().isBefore(LocalDateTime.now())) {
-                            finalRebuildDtos.add(dto);
-                        }
-                    }
+                // 2. 筛选真正需要重建的数据
+                List<DTO> finalRebuildDtos = expiredDtos.stream()
+                        .filter(dto -> {
+                            RedisData<D> redisData = doubleCheckMap.get(dtoKeyMap.get(dto));
+                            return redisData == null || redisData.getExpireTime().isBefore(LocalDateTime.now());
+                        })
+                        .toList();
 
-                    // 批量查询数据库
-                    if (!CollectionUtil.isEmpty(finalRebuildDtos)) {
-                        Map<DTO, D> dbMap = batchDbFallback.apply(finalRebuildDtos);
-                        // 批量写入缓存
-                        for (DTO dto : finalRebuildDtos) {
-                            D data = dbMap.getOrDefault(dto, null);
-                            if (data != null) {
-                                setWithLogicalExpire(dtoKeyMap.get(dto), data, time, timeUnit);
-                            }
-                        }
-                        log.debug("批量逻辑过期策略-异步重建缓存成功，重建数:{}", finalRebuildDtos.size());
-                    }
-                } catch (Exception e) {
-                    log.error("批量逻辑过期策略-异步重建缓存失败", e);
-                } finally {
-                    // 释放锁 + 取消续期
-                    releaseBatchLock(lockSuccessDtos, dtoLockKeyMap, dtoLockValueMap, renewalFutureMap);
+                if (CollectionUtil.isEmpty(finalRebuildDtos)) {
+                    return;
                 }
-            });
-        } catch (RejectedExecutionException e) {
-            // 线程池满，同步重建
-            log.warn("缓存重建线程池满，同步重建批量过期缓存，重建数:{}", lockSuccessDtos.size());
-            for (DTO dto : lockSuccessDtos) {
-                try {
-                    D data = batchDbFallback.apply(Collections.singletonList(dto)).get(dto);
+
+                // 3. 批量查库 + 写入逻辑过期缓存
+                log.debug("批量逻辑过期策略-异步重建缓存，重建数:{}", finalRebuildDtos.size());
+                Map<DTO, D> dbMap = batchDbFallback.apply(finalRebuildDtos);
+                for (DTO dto : finalRebuildDtos) {
+                    D data = dbMap.get(dto);
                     if (data != null) {
                         setWithLogicalExpire(dtoKeyMap.get(dto), data, time, timeUnit);
                     }
-                } finally {
-                    releaseBatchLock(Collections.singletonList(dto), dtoLockKeyMap, dtoLockValueMap, renewalFutureMap);
+                }
+            });
+        } catch (RejectedExecutionException e) {
+            // 线程池拒绝，同步兜底重建
+            log.warn("缓存重建线程池已满，同步重建过期缓存");
+            Map<DTO, D> dbMap = batchDbFallback.apply(expiredDtos);
+            for (DTO dto : expiredDtos) {
+                D data = dbMap.get(dto);
+                if (data != null) {
+                    setWithLogicalExpire(dtoKeyMap.get(dto), data, time, timeUnit);
                 }
             }
         }
-    }
-
-    /**
-     * 获取分布式锁（带日志）
-     */
-    private boolean tryLock(String key, String value) {
-        try {
-            Boolean isLock = stringRedisTemplate.opsForValue().setIfAbsent(
-                    key, value, Duration.ofSeconds(LOCK_TTL)
-            );
-            boolean result = BooleanUtil.isTrue(isLock);
-            if (result) {
-                log.debug("获取分布式锁成功，LockKey:{}", key);
-            } else {
-                log.debug("获取分布式锁失败，LockKey:{}", key);
-            }
-            return result;
-        } catch (Exception e) {
-            log.error("获取分布式锁异常，LockKey:{}", key, e);
-            return false;
-        }
-    }
-
-    /**
-     * 释放分布式锁（Lua脚本 + 日志）
-     */
-    private void unlock(String key, String value) {
-        String luaScript = "if redis.call('get', KEYS[1]) == ARGV[1] then " +
-                "return redis.call('del', KEYS[1]) " +
-                "else " +
-                "return 0 " +
-                "end";
-        try {
-            Long result = stringRedisTemplate.execute(
-                    new DefaultRedisScript<>(luaScript, Long.class),
-                    Collections.singletonList(key),
-                    value
-            );
-            if (result != null && result > 0) {
-                log.debug("释放分布式锁成功，LockKey:{}", key);
-            } else {
-                log.debug("释放分布式锁失败（锁已过期/归属其他线程），LockKey:{}", key);
-            }
-        } catch (Exception e) {
-            log.error("释放分布式锁异常，LockKey:{}", key, e);
-        }
-    }
-
-    /**
-     * 锁续期（优化日志 + 中断处理）
-     */
-    private Future<?> startLockRenewal(String lockKey, String lockValue) {
-        Runnable renewalTask = () -> {
-            try {
-                while (!Thread.currentThread().isInterrupted()) {
-                    Thread.sleep(LOCK_TTL * 1000L / 3); // 每1/3锁TTL续期一次
-
-                    Boolean success = stringRedisTemplate.opsForValue().setIfPresent(
-                            lockKey, lockValue, Duration.ofSeconds(LOCK_TTL)
-                    );
-                    if (BooleanUtil.isFalse(success)) {
-                        log.debug("锁续期失败，LockKey:{}", lockKey);
-                        break;
-                    }
-                    log.debug("锁续期成功，LockKey:{}", lockKey);
-                }
-            } catch (InterruptedException e) {
-                log.debug("锁续期线程被中断，LockKey:{}", lockKey);
-                Thread.currentThread().interrupt();
-            }
-        };
-        return CACHE_REBUILD_EXECUTOR.submit(renewalTask);
     }
 }
