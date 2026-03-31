@@ -1,353 +1,40 @@
-package org.rail.common.redis.util;
+package org.rail.common.redis.impl;
 
 import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.lang.TypeReference;
-import cn.hutool.core.map.MapUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
-import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
+import org.rail.common.core.result.PageResult;
 import org.rail.common.redis.bloomfilter.DistributedBloomFilterManager;
 import org.rail.common.redis.core.RedisAggCache;
 import org.rail.common.redis.core.RedisCache;
-import org.rail.common.redis.core.RedisStrategyCache;
 import org.rail.common.redis.exception.CacheException;
 import org.rail.common.redis.result.AggBatchResult;
 import org.rail.common.redis.result.AggCacheResult;
-import org.rail.common.core.result.PageResult;
-import org.rail.common.redis.result.RedisData;
-import org.redisson.api.*;
+import org.redisson.api.RBucket;
+import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
 
-import java.time.LocalDateTime;
 import java.util.*;
-import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import static org.rail.common.redis.constant.RedisConstants.AGG_CACHE_ORDER_BIZ_TYPE;
-
 /**
- * 缓存客户端工具类
- * 特性：
- * 1. 仅支持 TypeReference 泛型（彻底解决 List<实体> 反序列化问题，无类型推断歧义）
- * 2. 可配置化（通过配置文件注入参数，避免硬编码）
- * 3. 完善的日志监控（关键节点打印日志，便于排查问题）
- * 4. 增强的异常容错（线程中断、锁续期、任务拒绝等场景优化）
- * 5. 性能优化（批量操作、锁粒度控制）
- * 6. 简化接口（仅保留 TypeReference 版本，避免重载歧义）
+ * 聚合缓存
  */
 @Slf4j
-@Component
-public class CacheClient {
+public class RedissonAggCache implements RedisAggCache {
 
+    @Autowired
+    private RedissonClient redissonClient;
     @Autowired
     private RedisCache redisCache;
     @Autowired
-    private RedisStrategyCache redisStrategyCache;
-    @Autowired
-    private RedisAggCache redisAggCache;
-
-    // 注入分布式布隆过滤器管理器
-    @Autowired
     private DistributedBloomFilterManager bloomFilterManager;
 
-
-    // ========== 可配置化参数（支持 application.yml 注入） ==========
-    @Value("${cache.client.null-ttl:2}")
-    private Long CACHE_NULL_TTL; // 空值缓存过期时间（分钟）
-
-    @Value("${cache.client.lock-prefix:lock:}")
-    private String LOCK_PREFIX; // 锁前缀
-
-    @Value("${cache.client.lock-ttl:10}")
-    private Long LOCK_TTL; // 锁过期时间（秒）
-
-    @Value("${cache.client.thread-pool.core-size:5}")
-    private Integer CORE_POOL_SIZE; // 核心线程数
-
-    @Value("${cache.client.thread-pool.max-size:10}")
-    private Integer MAX_POOL_SIZE; // 最大线程数
-
-    @Value("${cache.client.thread-pool.queue-size:100}")
-    private Integer QUEUE_SIZE; // 任务队列大小
-
-    @Value("${cache.client.retry-count:5}")
-    private Integer DEFAULT_RETRY_COUNT; // 默认重试次数
-
-    @Value("${cache.client.retry-interval:50}")
-    private Long RETRY_INTERVAL; // 重试间隔（毫秒）
-    // ========== 聚合缓存配置 ==========
-    @Value("${cache.client.dep-prefix:dep:}")
-    private String DEP_PREFIX; // 依赖关系Set前缀（存储单表Key关联的聚合Key）
-
-    // ========== 线程池（可配置 + 优雅关闭） ==========
-    private ExecutorService CACHE_REBUILD_EXECUTOR;
-
-    // 初始化线程池
-    @Autowired
-    public void initThreadPool() {
-        CACHE_REBUILD_EXECUTOR = new ThreadPoolExecutor(
-                CORE_POOL_SIZE,
-                MAX_POOL_SIZE,
-                60L,
-                TimeUnit.SECONDS,
-                new ArrayBlockingQueue<>(QUEUE_SIZE),
-                new ThreadFactory() {
-                    private final AtomicInteger threadNum = new AtomicInteger(1);
-
-                    @Override
-                    public Thread newThread(Runnable r) {
-                        Thread thread = new Thread(r);
-                        thread.setName("cache-rebuild-thread-" + threadNum.getAndIncrement());
-                        thread.setDaemon(true); // 守护线程，避免阻塞应用关闭
-                        return thread;
-                    }
-                },
-                new ThreadPoolExecutor.CallerRunsPolicy() // 拒绝策略：调用者执行，避免任务丢失
-        );
-
-        // JVM关闭时优雅关闭线程池
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            log.info("开始关闭缓存重建线程池...");
-            CACHE_REBUILD_EXECUTOR.shutdown();
-            try {
-                if (!CACHE_REBUILD_EXECUTOR.awaitTermination(5, TimeUnit.SECONDS)) {
-                    log.warn("线程池未正常关闭，强制终止剩余任务");
-                    CACHE_REBUILD_EXECUTOR.shutdownNow();
-                }
-            } catch (InterruptedException e) {
-                CACHE_REBUILD_EXECUTOR.shutdownNow();
-                Thread.currentThread().interrupt();
-            }
-            log.info("缓存重建线程池已关闭");
-        }));
-    }
-
-    @PostConstruct
-    public void initAggCacheBloomFilter() {
-        bloomFilterManager.initBloomFilter(AGG_CACHE_ORDER_BIZ_TYPE);
-        log.info("聚合缓存布隆过滤器初始化完成 | BizType:{}", AGG_CACHE_ORDER_BIZ_TYPE);
-    }
-
-    // =============================== String类型缓存操作封装 ===================================
-
-    /**
-     * 设置缓存
-     */
-    public <T> void set(String key, T value) {
-        redisCache.set(key, value);
-    }
-
-    public <T> void set(String key, T value, Long expireTime, TimeUnit timeUnit) {
-        redisCache.set(key, value, expireTime, timeUnit);
-    }
-
-    /**
-     * 设置逻辑过期缓存
-     */
-    public <T> void setWithLogicalExpire(String key, T value, Long expireTime, TimeUnit timeUnit) {
-        redisCache.setWithLogicalExpire(key, value, expireTime, timeUnit);
-    }
-
-    /**
-     * 批量设置缓存（无过期时间）
-     */
-    public <T> void batchSet(Map<String, T> keyValueMap) {
-        redisCache.batchSet(keyValueMap);
-    }
-
-    /**
-     * 批量设置缓存（带统一过期时间）
-     */
-    public <T> void batchSet(Map<String, T> keyValueMap, Long expireTime, TimeUnit timeUnit) {
-        redisCache.batchSet(keyValueMap, expireTime, timeUnit);
-    }
-
-    /**
-     * 批量获取缓存
-     */
-    public <T> Map<String, T> batchGet(Collection<String> keys) {
-        return redisCache.batchGet(keys);
-    }
-
-    // =============================== Set类型缓存操作封装 ===================================
-    /**
-     * 向Set缓存添加单个成员（对应原stringRedisTemplate.opsForSet().add）
-     */
-    public <T> void addSetMember(String key, T value) {
-        redisCache.addSetMember(key, value);
-    }
-
-    /**
-     * 向Set缓存批量添加成员
-     */
-    public <T> void addSetMembers(String key, Collection<T> values) {
-        redisCache.addSetMembers(key, values);
-    }
-
-    /**
-     * 获取Set缓存所有成员（对应原stringRedisTemplate.opsForSet().members）
-     */
-    public <T> Set<T> getSetMembers(String key) {
-        return redisCache.getSetMembers(key);
-    }
-
-    // ========================== 缓存删除封装（String、Set通用） =========================
-    /**
-     * 删除缓存
-     */
-    public void delete(String key) {
-        redisCache.delete(key);
-    }
-
-    /**
-     * 批量删除缓存
-     */
-    public void batchDelete(Collection<String> keys) {
-        redisCache.batchDelete(keys);
-    }
-
-    // ========================== 缓存穿透 ================================
-
-    /**
-     * 缓存穿透（keyPrefix + id 生成Key）
-     */
-    public <D, ID> D queryWithPassThrough(
-            String keyPrefix,
-            ID id,
-            TypeReference<D> typeRef,
-            Function<ID, D> dbFallback,
-            Long time,
-            TimeUnit timeUnit
-    ) {
-        return redisStrategyCache.queryWithPassThrough(keyPrefix, id, typeRef, dbFallback, time, timeUnit);
-    }
-
-    /**
-     * 缓存穿透（自定义Key生成器）
-     */
-    public <D, DTO> D queryWithPassThrough(
-            Function<DTO, String> keyGenerator,
-            DTO dto,
-            TypeReference<D> typeRef,
-            Function<DTO, D> dbFallback,
-            Long time,
-            TimeUnit timeUnit
-    ) {
-        return redisStrategyCache.queryWithPassThrough(keyGenerator, dto, typeRef, dbFallback, time, timeUnit);
-    }
-
-    /**
-     * 批量缓存穿透
-     */
-    public <D, DTO> Map<DTO, D> batchQueryWithPassThrough(
-            Function<DTO, String> keyGenerator,
-            List<DTO> dtos,
-            TypeReference<D> typeRef,
-            Function<List<DTO>, Map<DTO, D>> batchDbFallback,
-            Long time,
-            TimeUnit timeUnit
-    ) {
-        return redisStrategyCache.batchQueryWithPassThrough(keyGenerator, dtos, typeRef, batchDbFallback, time, timeUnit);
-    }
-
-    // ========================== 互斥锁（Mutex）=========================
-
-    /**
-     * 互斥锁（简化版：keyPrefix + id，默认重试次数，仅 TypeReference）
-     */
-    public <D, ID> D queryWithMutex(
-            String keyPrefix,
-            ID id,
-            TypeReference<D> typeRef,
-            Function<ID, D> dbFallback,
-            Long time,
-            TimeUnit timeUnit
-    ) {
-        return redisStrategyCache.queryWithMutex(keyPrefix, id, typeRef, dbFallback, time, timeUnit);
-    }
-
-    /**
-     * 互斥锁（自定义Key生成器，指定重试次数）
-     */
-    public <D, DTO> D queryWithMutex(
-            Function<DTO, String> keyGenerator,
-            DTO dto,
-            TypeReference<D> typeRef,
-            Function<DTO, D> dbFallback,
-            Long time,
-            TimeUnit timeUnit,
-            int retryCount
-    ) {
-        return redisStrategyCache.queryWithMutex(keyGenerator, dto, typeRef, dbFallback, time, timeUnit, retryCount);
-    }
-
-    /**
-     * 批量互斥锁
-     */
-    public <D, DTO> Map<DTO, D> batchQueryWithMutex(
-            Function<DTO, String> keyGenerator,
-            List<DTO> dtos,
-            TypeReference<D> typeRef,
-            Function<List<DTO>, Map<DTO, D>> batchDbFallback,
-            Long time,
-            TimeUnit timeUnit,
-            int retryCount
-    ) {
-        return redisStrategyCache.batchQueryWithMutex(keyGenerator, dtos, typeRef, batchDbFallback, time, timeUnit, retryCount);
-    }
-
-
-    // =========================== 逻辑过期（LogicalExpire）=============================
-
-    /**
-     * 逻辑过期（简化版：keyPrefix + id）
-     */
-    public <D, ID> D queryWithLogicalExpire(
-            String keyPrefix,
-            ID id,
-            TypeReference<D> typeRef,
-            Function<ID, D> dbFallback,
-            Long time,
-            TimeUnit timeUnit
-    ) {
-        return redisStrategyCache.queryWithLogicalExpire(keyPrefix, id, typeRef, dbFallback, time, timeUnit);
-    }
-
-    /**
-     * 逻辑过期（核心版：自定义Key生成器）
-     */
-    public <D, DTO> D queryWithLogicalExpire(
-            Function<DTO, String> keyGenerator,
-            DTO dto,
-            TypeReference<D> typeRef,
-            Function<DTO, D> dbFallback,
-            Long time,
-            TimeUnit timeUnit
-    ) {
-        return redisStrategyCache.queryWithLogicalExpire(keyGenerator, dto, typeRef, dbFallback, time, timeUnit);
-    }
-
-    /**
-     * 批量逻辑过期
-     */
-    public <D, DTO> Map<DTO, D> batchQueryWithLogicalExpire(
-            Function<DTO, String> keyGenerator,
-            List<DTO> dtos,
-            TypeReference<D> typeRef,
-            Function<List<DTO>, Map<DTO, D>> batchDbFallback,
-            Long time,
-            TimeUnit timeUnit
-    ) {
-        return redisStrategyCache.batchQueryWithLogicalExpire(keyGenerator, dtos, typeRef, batchDbFallback, time, timeUnit);
-    }
-
-
-// ========================== 聚合缓存（单Key关联多表Key） =========================
+    // ========================== 聚合缓存（单Key关联多表Key） =========================
     /**
      * 1.布隆过滤器：分页不适用，组合太多，容易引发维度爆炸
      * 聚合缓存查询（存储聚合结果 + 自动记录单表依赖关系）
@@ -371,7 +58,32 @@ public class CacheClient {
             Long time,
             TimeUnit timeUnit
     ) {
-        return redisAggCache.queryAggCache(aggKey, dependSingleKeys, typeRef, dbFallback, dto, bizType, time, timeUnit);
+        // 布隆过滤器前置拦截
+        boolean mightExist = bloomFilterManager.mightContain(bizType, aggKey);
+        if (!mightExist) {
+            return null;
+        }
+
+        RBucket<D> bucket = redissonClient.getBucket(aggKey);
+        D data = bucket.get();
+
+        // 缓存未命中，查询数据库
+        if (data != null) return data;
+        data = dbFallback.apply(dto);
+
+        if (data == null || (data instanceof PageResult<?> pr && pr.getTotal() == 0)) return null;
+
+        // 6. 数据库有数据 → ①写入聚合缓存 ②记录依赖 ③将aggKey加入布隆
+        redisCache.set(aggKey, data, time, timeUnit);
+        if (CollectionUtil.isNotEmpty(dependSingleKeys)) {
+            for (String singleKey : dependSingleKeys) {
+                String depSetKey = buildDepSetKey(singleKey);
+                redisCache.addSetMember(depSetKey, aggKey);
+            }
+        }
+        bloomFilterManager.add(bizType, aggKey);
+
+        return data;
     }
 
     /**
@@ -413,11 +125,11 @@ public class CacheClient {
         if (data == null || (data instanceof PageResult<?> pr && pr.getTotal() == 0)) return null;
 
         // 6. 数据库有数据 → 写入缓存 + 记录依赖 + 加入布隆
-        set(aggKey, data, time, timeUnit);
+        redisCache.set(aggKey, data, time, timeUnit);
         if (CollectionUtil.isNotEmpty(dependSingleKeys)) {
             for (String singleKey : dependSingleKeys) {
                 String depSetKey = buildDepSetKey(singleKey);
-                addSetMember(depSetKey, aggKey);
+                redisCache.addSetMember(depSetKey, aggKey);
             }
         }
         bloomFilterManager.add(bizType, aggKey);
@@ -459,17 +171,17 @@ public class CacheClient {
 
         // 数据库无数据 → 缓存空值（短TTL）+ 返回null
         if (data == null || (data instanceof PageResult && ((PageResult<?>) data).getTotal() == 0)) {
-            set(aggKey, (D) "", CACHE_NULL_TTL, TimeUnit.MINUTES);
+            redisCache.set(aggKey, (D) "", CACHE_NULL_TTL, TimeUnit.MINUTES);
             log.debug("聚合缓存策略-数据库无数据，缓存空值（TTL:{}分钟） | AggKey:{}", CACHE_NULL_TTL, aggKey);
             return null;
         }
 
         // 数据库有数据 → ①写入聚合缓存 ②记录依赖
-        set(aggKey, data, time, timeUnit);
+        redisCache.set(aggKey, data, time, timeUnit);
         if (CollectionUtil.isNotEmpty(dependSingleKeys)) {
             for (String singleKey : dependSingleKeys) {
                 String depSetKey = buildDepSetKey(singleKey);
-                addSetMember(depSetKey, aggKey);
+                redisCache.addSetMember(depSetKey, aggKey);
                 log.debug("聚合缓存策略-记录依赖关系，SingleKey:{}, AggKey:{}", singleKey, aggKey);
             }
         }
@@ -509,17 +221,17 @@ public class CacheClient {
 
         // 4. 数据库无数据 → 缓存空值（短TTL）+ 返回null
         if (data == null || (data instanceof PageResult && ((PageResult<?>) data).getTotal() == 0)) {
-            set(aggKey, (D) "", CACHE_NULL_TTL, TimeUnit.MINUTES);
+            redisCache.set(aggKey, (D) "", CACHE_NULL_TTL, TimeUnit.MINUTES);
             log.debug("聚合缓存策略-数据库无数据，缓存空值（TTL:{}分钟） | AggKey:{}", CACHE_NULL_TTL, aggKey);
             return null;
         }
 
         // 5. 数据库有数据 → 写入缓存 + 记录依赖
-        set(aggKey, data, time, timeUnit);
+        redisCache.set(aggKey, data, time, timeUnit);
         if (CollectionUtil.isNotEmpty(dependSingleKeys)) {
             for (String singleKey : dependSingleKeys) {
                 String depSetKey = buildDepSetKey(singleKey);
-                addSetMember(depSetKey, aggKey);
+                redisCache.addSetMember(depSetKey, aggKey);
                 log.debug("聚合缓存策略-记录依赖关系，SingleKey:{}, AggKey:{}", singleKey, aggKey);
             }
         }
@@ -562,7 +274,7 @@ public class CacheClient {
         }
 
         // 批量查询聚合缓存
-        Map<String, D> cachedDataMap = batchGet(aggKeys);
+        Map<String, D> cachedDataMap = redisCache.batchGet(aggKeys);
 
         List<String> missAggKeys = new ArrayList<>(); // 缓存未命中的Key
         List<DTO> missDtos = new ArrayList<>(); // 缓存未命中对应的DTO
@@ -610,7 +322,7 @@ public class CacheClient {
         if (CollectionUtil.isNotEmpty(nullAggKeys)) {
             Map<String, String> nullValueMap = nullAggKeys.stream()
                     .collect(Collectors.toMap(key -> key, key -> ""));
-            batchSet(nullValueMap, CACHE_NULL_TTL, TimeUnit.MINUTES);
+            redisCache.batchSet(nullValueMap, CACHE_NULL_TTL, TimeUnit.MINUTES);
             log.debug("批量聚合缓存策略-批量缓存空值，共{}个Key，TTL:{}分钟", nullAggKeys.size(), CACHE_NULL_TTL);
         }
 
@@ -621,13 +333,13 @@ public class CacheClient {
                             Map.Entry::getKey,
                             entry -> JSONUtil.toJsonStr(entry.getValue())
                     ));
-            batchSet(normalValueMap, time, timeUnit);
+            redisCache.batchSet(normalValueMap, time, timeUnit);
             log.debug("批量聚合缓存策略-批量缓存正常数据，共{}个Key，TTL:{} {}", normalDataMap.size(), time, timeUnit);
 
             if (CollectionUtil.isNotEmpty(dependSingleKeys)) {
                 for (String singleKey : dependSingleKeys) {
                     String depSetKey = buildDepSetKey(singleKey);
-                    addSetMember(depSetKey, normalDataMap.keySet().toArray(new String[0]));
+                    redisCache.addSetMember(depSetKey, normalDataMap.keySet().toArray(new String[0]));
                     log.debug("批量聚合缓存策略-批量记录依赖关系，SingleKey:{}, 关联AggKey数量:{}", singleKey, normalDataMap.size());
                 }
             }
@@ -654,18 +366,18 @@ public class CacheClient {
 
         try {
             // 步骤1：删除单表自身缓存
-            delete(singleKey);
+            redisCache.delete(singleKey);
             log.debug("清理聚合缓存-删除单表缓存，SingleKey:{}", singleKey);
 
             // 步骤2：读取依赖Set，获取关联的聚合Key
             String depSetKey = buildDepSetKey(singleKey);
-            Set<String> aggKeys = getSetMembers(depSetKey);
+            Set<String> aggKeys = redisCache.getSetMembers(depSetKey);
 
             // 步骤3：批量删除聚合缓存 + 清空依赖Set
             if (aggKeys != null && CollectionUtil.isNotEmpty(aggKeys)) {
-                batchDelete(aggKeys);
+                redisCache.batchDelete(aggKeys);
                 log.debug("清理聚合缓存-批量删除聚合Key，数量:{}, SingleKey:{}", aggKeys.size(), singleKey);
-                delete(depSetKey); // 清空dep Set，减少空间占用
+                redisCache.delete(depSetKey); // 清空dep Set，减少空间占用
                 log.debug("清理聚合缓存-清空依赖Set，DepSetKey:{}", depSetKey);
             } else {
                 log.debug("清理聚合缓存-无关联聚合Key，SingleKey:{}", singleKey);
