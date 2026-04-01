@@ -6,10 +6,16 @@ public final class RedisConstants {
 
     /*public static final String LOGIN_CODE_KEY = "login:code:";
     public static final Long LOGIN_CODE_TTL = 2L;*/
+    // =============== 公共常量 ================
+    public static final String LOCK_PREFIX = "lock:";
+    public static final Long LOCK_TTL = 10L;  // （秒）分布式锁默认过期时间，防止死锁
+    public static final Long CACHE_NULL_TTL = 2L;
+    public static final String DEP_PREFIX = "dep:";
 
     public static final Long RAIL_DEFAULT_TTL = 15L;
     public static final Long RAIL_TRAIN_BASE_CACHE_TTL = 3600L;
     public static final Long RAIL_AGG_SEAT_CLASS_CACHE_TTL_SECONDS = 5L;
+
     // =============== 单表根key（唯一） ================
     public static final String RAIL_PASSENGER_LIST_USER_PREFIX = "rail:passenger:list:user:"; // 乘车人列表
     public static final String RAIL_ORDER_PREFIX = "rail:order:";    //  + orderSn

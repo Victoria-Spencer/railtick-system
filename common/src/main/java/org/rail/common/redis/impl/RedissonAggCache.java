@@ -21,6 +21,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import static org.rail.common.redis.constant.RedisConstants.CACHE_NULL_TTL;
+import static org.rail.common.redis.constant.RedisConstants.DEP_PREFIX;
+
 /**
  * 聚合缓存
  */
@@ -48,6 +51,7 @@ public class RedissonAggCache implements RedisAggCache {
      * @param timeUnit 时间单位
      * @return 聚合数据
      */
+    @Override
     public <D, DTO> D queryAggCache(
             String aggKey,
             List<String> dependSingleKeys,
@@ -97,6 +101,7 @@ public class RedissonAggCache implements RedisAggCache {
      * @param timeUnit 时间单位
      * @return 聚合数据
      */
+    @Override
     public <D, DTO> D queryAggCache(
             String aggKey,
             TypeReference<D> typeRef,
@@ -149,6 +154,7 @@ public class RedissonAggCache implements RedisAggCache {
      * @param timeUnit 时间单位
      * @return 聚合数据
      */
+    @Override
     public <D, DTO> D queryAggCache(
             String aggKey,
             List<String> dependSingleKeys,
@@ -199,6 +205,7 @@ public class RedissonAggCache implements RedisAggCache {
      * @param timeUnit 正常数据缓存时间单位
      * @return 聚合数据
      */
+    @Override
     public <D, DTO> D queryAggCache(
             String aggKey,
             TypeReference<D> typeRef,
@@ -249,6 +256,7 @@ public class RedissonAggCache implements RedisAggCache {
      * @param timeUnit 正常数据缓存时间单位
      * @return 聚合数据列表（和传入的dtos顺序完全一致，未命中且查库无数据则为null）
      */
+    @Override
     public <D, DTO> List<D> batchQueryAggCache(
             Function<DTO, String> keyGenerator,
             List<DTO> dtos,
@@ -359,6 +367,7 @@ public class RedissonAggCache implements RedisAggCache {
      * 逻辑：删除单表缓存 → 读取dep Set删除聚合缓存 → 清空dep Set
      * @param singleKey 单表Key（如 rail:order:123）
      */
+    @Override
     public void autoClearAggCache(String singleKey) {
         if (StrUtil.isBlank(singleKey)) {
             throw new CacheException("清理聚合缓存失败：单表Key为空");

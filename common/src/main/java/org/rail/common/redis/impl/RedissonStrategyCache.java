@@ -16,10 +16,13 @@ import org.springframework.beans.factory.annotation.Value;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+
+import static org.rail.common.redis.constant.RedisConstants.*;
 
 /**
  * 三大缓存策略
@@ -31,21 +34,12 @@ public class RedissonStrategyCache implements RedisStrategyCache {
     private RedisCache redisCache;
     @Autowired
     private RedissonClient redissonClient;
+    @Autowired
+    private ExecutorService cacheRebuildExecutor;
 
-    @Value("${cache.client.null-ttl:2}")
-    private Long CACHE_NULL_TTL; // 空值缓存过期时间（分钟）
 
-    @Value("${cache.client.lock-prefix:lock:}")
-    private String LOCK_PREFIX; // 锁前缀
-
-    @Value("${cache.client.lock-ttl:10}")
-    private Long LOCK_TTL; // 锁过期时间（秒）
-
-    @Value("${cache.client.retry-count:5}")
-    private Integer DEFAULT_RETRY_COUNT; // 默认重试次数
-
-    @Value("${cache.client.retry-interval:50}")
-    private Long RETRY_INTERVAL; // 重试间隔（毫秒）
+    private final Integer DEFAULT_RETRY_COUNT = 5; // 默认重试次数
+    private final Integer RETRY_INTERVAL = 50; // 重试间隔（毫秒）
 
     // ========================== 缓存穿透 ================================
     /**
@@ -434,7 +428,7 @@ public class RedissonStrategyCache implements RedisStrategyCache {
         // 缓存过期，加锁，异步重建
         try {
             if(lock.tryLock(2, TimeUnit.SECONDS)) {
-                CACHE_REBUILD_EXECUTOR.submit(() -> {
+                cacheRebuildExecutor.submit(() -> {
                     try {
                         D dbData = dbFallback.apply(dto);
                         if (dbData != null) {
@@ -550,7 +544,7 @@ public class RedissonStrategyCache implements RedisStrategyCache {
     ) {
         try {
             // 线程池异步重建缓存
-            CACHE_REBUILD_EXECUTOR.submit(() -> {
+            cacheRebuildExecutor.submit(() -> {
                 // 1. 二次检查缓存
                 List<String> checkKeys = expiredDtos.stream()
                         .map(dtoKeyMap::get)

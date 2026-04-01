@@ -2,7 +2,6 @@ package org.rail.common.redis.util;
 
 import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.lang.TypeReference;
-import cn.hutool.core.map.MapUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
 import jakarta.annotation.PostConstruct;
@@ -15,13 +14,11 @@ import org.rail.common.redis.exception.CacheException;
 import org.rail.common.redis.result.AggBatchResult;
 import org.rail.common.redis.result.AggCacheResult;
 import org.rail.common.core.result.PageResult;
-import org.rail.common.redis.result.RedisData;
 import org.redisson.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -54,78 +51,6 @@ public class CacheClient {
     // 注入分布式布隆过滤器管理器
     @Autowired
     private DistributedBloomFilterManager bloomFilterManager;
-
-
-    // ========== 可配置化参数（支持 application.yml 注入） ==========
-    @Value("${cache.client.null-ttl:2}")
-    private Long CACHE_NULL_TTL; // 空值缓存过期时间（分钟）
-
-    @Value("${cache.client.lock-prefix:lock:}")
-    private String LOCK_PREFIX; // 锁前缀
-
-    @Value("${cache.client.lock-ttl:10}")
-    private Long LOCK_TTL; // 锁过期时间（秒）
-
-    @Value("${cache.client.thread-pool.core-size:5}")
-    private Integer CORE_POOL_SIZE; // 核心线程数
-
-    @Value("${cache.client.thread-pool.max-size:10}")
-    private Integer MAX_POOL_SIZE; // 最大线程数
-
-    @Value("${cache.client.thread-pool.queue-size:100}")
-    private Integer QUEUE_SIZE; // 任务队列大小
-
-    @Value("${cache.client.retry-count:5}")
-    private Integer DEFAULT_RETRY_COUNT; // 默认重试次数
-
-    @Value("${cache.client.retry-interval:50}")
-    private Long RETRY_INTERVAL; // 重试间隔（毫秒）
-    // ========== 聚合缓存配置 ==========
-    @Value("${cache.client.dep-prefix:dep:}")
-    private String DEP_PREFIX; // 依赖关系Set前缀（存储单表Key关联的聚合Key）
-
-    // ========== 线程池（可配置 + 优雅关闭） ==========
-    private ExecutorService CACHE_REBUILD_EXECUTOR;
-
-    // 初始化线程池
-    @Autowired
-    public void initThreadPool() {
-        CACHE_REBUILD_EXECUTOR = new ThreadPoolExecutor(
-                CORE_POOL_SIZE,
-                MAX_POOL_SIZE,
-                60L,
-                TimeUnit.SECONDS,
-                new ArrayBlockingQueue<>(QUEUE_SIZE),
-                new ThreadFactory() {
-                    private final AtomicInteger threadNum = new AtomicInteger(1);
-
-                    @Override
-                    public Thread newThread(Runnable r) {
-                        Thread thread = new Thread(r);
-                        thread.setName("cache-rebuild-thread-" + threadNum.getAndIncrement());
-                        thread.setDaemon(true); // 守护线程，避免阻塞应用关闭
-                        return thread;
-                    }
-                },
-                new ThreadPoolExecutor.CallerRunsPolicy() // 拒绝策略：调用者执行，避免任务丢失
-        );
-
-        // JVM关闭时优雅关闭线程池
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            log.info("开始关闭缓存重建线程池...");
-            CACHE_REBUILD_EXECUTOR.shutdown();
-            try {
-                if (!CACHE_REBUILD_EXECUTOR.awaitTermination(5, TimeUnit.SECONDS)) {
-                    log.warn("线程池未正常关闭，强制终止剩余任务");
-                    CACHE_REBUILD_EXECUTOR.shutdownNow();
-                }
-            } catch (InterruptedException e) {
-                CACHE_REBUILD_EXECUTOR.shutdownNow();
-                Thread.currentThread().interrupt();
-            }
-            log.info("缓存重建线程池已关闭");
-        }));
-    }
 
     @PostConstruct
     public void initAggCacheBloomFilter() {
@@ -394,35 +319,7 @@ public class CacheClient {
             Long time,
             TimeUnit timeUnit
     ) {
-        // 布隆过滤器前置拦截
-        boolean mightExist = bloomFilterManager.mightContain(bizType, aggKey);
-        if (!mightExist) {
-            return null;
-        }
-
-        RBucket<D> bucket = redissonClient.getBucket(aggKey);
-        D data = bucket.get();
-
-        if (data != null) return data;
-
-        // 缓存未命中，查询数据库
-        AggCacheResult<D> aggResult = dbFallback.apply(dto);
-        data = aggResult.getData();
-        List<String> dependSingleKeys = aggResult.getDependSingleKeys();
-
-        if (data == null || (data instanceof PageResult<?> pr && pr.getTotal() == 0)) return null;
-
-        // 6. 数据库有数据 → 写入缓存 + 记录依赖 + 加入布隆
-        set(aggKey, data, time, timeUnit);
-        if (CollectionUtil.isNotEmpty(dependSingleKeys)) {
-            for (String singleKey : dependSingleKeys) {
-                String depSetKey = buildDepSetKey(singleKey);
-                addSetMember(depSetKey, aggKey);
-            }
-        }
-        bloomFilterManager.add(bizType, aggKey);
-
-        return data;
+        return redisAggCache.queryAggCache(aggKey, typeRef, dbFallback, dto, bizType, time, timeUnit);
     }
 
     /**
@@ -446,35 +343,7 @@ public class CacheClient {
             Long time,
             TimeUnit timeUnit
     ) {
-        // 查询聚合缓存
-        RBucket<D> bucket = redissonClient.getBucket(aggKey);
-        D data = bucket.get();
-
-        if (data != null) return data;
-        if (bucket.isExists()) return null;
-
-        // 缓存未命中，查询数据库
-        log.debug("聚合缓存策略-缓存未命中，查询数据库，AggKey:{}", aggKey);
-        data = dbFallback.apply(dto);
-
-        // 数据库无数据 → 缓存空值（短TTL）+ 返回null
-        if (data == null || (data instanceof PageResult && ((PageResult<?>) data).getTotal() == 0)) {
-            set(aggKey, (D) "", CACHE_NULL_TTL, TimeUnit.MINUTES);
-            log.debug("聚合缓存策略-数据库无数据，缓存空值（TTL:{}分钟） | AggKey:{}", CACHE_NULL_TTL, aggKey);
-            return null;
-        }
-
-        // 数据库有数据 → ①写入聚合缓存 ②记录依赖
-        set(aggKey, data, time, timeUnit);
-        if (CollectionUtil.isNotEmpty(dependSingleKeys)) {
-            for (String singleKey : dependSingleKeys) {
-                String depSetKey = buildDepSetKey(singleKey);
-                addSetMember(depSetKey, aggKey);
-                log.debug("聚合缓存策略-记录依赖关系，SingleKey:{}, AggKey:{}", singleKey, aggKey);
-            }
-        }
-
-        return data;
+        return redisAggCache.queryAggCache(aggKey, dependSingleKeys, typeRef, dbFallback, dto, time, timeUnit);
     }
 
     /**
@@ -495,36 +364,7 @@ public class CacheClient {
             Long time,
             TimeUnit timeUnit
     ) {
-        RBucket<D> bucket = redissonClient.getBucket(aggKey);
-        D data = bucket.get();
-
-        if (data != null) return data;
-        if (bucket.isExists()) return null;
-
-        // 缓存未命中，查询数据库
-        log.debug("聚合缓存策略-缓存未命中，查询数据库，AggKey:{}", aggKey);
-        AggCacheResult<D> aggResult = dbFallback.apply(dto);
-        data = aggResult.getData();
-        List<String> dependSingleKeys = aggResult.getDependSingleKeys();
-
-        // 4. 数据库无数据 → 缓存空值（短TTL）+ 返回null
-        if (data == null || (data instanceof PageResult && ((PageResult<?>) data).getTotal() == 0)) {
-            set(aggKey, (D) "", CACHE_NULL_TTL, TimeUnit.MINUTES);
-            log.debug("聚合缓存策略-数据库无数据，缓存空值（TTL:{}分钟） | AggKey:{}", CACHE_NULL_TTL, aggKey);
-            return null;
-        }
-
-        // 5. 数据库有数据 → 写入缓存 + 记录依赖
-        set(aggKey, data, time, timeUnit);
-        if (CollectionUtil.isNotEmpty(dependSingleKeys)) {
-            for (String singleKey : dependSingleKeys) {
-                String depSetKey = buildDepSetKey(singleKey);
-                addSetMember(depSetKey, aggKey);
-                log.debug("聚合缓存策略-记录依赖关系，SingleKey:{}, AggKey:{}", singleKey, aggKey);
-            }
-        }
-
-        return data;
+        return redisAggCache.queryAggCache(aggKey, typeRef, dbFallback, dto, time, timeUnit);
     }
 
     /**
@@ -545,100 +385,7 @@ public class CacheClient {
             Long time,
             TimeUnit timeUnit
     ) {
-        // 通过keyGenerator生成aggKeys列表（和dtos一一对应）
-        List<String> aggKeys = dtos.stream()
-                .map(keyGenerator)
-                .collect(Collectors.toList());
-
-        // 校验生成的aggKeys：非空 + 无空白Key + 和dtos长度一致
-        if (CollectionUtil.isEmpty(aggKeys) || aggKeys.size() != dtos.size()) {
-            throw new IllegalArgumentException("Key生成器生成的AggKey列表不能为空，且长度必须和DTO列表一致");
-        }
-        for (int i = 0; i < aggKeys.size(); i++) {
-            String aggKey = aggKeys.get(i);
-            if (StrUtil.isBlank(aggKey)) {
-                throw new IllegalArgumentException(String.format("Key生成器为第%d个DTO生成的AggKey为空", i));
-            }
-        }
-
-        // 批量查询聚合缓存
-        Map<String, D> cachedDataMap = batchGet(aggKeys);
-
-        List<String> missAggKeys = new ArrayList<>(); // 缓存未命中的Key
-        List<DTO> missDtos = new ArrayList<>(); // 缓存未命中对应的DTO
-
-        for (int i = 0; i < aggKeys.size(); i++) {
-            String aggKey = aggKeys.get(i);
-            D data = cachedDataMap.get(aggKey);
-
-            if (data != null) {
-                cachedDataMap.put(aggKey, data);
-                log.debug("批量聚合缓存策略-命中缓存，AggKey:{}", aggKey);
-            } else {
-                missAggKeys.add(aggKey);
-                missDtos.add(dtos.get(i));
-                log.debug("批量聚合缓存策略-缓存未命中，待查库，AggKey:{}", aggKey);
-            }
-        }
-
-        // 全部命中，直接返回
-        if (CollectionUtil.isEmpty(missAggKeys)) {
-            return aggKeys.stream().map(cachedDataMap::get).collect(Collectors.toList());
-        }
-
-        // 缓存未命中，批量查询数据库
-        log.debug("批量聚合缓存策略-{}个Key缓存未命中，批量查询数据库", missAggKeys.size());
-        AggBatchResult<D> aggBatchResult = dbFallback.apply(missDtos);
-        Map<String, D> dbDataMap = aggBatchResult.getDataMap() == null ? new HashMap<>() : aggBatchResult.getDataMap();
-        List<String> dependSingleKeys = aggBatchResult.getDependSingleKeys() == null ? new ArrayList<>() : aggBatchResult.getDependSingleKeys();
-
-        // 处理查库结果：空值缓存 + 正常数据缓存
-        List<String> nullAggKeys = new ArrayList<>();
-        Map<String, D> normalDataMap = new HashMap<>();
-
-        for (String missgKey : missAggKeys) {
-            D dbData = dbDataMap.get(missgKey);
-            if (dbData == null || (dbData instanceof PageResult && ((PageResult<?>) dbData).getTotal() == 0)) {
-                nullAggKeys.add(missgKey);
-                log.debug("批量聚合缓存策略-数据库无数据，待缓存空值，AggKey:{}", missgKey);
-            } else {
-                normalDataMap.put(missgKey, dbData);
-            }
-        }
-
-        // 批量缓存空值（短TTL）
-        if (CollectionUtil.isNotEmpty(nullAggKeys)) {
-            Map<String, String> nullValueMap = nullAggKeys.stream()
-                    .collect(Collectors.toMap(key -> key, key -> ""));
-            batchSet(nullValueMap, CACHE_NULL_TTL, TimeUnit.MINUTES);
-            log.debug("批量聚合缓存策略-批量缓存空值，共{}个Key，TTL:{}分钟", nullAggKeys.size(), CACHE_NULL_TTL);
-        }
-
-        // 批量缓存正常数据 + 记录依赖关系
-        if (CollectionUtil.isNotEmpty(normalDataMap)) {
-            Map<String, String> normalValueMap = normalDataMap.entrySet().stream()
-                    .collect(Collectors.toMap(
-                            Map.Entry::getKey,
-                            entry -> JSONUtil.toJsonStr(entry.getValue())
-                    ));
-            batchSet(normalValueMap, time, timeUnit);
-            log.debug("批量聚合缓存策略-批量缓存正常数据，共{}个Key，TTL:{} {}", normalDataMap.size(), time, timeUnit);
-
-            if (CollectionUtil.isNotEmpty(dependSingleKeys)) {
-                for (String singleKey : dependSingleKeys) {
-                    String depSetKey = buildDepSetKey(singleKey);
-                    addSetMember(depSetKey, normalDataMap.keySet().toArray(new String[0]));
-                    log.debug("批量聚合缓存策略-批量记录依赖关系，SingleKey:{}, 关联AggKey数量:{}", singleKey, normalDataMap.size());
-                }
-            }
-        }
-
-        // 合并结果并返回（和dtos顺序一致）
-        Map<String, D> finalDataMap = new LinkedHashMap<>(cachedDataMap);
-        finalDataMap.putAll(normalDataMap);
-        nullAggKeys.forEach(key -> finalDataMap.put(key, null));
-
-        return aggKeys.stream().map(finalDataMap::get).collect(Collectors.toList());
+        return redisAggCache.batchQueryAggCache(keyGenerator, dtos, typeRef, dbFallback, time, timeUnit);
     }
 
 
@@ -648,40 +395,6 @@ public class CacheClient {
      * @param singleKey 单表Key（如 rail:order:123）
      */
     public void autoClearAggCache(String singleKey) {
-        if (StrUtil.isBlank(singleKey)) {
-            throw new CacheException("清理聚合缓存失败：单表Key为空");
-        }
-
-        try {
-            // 步骤1：删除单表自身缓存
-            delete(singleKey);
-            log.debug("清理聚合缓存-删除单表缓存，SingleKey:{}", singleKey);
-
-            // 步骤2：读取依赖Set，获取关联的聚合Key
-            String depSetKey = buildDepSetKey(singleKey);
-            Set<String> aggKeys = getSetMembers(depSetKey);
-
-            // 步骤3：批量删除聚合缓存 + 清空依赖Set
-            if (aggKeys != null && CollectionUtil.isNotEmpty(aggKeys)) {
-                batchDelete(aggKeys);
-                log.debug("清理聚合缓存-批量删除聚合Key，数量:{}, SingleKey:{}", aggKeys.size(), singleKey);
-                delete(depSetKey); // 清空dep Set，减少空间占用
-                log.debug("清理聚合缓存-清空依赖Set，DepSetKey:{}", depSetKey);
-            } else {
-                log.debug("清理聚合缓存-无关联聚合Key，SingleKey:{}", singleKey);
-            }
-        } catch (Exception e) {
-            log.error("清理聚合缓存失败，SingleKey:{}", singleKey, e);
-            throw new RuntimeException("清理聚合缓存失败", e);
-        }
-    }
-
-    /**
-     * 构建依赖Set的Key（辅助方法）
-     * @param singleKey 单表Key
-     * @return 如 rail:dep:rail:order:123
-     */
-    private String buildDepSetKey(String singleKey) {
-        return DEP_PREFIX + singleKey;
+        redisAggCache.autoClearAggCache(singleKey);
     }
 }

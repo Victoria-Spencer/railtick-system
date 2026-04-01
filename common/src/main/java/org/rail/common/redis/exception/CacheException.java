@@ -3,7 +3,7 @@ package org.rail.common.redis.exception;
 /**
  * 缓存异常类
  */
-public class CacheException  extends RuntimeException {
+public class CacheException extends RuntimeException {
 
     private static final long serialVersionUID = 1L;
 
