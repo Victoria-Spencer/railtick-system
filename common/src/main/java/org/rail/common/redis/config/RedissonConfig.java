@@ -2,6 +2,7 @@ package org.rail.common.redis.config;
 
 import org.redisson.Redisson;
 import org.redisson.api.RedissonClient;
+import org.redisson.codec.JsonJacksonCodec;
 import org.redisson.config.Config;
 import org.redisson.config.SingleServerConfig;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,11 +18,17 @@ public class RedissonConfig {
     // 直接注入SpringBoot自动封装的Redis配置类
     @Autowired
     private RedisProperties redisProperties;
+    @Autowired
+    private JsonJacksonCodec redissonJsonCodec;
 
     @Bean
     public RedissonClient redissonClient() {
         // 单节点配置
         Config config = new Config();
+
+        // 设置全局JSON序列化（替换默认二进制序列化）
+        config.setCodec(redissonJsonCodec);
+
         SingleServerConfig serverConfig = config.useSingleServer();
 
         // 1. 拼接Redis地址

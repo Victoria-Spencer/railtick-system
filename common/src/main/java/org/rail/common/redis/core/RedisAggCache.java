@@ -9,28 +9,26 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
 public interface RedisAggCache {
-    <D, DTO> D queryAggCache(
+    <D, DTO> D queryAggCacheWithBloom(
             String aggKey,
             List<String> dependSingleKeys,
             TypeReference<D> typeRef,
             Function<DTO, D> dbFallback,
             DTO dto,
-            String bizType,
             Long time,
             TimeUnit timeUnit
     );
 
-    <D, DTO> D queryAggCache(
+    <D, DTO> D queryAggCacheWithBloom(
             String aggKey,
             TypeReference<D> typeRef,
             Function<DTO, AggCacheResult<D>> dbFallback,
             DTO dto,
-            String bizType,
             Long time,
             TimeUnit timeUnit
     );
 
-    <D, DTO> D queryAggCache(
+    <D, DTO> D queryAggCacheWithNullCache(
             String aggKey,
             List<String> dependSingleKeys,
             TypeReference<D> typeRef,
@@ -40,7 +38,7 @@ public interface RedisAggCache {
             TimeUnit timeUnit
     );
 
-    <D, DTO> D queryAggCache(
+    <D, DTO> D queryAggCacheWithNullCache(
             String aggKey,
             TypeReference<D> typeRef,
             Function<DTO, AggCacheResult<D>> dbFallback,

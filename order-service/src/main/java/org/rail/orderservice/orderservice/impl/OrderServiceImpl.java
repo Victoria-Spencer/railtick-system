@@ -469,7 +469,7 @@ public class OrderServiceImpl implements OrderService {
         String aggKey = buildOrderPageCacheKey(orderPageQueryDTO);
         // 缓存订单分页查询信息
         TypeReference<PageResult<OrderPageQueryVO>> typeRef = new TypeReference<>() {};
-        return cacheClient.queryAggCache(
+        return cacheClient.queryAggCacheWithNullCache(
                 aggKey,
                 typeRef,
                 // 缓存未命中时，查库
@@ -546,7 +546,7 @@ public class OrderServiceImpl implements OrderService {
     public PageResult<SelfTicketPageVO> selfTicketPageQuery(FrontSelfTicketPageDTO frontSelfTicketPageDTO) {
         String aggKey = buildSelfTicketCacheKey(frontSelfTicketPageDTO);
         TypeReference<PageResult<SelfTicketPageVO>> typeRef = new TypeReference<>() {};
-        return cacheClient.queryAggCache(
+        return cacheClient.queryAggCacheWithNullCache(
                 aggKey,
                 typeRef,
                 this::loadSelfTicketFromDb,

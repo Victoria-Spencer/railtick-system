@@ -6,15 +6,13 @@ import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.rail.common.core.result.PageResult;
-import org.rail.common.redis.bloomfilter.DistributedBloomFilterManager;
 import org.rail.common.redis.core.RedisAggCache;
 import org.rail.common.redis.core.RedisCache;
-import org.rail.common.redis.exception.CacheException;
 import org.rail.common.redis.result.AggBatchResult;
 import org.rail.common.redis.result.AggCacheResult;
-import org.redisson.api.RBucket;
-import org.redisson.api.RedissonClient;
+import org.redisson.api.RBloomFilter;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
 
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -28,14 +26,68 @@ import static org.rail.common.redis.constant.RedisConstants.DEP_PREFIX;
  * 聚合缓存
  */
 @Slf4j
+@Component
 public class RedissonAggCache implements RedisAggCache {
 
     @Autowired
-    private RedissonClient redissonClient;
-    @Autowired
     private RedisCache redisCache;
     @Autowired
-    private DistributedBloomFilterManager bloomFilterManager;
+    private RBloomFilter<String> aggCacheBloomFilter;
+
+    // ========================== 通用极简校验方法 ================================
+    private static void validateRequired(Object param, String paramName) {
+        if (param == null) {
+            throw new IllegalArgumentException(StrUtil.format("参数【{}】不能为空", paramName));
+        }
+    }
+
+    private static void validateKey(String key) {
+        if (StrUtil.isBlank(key)) {
+            throw new IllegalArgumentException("缓存Key不能为空");
+        }
+    }
+
+    private static <T> void validateCollectionNotEmpty(Collection<T> coll, String paramName) {
+        validateRequired(coll, paramName);
+        if (coll.isEmpty()) {
+            throw new IllegalArgumentException(StrUtil.format("集合参数【{}】不能为空集合", paramName));
+        }
+    }
+
+    private static void validateTimeParams(Long time, TimeUnit timeUnit) {
+        validateRequired(time, "缓存过期时间");
+        validateRequired(timeUnit, "时间单位");
+        if (time <= 0) {
+            throw new IllegalArgumentException("缓存过期时间必须大于0");
+        }
+    }
+
+    private void validateBloomFilter() {
+        validateRequired(aggCacheBloomFilter, "aggCacheBloomFilter");
+    }
+
+    // ============================== 组合封装校验 =======================================
+    /**
+     * 单条聚合缓存 统一校验
+     */
+    private static void validateAggCacheSingle(String aggKey, TypeReference<?> typeRef, Object dbFallback, Object dto, Long time, TimeUnit timeUnit) {
+        validateKey(aggKey);
+        validateRequired(typeRef, "typeRef");
+        validateRequired(dbFallback, "dbFallback");
+        validateRequired(dto, "dto");
+        validateTimeParams(time, timeUnit);
+    }
+
+    /**
+     * 批量聚合缓存 统一校验
+     */
+    private static void validateAggCacheBatch(Function<?, ?> keyGenerator, List<?> dtos, TypeReference<?> typeRef, Object dbFallback, Long time, TimeUnit timeUnit) {
+        validateRequired(keyGenerator, "keyGenerator");
+        validateCollectionNotEmpty(dtos, "dtos");
+        validateRequired(typeRef, "typeRef");
+        validateRequired(dbFallback, "dbFallback");
+        validateTimeParams(time, timeUnit);
+    }
 
     // ========================== 聚合缓存（单Key关联多表Key） =========================
     /**
@@ -46,30 +98,30 @@ public class RedissonAggCache implements RedisAggCache {
      * @param typeRef 聚合数据类型（TypeReference，兼容泛型）
      * @param dbFallback DB查询回调（缓存未命中时执行）
      * @param dto 入参DTO（传递给dbFallback）
-     * @param bizType 布隆过滤器业务类型（如"agg_cache_order"）
      * @param time 缓存过期时间
      * @param timeUnit 时间单位
      * @return 聚合数据
      */
     @Override
-    public <D, DTO> D queryAggCache(
+    public <D, DTO> D queryAggCacheWithBloom(
             String aggKey,
             List<String> dependSingleKeys,
             TypeReference<D> typeRef,
             Function<DTO, D> dbFallback,
             DTO dto,
-            String bizType,
             Long time,
             TimeUnit timeUnit
     ) {
+        validateAggCacheSingle(aggKey, typeRef, dbFallback, dto, time, timeUnit);
+        validateBloomFilter();
+
         // 布隆过滤器前置拦截
-        boolean mightExist = bloomFilterManager.mightContain(bizType, aggKey);
+        boolean mightExist = aggCacheBloomFilter.contains(aggKey);
         if (!mightExist) {
             return null;
         }
 
-        RBucket<D> bucket = redissonClient.getBucket(aggKey);
-        D data = bucket.get();
+        D data = redisCache.get(aggKey);
 
         // 缓存未命中，查询数据库
         if (data != null) return data;
@@ -85,7 +137,7 @@ public class RedissonAggCache implements RedisAggCache {
                 redisCache.addSetMember(depSetKey, aggKey);
             }
         }
-        bloomFilterManager.add(bizType, aggKey);
+        aggCacheBloomFilter.add(aggKey);
 
         return data;
     }
@@ -96,29 +148,29 @@ public class RedissonAggCache implements RedisAggCache {
      * @param typeRef 聚合数据类型
      * @param dbFallback DB查询回调（返回AggCacheResult，包含数据+依赖单表Key）
      * @param dto 入参DTO
-     * @param bizType 布隆过滤器业务类型
      * @param time 缓存过期时间
      * @param timeUnit 时间单位
      * @return 聚合数据
      */
     @Override
-    public <D, DTO> D queryAggCache(
+    public <D, DTO> D queryAggCacheWithBloom(
             String aggKey,
             TypeReference<D> typeRef,
             Function<DTO, AggCacheResult<D>> dbFallback,
             DTO dto,
-            String bizType,
             Long time,
             TimeUnit timeUnit
     ) {
+        validateAggCacheSingle(aggKey, typeRef, dbFallback, dto, time, timeUnit);
+        validateBloomFilter();
+
         // 布隆过滤器前置拦截
-        boolean mightExist = bloomFilterManager.mightContain(bizType, aggKey);
+        boolean mightExist = aggCacheBloomFilter.contains(aggKey);
         if (!mightExist) {
             return null;
         }
 
-        RBucket<D> bucket = redissonClient.getBucket(aggKey);
-        D data = bucket.get();
+        D data = redisCache.get(aggKey);
 
         if (data != null) return data;
 
@@ -137,7 +189,7 @@ public class RedissonAggCache implements RedisAggCache {
                 redisCache.addSetMember(depSetKey, aggKey);
             }
         }
-        bloomFilterManager.add(bizType, aggKey);
+        aggCacheBloomFilter.add(aggKey);
 
         return data;
     }
@@ -155,7 +207,7 @@ public class RedissonAggCache implements RedisAggCache {
      * @return 聚合数据
      */
     @Override
-    public <D, DTO> D queryAggCache(
+    public <D, DTO> D queryAggCacheWithNullCache(
             String aggKey,
             List<String> dependSingleKeys,
             TypeReference<D> typeRef,
@@ -164,12 +216,13 @@ public class RedissonAggCache implements RedisAggCache {
             Long time,
             TimeUnit timeUnit
     ) {
+        validateAggCacheSingle(aggKey, typeRef, dbFallback, dto, time, timeUnit);
+
         // 查询聚合缓存
-        RBucket<D> bucket = redissonClient.getBucket(aggKey);
-        D data = bucket.get();
+        D data = redisCache.get(aggKey);
 
         if (data != null) return data;
-        if (bucket.isExists()) return null;
+        if (redisCache.exists(aggKey)) return null;
 
         // 缓存未命中，查询数据库
         log.debug("聚合缓存策略-缓存未命中，查询数据库，AggKey:{}", aggKey);
@@ -206,7 +259,7 @@ public class RedissonAggCache implements RedisAggCache {
      * @return 聚合数据
      */
     @Override
-    public <D, DTO> D queryAggCache(
+    public <D, DTO> D queryAggCacheWithNullCache(
             String aggKey,
             TypeReference<D> typeRef,
             Function<DTO, AggCacheResult<D>> dbFallback,
@@ -214,11 +267,12 @@ public class RedissonAggCache implements RedisAggCache {
             Long time,
             TimeUnit timeUnit
     ) {
-        RBucket<D> bucket = redissonClient.getBucket(aggKey);
-        D data = bucket.get();
+        validateAggCacheSingle(aggKey, typeRef, dbFallback, dto, time, timeUnit);
+
+        D data = redisCache.get(aggKey);
 
         if (data != null) return data;
-        if (bucket.isExists()) return null;
+        if (redisCache.exists(aggKey)) return null;
 
         // 缓存未命中，查询数据库
         log.debug("聚合缓存策略-缓存未命中，查询数据库，AggKey:{}", aggKey);
@@ -265,6 +319,8 @@ public class RedissonAggCache implements RedisAggCache {
             Long time,
             TimeUnit timeUnit
     ) {
+        validateAggCacheBatch(keyGenerator, dtos, typeRef, dbFallback, time, timeUnit);
+
         // 通过keyGenerator生成aggKeys列表（和dtos一一对应）
         List<String> aggKeys = dtos.stream()
                 .map(keyGenerator)
@@ -370,7 +426,7 @@ public class RedissonAggCache implements RedisAggCache {
     @Override
     public void autoClearAggCache(String singleKey) {
         if (StrUtil.isBlank(singleKey)) {
-            throw new CacheException("清理聚合缓存失败：单表Key为空");
+            throw new IllegalArgumentException("清理聚合缓存失败：单表Key为空");
         }
 
         try {

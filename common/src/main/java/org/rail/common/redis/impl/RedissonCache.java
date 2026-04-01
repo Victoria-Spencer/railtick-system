@@ -9,6 +9,7 @@ import org.rail.common.redis.exception.CacheException;
 import org.rail.common.redis.result.RedisData;
 import org.redisson.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -18,6 +19,7 @@ import java.util.stream.Collectors;
 /**
  * 基础操作
  */
+@Component
 public class RedissonCache implements RedisCache {
 
     @Autowired

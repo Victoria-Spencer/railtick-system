@@ -1,31 +1,18 @@
 package org.rail.common.redis.util;
 
-import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.lang.TypeReference;
-import cn.hutool.core.util.StrUtil;
-import cn.hutool.json.JSONUtil;
-import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
-import org.rail.common.redis.bloomfilter.DistributedBloomFilterManager;
 import org.rail.common.redis.core.RedisAggCache;
 import org.rail.common.redis.core.RedisCache;
 import org.rail.common.redis.core.RedisStrategyCache;
-import org.rail.common.redis.exception.CacheException;
 import org.rail.common.redis.result.AggBatchResult;
 import org.rail.common.redis.result.AggCacheResult;
-import org.rail.common.core.result.PageResult;
-import org.redisson.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
-import java.util.stream.Collectors;
-
-import static org.rail.common.redis.constant.RedisConstants.AGG_CACHE_ORDER_BIZ_TYPE;
 
 /**
  * 缓存客户端工具类
@@ -47,16 +34,6 @@ public class CacheClient {
     private RedisStrategyCache redisStrategyCache;
     @Autowired
     private RedisAggCache redisAggCache;
-
-    // 注入分布式布隆过滤器管理器
-    @Autowired
-    private DistributedBloomFilterManager bloomFilterManager;
-
-    @PostConstruct
-    public void initAggCacheBloomFilter() {
-        bloomFilterManager.initBloomFilter(AGG_CACHE_ORDER_BIZ_TYPE);
-        log.info("聚合缓存布隆过滤器初始化完成 | BizType:{}", AGG_CACHE_ORDER_BIZ_TYPE);
-    }
 
     // =============================== String类型缓存操作封装 ===================================
 
@@ -281,22 +258,20 @@ public class CacheClient {
      * @param typeRef 聚合数据类型（TypeReference，兼容泛型）
      * @param dbFallback DB查询回调（缓存未命中时执行）
      * @param dto 入参DTO（传递给dbFallback）
-     * @param bizType 布隆过滤器业务类型（如"agg_cache_order"）
      * @param time 缓存过期时间
      * @param timeUnit 时间单位
      * @return 聚合数据
      */
-    public <D, DTO> D queryAggCache(
+    public <D, DTO> D queryAggCacheWithBloom(
             String aggKey,
             List<String> dependSingleKeys,
             TypeReference<D> typeRef,
             Function<DTO, D> dbFallback,
             DTO dto,
-            String bizType,
             Long time,
             TimeUnit timeUnit
     ) {
-        return redisAggCache.queryAggCache(aggKey, dependSingleKeys, typeRef, dbFallback, dto, bizType, time, timeUnit);
+        return redisAggCache.queryAggCacheWithBloom(aggKey, dependSingleKeys, typeRef, dbFallback, dto, time, timeUnit);
     }
 
     /**
@@ -305,21 +280,19 @@ public class CacheClient {
      * @param typeRef 聚合数据类型
      * @param dbFallback DB查询回调（返回AggCacheResult，包含数据+依赖单表Key）
      * @param dto 入参DTO
-     * @param bizType 布隆过滤器业务类型
      * @param time 缓存过期时间
      * @param timeUnit 时间单位
      * @return 聚合数据
      */
-    public <D, DTO> D queryAggCache(
+    public <D, DTO> D queryAggCacheWithBloom(
             String aggKey,
             TypeReference<D> typeRef,
             Function<DTO, AggCacheResult<D>> dbFallback,
             DTO dto,
-            String bizType,
             Long time,
             TimeUnit timeUnit
     ) {
-        return redisAggCache.queryAggCache(aggKey, typeRef, dbFallback, dto, bizType, time, timeUnit);
+        return redisAggCache.queryAggCacheWithBloom(aggKey, typeRef, dbFallback, dto, time, timeUnit);
     }
 
     /**
@@ -334,7 +307,7 @@ public class CacheClient {
      * @param timeUnit 时间单位
      * @return 聚合数据
      */
-    public <D, DTO> D queryAggCache(
+    public <D, DTO> D queryAggCacheWithNullCache(
             String aggKey,
             List<String> dependSingleKeys,
             TypeReference<D> typeRef,
@@ -343,7 +316,7 @@ public class CacheClient {
             Long time,
             TimeUnit timeUnit
     ) {
-        return redisAggCache.queryAggCache(aggKey, dependSingleKeys, typeRef, dbFallback, dto, time, timeUnit);
+        return redisAggCache.queryAggCacheWithNullCache(aggKey, dependSingleKeys, typeRef, dbFallback, dto, time, timeUnit);
     }
 
     /**
@@ -356,7 +329,7 @@ public class CacheClient {
      * @param timeUnit 正常数据缓存时间单位
      * @return 聚合数据
      */
-    public <D, DTO> D queryAggCache(
+    public <D, DTO> D queryAggCacheWithNullCache(
             String aggKey,
             TypeReference<D> typeRef,
             Function<DTO, AggCacheResult<D>> dbFallback,
@@ -364,7 +337,7 @@ public class CacheClient {
             Long time,
             TimeUnit timeUnit
     ) {
-        return redisAggCache.queryAggCache(aggKey, typeRef, dbFallback, dto, time, timeUnit);
+        return redisAggCache.queryAggCacheWithNullCache(aggKey, typeRef, dbFallback, dto, time, timeUnit);
     }
 
     /**

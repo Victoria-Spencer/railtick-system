@@ -271,7 +271,7 @@ public class TicketServiceImpl implements TicketService {
                 }
                 // 缓存订单分页查询信息
                 TypeReference<List<TrainDetailVO>> typeRef = new TypeReference<>() {};
-                List<TrainDetailVO> detailVOS = cacheClient.queryAggCache(
+                List<TrainDetailVO> detailVOS = cacheClient.queryAggCacheWithNullCache(
                         aggKey,
                         typeRef,
                         // 缓存未命中时，查库

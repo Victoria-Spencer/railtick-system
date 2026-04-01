@@ -39,6 +39,7 @@ public final class RedisConstants {
     public static final String RAIL_AGG_TRAIN_BASE_INFO_PREFIX = "rail:agg:train:base:info:"; // 列车基础信息
     public static final String RAIL_AGG_SEAT_CLASS = "rail:agg:seat:class:"; // 余票信息
 
-    // ================ 聚合缓存对应的布隆过滤器业务类型 =================
+    // ================ 聚合缓存对应的布隆过滤器类型 =================
+    public static final String BLOOM_FILTER_PREFIX = "bloom:filter:";  // 布隆过滤器前缀
     public static final String AGG_CACHE_ORDER_BIZ_TYPE = "agg_cache:order";  // 订单模块
 }

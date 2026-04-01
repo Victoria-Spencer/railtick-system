@@ -41,7 +41,7 @@ public class AuthGlobalFilter implements GlobalFilter, Ordered {
 
         // 4.校验token
         String userId = JwtTokenUtil.parseToken(token).toString();
-        if (!userId.isEmpty()) {
+        if (userId.isEmpty()) {
             ServerHttpResponse response = exchange.getResponse();
             response.setStatusCode(HttpStatus.UNAUTHORIZED);
             return response.setComplete();

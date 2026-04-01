@@ -12,7 +12,7 @@ import org.rail.common.redis.result.RedisData;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -28,6 +28,7 @@ import static org.rail.common.redis.constant.RedisConstants.*;
  * 三大缓存策略
  */
 @Slf4j
+@Component
 public class RedissonStrategyCache implements RedisStrategyCache {
 
     @Autowired
@@ -40,6 +41,42 @@ public class RedissonStrategyCache implements RedisStrategyCache {
 
     private final Integer DEFAULT_RETRY_COUNT = 5; // 默认重试次数
     private final Integer RETRY_INTERVAL = 50; // 重试间隔（毫秒）
+
+    // ========================== 极简通用校验 ================================
+    private static void validateKey(String key) {
+        if (StrUtil.isBlank(key)) throw new IllegalArgumentException("缓存Key不能为空");
+    }
+    private static void validateRequired(Object param, String name) {
+        if (param == null) throw new IllegalArgumentException(StrUtil.format("参数【{}】不能为空", name));
+    }
+    private static <T> void validateCollectionNotEmpty(Collection<T> coll) {
+        if (coll == null || coll.isEmpty()) throw new IllegalArgumentException("集合参数不能为空");
+    }
+    private static void validateTimeParams(Long time, TimeUnit timeUnit) {
+        if (time == null || timeUnit == null || time <= 0) throw new IllegalArgumentException("缓存时间必须大于0");
+    }
+    private static void validateRetryCount(int retryCount) {
+        if (retryCount <= 0) throw new IllegalArgumentException("重试次数必须大于0");
+    }
+
+    // ============================= 极简组合校验 ====================================
+    private static <DTO> void validateCacheCommon(Function<DTO, String> keyGenerator, DTO dto, TypeReference<?> typeRef, Function<?, ?> dbFallback, Long time, TimeUnit timeUnit) {
+        validateRequired(keyGenerator, "keyGenerator");
+        validateRequired(dto, "dto");
+        validateRequired(typeRef, "typeRef");
+        validateRequired(dbFallback, "dbFallback");
+        validateTimeParams(time, timeUnit);
+    }
+    private static <DTO> void validateCacheBatch(Function<DTO, String> keyGenerator, List<DTO> dtos, TypeReference<?> typeRef, Function<?, ?> batchDbFallback, Long time, TimeUnit timeUnit) {
+        validateRequired(keyGenerator, "keyGenerator");
+        validateCollectionNotEmpty(dtos);
+        validateRequired(typeRef, "typeRef");
+        validateRequired(batchDbFallback, "batchDbFallback");
+        validateTimeParams(time, timeUnit);
+    }
+    private void validateCacheAsync() {
+        validateRequired(cacheRebuildExecutor, "cacheRebuildExecutor");
+    }
 
     // ========================== 缓存穿透 ================================
     /**
@@ -76,6 +113,7 @@ public class RedissonStrategyCache implements RedisStrategyCache {
             Long time,
             TimeUnit timeUnit
     ) {
+        validateCacheCommon(keyGenerator, dto, typeRef, dbFallback, time, timeUnit);
         String key = keyGenerator.apply(dto);
         if (StrUtil.isBlank(key)) {
             throw new IllegalArgumentException("生成的缓存Key不能为空");
@@ -115,6 +153,8 @@ public class RedissonStrategyCache implements RedisStrategyCache {
             Long time,
             TimeUnit timeUnit
     ) {
+        validateCacheBatch(keyGenerator, dtos, typeRef, batchDbFallback, time, timeUnit);
+
         // 1. 构建DTO-Key映射
         Map<DTO, String> dtoKeyMap = new HashMap<>();
         List<String> keys = new ArrayList<>();
@@ -218,6 +258,9 @@ public class RedissonStrategyCache implements RedisStrategyCache {
             TimeUnit timeUnit,
             int retryCount
     ) {
+        validateCacheCommon(keyGenerator, dto, typeRef, dbFallback, time, timeUnit);
+        validateRetryCount(retryCount);
+
         String key = keyGenerator.apply(dto);
         if (StrUtil.isBlank(key)) {
             throw new IllegalArgumentException("生成的缓存Key不能为空");
@@ -274,6 +317,9 @@ public class RedissonStrategyCache implements RedisStrategyCache {
             TimeUnit timeUnit,
             int retryCount
     ) {
+        validateCacheBatch(keyGenerator, dtos, typeRef, batchDbFallback, time, timeUnit);
+        validateRetryCount(retryCount);
+
         // 1. 构建DTO-Key映射
         Map<DTO, String> dtoKeyMap = new HashMap<>();
         List<String> keys = new ArrayList<>();
@@ -405,6 +451,8 @@ public class RedissonStrategyCache implements RedisStrategyCache {
             Long time,
             TimeUnit timeUnit
     ) {
+        validateCacheCommon(keyGenerator, dto, typeRef, dbFallback, time, timeUnit);
+
         String key = keyGenerator.apply(dto);
         if (StrUtil.isBlank(key)) {
             throw new IllegalArgumentException("生成的缓存Key不能为空");
@@ -428,6 +476,7 @@ public class RedissonStrategyCache implements RedisStrategyCache {
         // 缓存过期，加锁，异步重建
         try {
             if(lock.tryLock(2, TimeUnit.SECONDS)) {
+                validateCacheAsync();
                 cacheRebuildExecutor.submit(() -> {
                     try {
                         D dbData = dbFallback.apply(dto);
@@ -461,6 +510,8 @@ public class RedissonStrategyCache implements RedisStrategyCache {
             Long time,
             TimeUnit timeUnit
     ) {
+        validateCacheBatch(keyGenerator, dtos, typeRef, batchDbFallback, time, timeUnit);
+
         // 构建DTO-Key映射
         Map<DTO, String> dtoKeyMap = new HashMap<>();
         List<String> keys = new ArrayList<>();
@@ -544,6 +595,7 @@ public class RedissonStrategyCache implements RedisStrategyCache {
     ) {
         try {
             // 线程池异步重建缓存
+            validateCacheAsync();
             cacheRebuildExecutor.submit(() -> {
                 // 1. 二次检查缓存
                 List<String> checkKeys = expiredDtos.stream()
