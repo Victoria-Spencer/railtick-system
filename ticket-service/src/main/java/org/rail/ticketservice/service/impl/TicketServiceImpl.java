@@ -6,12 +6,12 @@ import cn.hutool.core.lang.TypeReference;
 import com.alibaba.nacos.common.utils.CollectionUtils;
 import org.apache.commons.lang.StringUtils;
 import org.rail.api.constant.OrderTypeConstants;
+import org.rail.common.redis.api.ICacheClient;
 import org.rail.common.redis.constant.RedisConstants;
 import org.rail.common.core.exception.BusinessException;
 import org.rail.common.redis.result.AggBatchResult;
 import org.rail.common.redis.result.AggCacheResult;
 import org.rail.common.core.util.BeanUtils;
-import org.rail.common.redis.util.CacheClient;
 import org.rail.api.dto.*;
 import org.rail.ticketservice.constant.SeatStatusConstants;
 import org.rail.ticketservice.mapper.*;
@@ -49,7 +49,7 @@ public class TicketServiceImpl implements TicketService {
     private TrainSeatMapper trainSeatMapper;
     @Autowired SeatIntervalOccupyMapper seatIntervalOccupyMapper;
     @Autowired
-    private CacheClient cacheClient;
+    private ICacheClient cacheClient;
 
     // 从配置文件注入预订单有效期（分钟）
     @Value("${order.pre.expire-minutes : 15}") // 默认15分钟

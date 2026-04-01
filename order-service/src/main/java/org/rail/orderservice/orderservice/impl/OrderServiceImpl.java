@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.rail.api.client.TicketFeignClient;
 import org.rail.api.client.UserFeignClient;
 import org.rail.api.constant.OrderTypeConstants;
+import org.rail.common.redis.api.ICacheClient;
 import org.rail.common.redis.constant.RedisConstants;
 import org.rail.common.core.exception.BusinessException;
 import org.rail.common.core.exception.OpenFeignException;
@@ -17,7 +18,6 @@ import org.rail.common.core.exception.OrderNotFoundException;
 import org.rail.common.redis.result.AggCacheResult;
 import org.rail.common.core.result.PageResult;
 import org.rail.common.core.result.Result;
-import org.rail.common.redis.util.CacheClient;
 import org.rail.api.dto.*;
 import org.rail.orderservice.constant.PreOrderStatusConstants;
 import org.rail.api.constant.SeatIntervalStatusConstants;
@@ -43,6 +43,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static org.rail.common.redis.constant.RedisConstants.RAIL_PRE_ORDER_DETAILS_PREFIX;
+import static org.rail.common.redis.constant.RedisConstants.RAIL_PRE_ORDER_PREFIX;
+
 @Slf4j
 @Service
 public class OrderServiceImpl implements OrderService {
@@ -57,7 +60,7 @@ public class OrderServiceImpl implements OrderService {
     @Autowired
     private TicketFeignClient ticketFeignClient;
     @Autowired
-    private CacheClient cacheClient;
+    private ICacheClient cacheClient;
 
     /**
      * 1.创建预订单，临时锁定座位
@@ -80,7 +83,9 @@ public class OrderServiceImpl implements OrderService {
     @GlobalTransactional
     public String createPreOrder(CreatePreOrderDTO createPreOrderDTO) {
         // 1. 根据用户ID和列车ID，查询是否已存在预订单
-        PreOrder preOrder = orderMapper.getByPreOrderUserIdAndTrainId(createPreOrderDTO.getUserId(), createPreOrderDTO.getTrainId());
+        String preOrderKey = buildPreOrderKey(createPreOrderDTO.getUserId(), createPreOrderDTO.getTrainId());
+        PreOrder preOrder = cacheClient.get(preOrderKey);
+//        PreOrder preOrder = orderMapper.getByPreOrderUserIdAndTrainId(createPreOrderDTO.getUserId(), createPreOrderDTO.getTrainId());
 
         if(ObjectUtil.isNotNull(preOrder)) {
             // 2. 存在旧预订单：更新逻辑
@@ -91,16 +96,28 @@ public class OrderServiceImpl implements OrderService {
         }
     }
 
+    private String buildPreOrderKey(Long userId, Long trainId) {
+        if (userId == null || trainId == null) {
+            throw new IllegalArgumentException("userId 和 trainId 不能为 null");
+        }
+        return String.format("%s%s:%d:%s:%d",
+                RAIL_PRE_ORDER_PREFIX, "userId", userId, "trainId", trainId);
+    }
+
     /**
      * 更新已存在的预订单，保留主记录，仅替换明细
      */
     private String updateExistPreOrder(CreatePreOrderDTO createPreOrderDTO, PreOrder preOrder) {
         // 1 释放旧明细关联的座位锁
-        List<PreOrderDetails> oldDetails = orderMapper.getTempSeatInfoByPreOrderId(preOrder.getId());
+        String detailsKey = buildPreOrderDetailsKey(preOrder.getId());
+        Set<PreOrderDetails> oldSet = cacheClient.getSetMembers(detailsKey);
+        List<PreOrderDetails> oldDetails = oldSet.stream().toList();
+//        List<PreOrderDetails> oldDetails = orderMapper.getTempSeatInfoByPreOrderId(preOrder.getId());
         releaseOldPreOrderSeatLock(preOrder, oldDetails);
 
         // 2 删除旧明细（仅删明细，不删主记录）
-        orderMapper.deletePreOrderDetailsByPreOrderId(preOrder.getId());
+        cacheClient.delete(detailsKey);
+//        orderMapper.deletePreOrderDetailsByPreOrderId(preOrder.getId());
 
         // 3 更新预订单主记录（重置过期时间、状态）
         updatePreOrderMainInfo(createPreOrderDTO, preOrder);
@@ -112,6 +129,14 @@ public class OrderServiceImpl implements OrderService {
         return preOrder.getPreOrderSn();
     }
 
+    private String buildPreOrderDetailsKey(Long id) {
+        if (id == null) {
+            throw new IllegalArgumentException("id（preOrder）不能为 null");
+        }
+        return String.format("%s%s:%d",
+                RAIL_PRE_ORDER_DETAILS_PREFIX, "preOrderId", id);
+    }
+
     /**
      * 更新预订单主表信息
      */
@@ -120,7 +145,10 @@ public class OrderServiceImpl implements OrderService {
         preOrder.setTotalAmount(newTotalAmount);
         preOrder.setExpireTime(calculateExpireTime());
         preOrder.setStatus(PreOrderStatusConstants.VALID);
-        orderMapper.updatePreOrder(preOrder);
+
+        String preOrderKey = buildPreOrderKey(preOrder.getUserId(), preOrder.getTrainId());
+        cacheClient.set(preOrderKey, preOrder, RedisConstants.RAIL_DEFAULT_TTL, TimeUnit.MINUTES);
+//        orderMapper.updatePreOrder(preOrder);
     }
 
     /**
@@ -198,7 +226,9 @@ public class OrderServiceImpl implements OrderService {
         }
 
         // 批量插入
-        orderMapper.batchInsertPreOrderDetails(detailsList);
+        String detailsKey = buildPreOrderDetailsKey(preOrderId);
+        cacheClient.addSetMembersWithExpire(detailsKey, detailsList, RedisConstants.RAIL_DEFAULT_TTL, TimeUnit.MINUTES);
+//        orderMapper.batchInsertPreOrderDetails(detailsList);
 
         // 锁定新座位
         if (ObjectUtil.isNotEmpty(insertDTOList)) {

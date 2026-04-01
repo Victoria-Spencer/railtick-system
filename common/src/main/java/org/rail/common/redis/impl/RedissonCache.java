@@ -214,6 +214,42 @@ public class RedissonCache implements RedisCache {
     }
 
     /**
+     * 向Set缓存添加单个成员，并设置过期时间
+     */
+    @Override
+    public <T> void addSetMemberWithExpire(String key, T value, long expireTime, TimeUnit timeUnit) {
+        if (StrUtil.isBlank(key) || value == null || expireTime <= 0) {
+            return;
+        }
+        try {
+            RSet<T> set = redissonClient.getSet(key);
+            set.add(value);
+            // 设置过期时间（自动刷新）
+            set.expire(expireTime, timeUnit);
+        } catch (Exception e) {
+            throw new CacheException("Set缓存添加成员(带过期)失败", e);
+        }
+    }
+
+    /**
+     * 向Set缓存批量添加成员，并设置过期时间
+     */
+    @Override
+    public <T> void addSetMembersWithExpire(String key, Collection<T> values, long expireTime, TimeUnit timeUnit) {
+        if (StrUtil.isBlank(key) || CollectionUtil.isEmpty(values) || expireTime <= 0) {
+            return;
+        }
+        try {
+            RSet<T> set = redissonClient.getSet(key);
+            set.addAll(values);
+            // 设置过期时间（自动刷新）
+            set.expire(expireTime, timeUnit);
+        } catch (Exception e) {
+            throw new CacheException("Set缓存批量添加成员(带过期)失败", e);
+        }
+    }
+
+    /**
      * 获取Set缓存所有成员（对应原stringRedisTemplate.opsForSet().members）
      */
     @Override

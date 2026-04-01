@@ -5,10 +5,10 @@ import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.annotation.AfterReturning;
 import org.aspectj.lang.reflect.MethodSignature;
 import org.rail.common.redis.annotation.AutoClearAggCache;
-import org.rail.common.redis.util.CacheClient;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Pointcut;
 import org.rail.common.core.util.ThreadLocalUtils;
+import org.rail.common.redis.api.ICacheClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -24,7 +24,7 @@ import java.lang.reflect.Field;
 public class AggCacheClearAspect {
 
     @Autowired
-    private CacheClient cacheClient;
+    private ICacheClient cacheClient;
 
     // 切点：拦截所有标记@AutoClearAggCache的方法
     @Pointcut("@annotation(org.rail.common.redis.annotation.AutoClearAggCache)")

@@ -2,6 +2,7 @@ package org.rail.common.redis.util;
 
 import cn.hutool.core.lang.TypeReference;
 import lombok.extern.slf4j.Slf4j;
+import org.rail.common.redis.api.ICacheClient;
 import org.rail.common.redis.core.RedisAggCache;
 import org.rail.common.redis.core.RedisCache;
 import org.rail.common.redis.core.RedisStrategyCache;
@@ -26,7 +27,7 @@ import java.util.function.Function;
  */
 @Slf4j
 @Component
-public class CacheClient {
+public class CacheClient implements ICacheClient {
 
     @Autowired
     private RedisCache redisCache;
@@ -40,10 +41,12 @@ public class CacheClient {
     /**
      * 设置缓存
      */
+    @Override
     public <T> void set(String key, T value) {
         redisCache.set(key, value);
     }
 
+    @Override
     public <T> void set(String key, T value, Long expireTime, TimeUnit timeUnit) {
         redisCache.set(key, value, expireTime, timeUnit);
     }
@@ -51,6 +54,7 @@ public class CacheClient {
     /**
      * 设置逻辑过期缓存
      */
+    @Override
     public <T> void setWithLogicalExpire(String key, T value, Long expireTime, TimeUnit timeUnit) {
         redisCache.setWithLogicalExpire(key, value, expireTime, timeUnit);
     }
@@ -58,6 +62,7 @@ public class CacheClient {
     /**
      * 批量设置缓存（无过期时间）
      */
+    @Override
     public <T> void batchSet(Map<String, T> keyValueMap) {
         redisCache.batchSet(keyValueMap);
     }
@@ -65,21 +70,40 @@ public class CacheClient {
     /**
      * 批量设置缓存（带统一过期时间）
      */
+    @Override
     public <T> void batchSet(Map<String, T> keyValueMap, Long expireTime, TimeUnit timeUnit) {
         redisCache.batchSet(keyValueMap, expireTime, timeUnit);
     }
 
     /**
+     * 单条获取缓存（自动处理空值"" -> null）
+     */
+    @Override
+    public <T> T get(String key) {
+        return redisCache.get(key);
+    }
+
+    /**
      * 批量获取缓存
      */
+    @Override
     public <T> Map<String, T> batchGet(Collection<String> keys) {
         return redisCache.batchGet(keys);
+    }
+
+    /**
+     * 判断缓存是否存在
+     */
+    @Override
+    public boolean exists(String key) {
+        return redisCache.exists(key);
     }
 
     // =============================== Set类型缓存操作封装 ===================================
     /**
      * 向Set缓存添加单个成员（对应原stringRedisTemplate.opsForSet().add）
      */
+    @Override
     public <T> void addSetMember(String key, T value) {
         redisCache.addSetMember(key, value);
     }
@@ -87,13 +111,31 @@ public class CacheClient {
     /**
      * 向Set缓存批量添加成员
      */
+    @Override
     public <T> void addSetMembers(String key, Collection<T> values) {
         redisCache.addSetMembers(key, values);
     }
 
     /**
+     * 向Set缓存添加单个成员，并设置过期时间
+     */
+    @Override
+    public <T> void addSetMemberWithExpire(String key, T value, long expireTime, TimeUnit timeUnit) {
+        redisCache.addSetMemberWithExpire(key, value, expireTime, timeUnit);
+    }
+
+    /**
+     * 向Set缓存批量添加成员，并设置过期时间
+     */
+    @Override
+    public <T> void addSetMembersWithExpire(String key, Collection<T> values, long expireTime, TimeUnit timeUnit) {
+        redisCache.addSetMembersWithExpire(key, values, expireTime, timeUnit);
+    }
+
+    /**
      * 获取Set缓存所有成员（对应原stringRedisTemplate.opsForSet().members）
      */
+    @Override
     public <T> Set<T> getSetMembers(String key) {
         return redisCache.getSetMembers(key);
     }
@@ -102,6 +144,7 @@ public class CacheClient {
     /**
      * 删除缓存
      */
+    @Override
     public void delete(String key) {
         redisCache.delete(key);
     }
@@ -109,6 +152,7 @@ public class CacheClient {
     /**
      * 批量删除缓存
      */
+    @Override
     public void batchDelete(Collection<String> keys) {
         redisCache.batchDelete(keys);
     }
@@ -118,6 +162,7 @@ public class CacheClient {
     /**
      * 缓存穿透（keyPrefix + id 生成Key）
      */
+    @Override
     public <D, ID> D queryWithPassThrough(
             String keyPrefix,
             ID id,
@@ -132,6 +177,7 @@ public class CacheClient {
     /**
      * 缓存穿透（自定义Key生成器）
      */
+    @Override
     public <D, DTO> D queryWithPassThrough(
             Function<DTO, String> keyGenerator,
             DTO dto,
@@ -146,6 +192,7 @@ public class CacheClient {
     /**
      * 批量缓存穿透
      */
+    @Override
     public <D, DTO> Map<DTO, D> batchQueryWithPassThrough(
             Function<DTO, String> keyGenerator,
             List<DTO> dtos,
@@ -162,6 +209,7 @@ public class CacheClient {
     /**
      * 互斥锁（简化版：keyPrefix + id，默认重试次数，仅 TypeReference）
      */
+    @Override
     public <D, ID> D queryWithMutex(
             String keyPrefix,
             ID id,
@@ -176,6 +224,7 @@ public class CacheClient {
     /**
      * 互斥锁（自定义Key生成器，指定重试次数）
      */
+    @Override
     public <D, DTO> D queryWithMutex(
             Function<DTO, String> keyGenerator,
             DTO dto,
@@ -191,6 +240,7 @@ public class CacheClient {
     /**
      * 批量互斥锁
      */
+    @Override
     public <D, DTO> Map<DTO, D> batchQueryWithMutex(
             Function<DTO, String> keyGenerator,
             List<DTO> dtos,
@@ -209,6 +259,7 @@ public class CacheClient {
     /**
      * 逻辑过期（简化版：keyPrefix + id）
      */
+    @Override
     public <D, ID> D queryWithLogicalExpire(
             String keyPrefix,
             ID id,
@@ -223,6 +274,7 @@ public class CacheClient {
     /**
      * 逻辑过期（核心版：自定义Key生成器）
      */
+    @Override
     public <D, DTO> D queryWithLogicalExpire(
             Function<DTO, String> keyGenerator,
             DTO dto,
@@ -237,6 +289,7 @@ public class CacheClient {
     /**
      * 批量逻辑过期
      */
+    @Override
     public <D, DTO> Map<DTO, D> batchQueryWithLogicalExpire(
             Function<DTO, String> keyGenerator,
             List<DTO> dtos,
@@ -262,6 +315,7 @@ public class CacheClient {
      * @param timeUnit 时间单位
      * @return 聚合数据
      */
+    @Override
     public <D, DTO> D queryAggCacheWithBloom(
             String aggKey,
             List<String> dependSingleKeys,
@@ -284,6 +338,7 @@ public class CacheClient {
      * @param timeUnit 时间单位
      * @return 聚合数据
      */
+    @Override
     public <D, DTO> D queryAggCacheWithBloom(
             String aggKey,
             TypeReference<D> typeRef,
@@ -307,6 +362,7 @@ public class CacheClient {
      * @param timeUnit 时间单位
      * @return 聚合数据
      */
+    @Override
     public <D, DTO> D queryAggCacheWithNullCache(
             String aggKey,
             List<String> dependSingleKeys,
@@ -329,6 +385,7 @@ public class CacheClient {
      * @param timeUnit 正常数据缓存时间单位
      * @return 聚合数据
      */
+    @Override
     public <D, DTO> D queryAggCacheWithNullCache(
             String aggKey,
             TypeReference<D> typeRef,
@@ -350,6 +407,7 @@ public class CacheClient {
      * @param timeUnit 正常数据缓存时间单位
      * @return 聚合数据列表（和传入的dtos顺序完全一致，未命中且查库无数据则为null）
      */
+    @Override
     public <D, DTO> List<D> batchQueryAggCache(
             Function<DTO, String> keyGenerator,
             List<DTO> dtos,
@@ -367,6 +425,7 @@ public class CacheClient {
      * 逻辑：删除单表缓存 → 读取dep Set删除聚合缓存 → 清空dep Set
      * @param singleKey 单表Key（如 rail:order:123）
      */
+    @Override
     public void autoClearAggCache(String singleKey) {
         redisAggCache.autoClearAggCache(singleKey);
     }

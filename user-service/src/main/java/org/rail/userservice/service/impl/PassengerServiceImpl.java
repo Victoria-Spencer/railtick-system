@@ -4,9 +4,9 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.lang.TypeReference;
 import com.github.pagehelper.PageHelper;
 import lombok.extern.slf4j.Slf4j;
+import org.rail.common.redis.api.ICacheClient;
 import org.rail.common.redis.constant.RedisConstants;
 import org.rail.common.core.result.PageResult;
-import org.rail.common.redis.util.CacheClient;
 import org.rail.common.core.util.ThreadLocalUtils;
 import org.rail.userservice.constant.VerifyStatusConstants;
 import org.rail.userservice.mapper.PassengerMapper;
@@ -29,7 +29,7 @@ public class PassengerServiceImpl implements PassengerService {
     @Autowired
     private PassengerMapper passengerMapper;
     @Autowired
-    private CacheClient cacheClient;
+    private ICacheClient cacheClient;
 
     /**
      * 分页查询（管理员）
