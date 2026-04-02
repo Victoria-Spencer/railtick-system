@@ -1,5 +1,6 @@
 package org.rail.userservice.controller;
 
+import org.apache.ibatis.jdbc.Null;
 import org.rail.api.dto.UserIdCardDTO;
 import org.rail.common.core.result.Result;
 import org.rail.userservice.pojo.dto.UserLoginDTO;
@@ -26,7 +27,7 @@ public class UserController {
     }
 
     @GetMapping("/logout")
-    public Result logout() {
+    public Result<Null> logout() {
         userService.logout();
         return Result.success();
     }
@@ -49,7 +50,7 @@ public class UserController {
     }
 
     @PostMapping("/deletion") // TODO 账号注销
-    public Result delete(@RequestParam String username) {
+    public Result<Null> delete(@RequestParam String username) {
         return null;
     }
 

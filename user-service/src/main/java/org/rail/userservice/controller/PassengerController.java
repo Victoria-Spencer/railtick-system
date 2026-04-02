@@ -1,5 +1,6 @@
 package org.rail.userservice.controller;
 
+import org.apache.ibatis.jdbc.Null;
 import org.rail.common.core.result.PageResult;
 import org.rail.common.core.result.Result;
 import org.rail.userservice.pojo.dto.PsgrPageQueryDTO;
@@ -37,19 +38,19 @@ public class PassengerController {
     }
 
     @PostMapping("/save")
-    public Result save(@RequestBody Passenger passenger) {
+    public Result<Null> save(@RequestBody Passenger passenger) {
         passengerService.save(passenger);
         return Result.success();
     }
 
     @PutMapping("/update")
-    public Result update(@RequestBody PsgrUpdateDTO psgrUpdateDTO) {
+    public Result<Null> update(@RequestBody PsgrUpdateDTO psgrUpdateDTO) {
         passengerService.update(psgrUpdateDTO);
         return Result.success();
     }
 
     @DeleteMapping("/delete")
-    public Result delete(@RequestParam List<Long> ids) {
+    public Result<Null> delete(@RequestParam List<Long> ids) {
         passengerService.deleteByIds(ids);
         return Result.success();
     }
