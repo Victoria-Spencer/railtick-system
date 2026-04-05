@@ -25,6 +25,10 @@ public class SnowflakeIdGenerator {
     private static long finalDatacenterId;
     private static Snowflake snowflake;
 
+    // 静态常量
+    private static final String PRE_ORD_PREFIX = "PRE_ORD_";
+    private static final String ORD_PREFIX = "ORD_";
+
     // Spring初始化完成后执行（核心：保证注入完成后再初始化静态变量）
     @PostConstruct
     public void init() {
@@ -68,10 +72,14 @@ public class SnowflakeIdGenerator {
 
     // ============================== 业务方法 ==============================
     public static String generatePreOrderSn() {
-        return String.valueOf(snowflake.nextId());
+        return PRE_ORD_PREFIX + snowflake.nextId();
     }
 
     public static String generateOrderSn() {
-        return "ORD" + snowflake.nextId();
+        return ORD_PREFIX + snowflake.nextId();
+    }
+
+    public static long nextId() {
+        return snowflake.nextId();
     }
 }

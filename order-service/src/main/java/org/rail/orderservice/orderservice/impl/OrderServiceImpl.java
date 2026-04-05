@@ -269,9 +269,13 @@ public class OrderServiceImpl implements OrderService {
      * 构建单个预订单明细对象
      */
     private PreOrderDetails buildPreOrderDetail(Long preOrderId, PassengerOrderDetailDTO passengerDTO) {
-        // 默认不选座
+        long detailId = SnowflakeIdGenerator.nextId();
+
         PreOrderDetails preOrderDetails = BeanUtil.copyProperties(passengerDTO, PreOrderDetails.class);
+        preOrderDetails.setId(detailId);
         preOrderDetails.setPreOrderId(preOrderId);
+
+        // 默认不选座
         preOrderDetails.setCarriageNumber(null);
         preOrderDetails.setTempSeatNo(null);
         return preOrderDetails;
@@ -669,19 +673,21 @@ public class OrderServiceImpl implements OrderService {
      */
     private String createNewPreOrder(CreatePreOrderDTO createPreOrderDTO) {
         // 1. 构建预订单主表
+        Long preOrderId = SnowflakeIdGenerator.nextId();
         String preOrderSn = SnowflakeIdGenerator.generatePreOrderSn();
         Double totalAmount = calculateTotalAmount(createPreOrderDTO.getPassengerOrderDetailDTOList());
 
         PreOrder preOrder = BeanUtil.copyProperties(createPreOrderDTO, PreOrder.class);
+        preOrder.setId(preOrderId);
         preOrder.setPreOrderSn(preOrderSn);
         preOrder.setExpireTime(calculateExpireTime());
         preOrder.setCreateTime(LocalDateTime.now());
         preOrder.setTotalAmount(totalAmount);
-        
-        // 2. 插入数据库,并返回订单id
-        orderMapper.insertPreOrder(preOrder);
-        Long preOrderId = preOrder.getId();
 
+        // 2. 插入预订单主表
+        String preOrderKey = buildPreOrderKey(preOrder.getUserId(), preOrder.getTrainId());
+        cacheClient.set(preOrderKey, preOrder, RedisConstants.RAIL_DEFAULT_TTL, TimeUnit.MINUTES);
+//        orderMapper.insertPreOrder(preOrder);
 
         // 3. 插入明细
         insertNewPreOrderDetails(createPreOrderDTO, preOrderId);
@@ -716,7 +722,10 @@ public class OrderServiceImpl implements OrderService {
 
 
         // 批量插入
-        orderMapper.batchInsertPreOrderDetails(detailsList);
+        // 批量插入
+        String detailsKey = buildPreOrderDetailsKey(preOrderId);
+        cacheClient.addSetMembersWithExpire(detailsKey, detailsList, RedisConstants.RAIL_DEFAULT_TTL, TimeUnit.MINUTES);
+//        orderMapper.batchInsertPreOrderDetails(detailsList);
         // 锁定新座位
         if(ObjectUtil.isNotEmpty(insertDTOList)) {
             sioDTO.setInsertDTOList(insertDTOList);
