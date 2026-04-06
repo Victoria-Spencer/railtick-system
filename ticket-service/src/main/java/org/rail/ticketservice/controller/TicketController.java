@@ -4,7 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.ibatis.jdbc.Null;
 import org.rail.api.dto.AvailableSeatDTO;
 import org.rail.api.dto.RandomSeatQueryDTO;
-import org.rail.api.dto.SeatIntervalOccupyDTO;
+import org.rail.api.dto.operateSeatIntervalOccupy;
 import org.rail.common.core.result.Result;
 import org.rail.ticketservice.pojo.dto.PlannedTicketQueryDTO;
 import org.rail.ticketservice.pojo.dto.TicketQueryDTO;
@@ -52,7 +52,7 @@ public class TicketController {
     }
 
     @PutMapping("/seat-status/update")
-    public Result<Null> updateSeatStatus(@RequestBody SeatIntervalOccupyDTO sioDTO) {
+    public Result<Null> updateSeatStatus(@RequestBody operateSeatIntervalOccupy sioDTO) {
         ticketService.updateSeatStatus(sioDTO);
         return Result.success();
     }

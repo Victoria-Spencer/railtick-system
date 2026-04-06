@@ -468,15 +468,18 @@ public class TicketServiceImpl implements TicketService {
       *               - insertDTOList：新增的占用记录列表
      *                - updateDTOList：更新的占用记录列表
      */
-    public void updateSeatStatus(SeatIntervalOccupyDTO sioDTO) {
-        List<SeatIntervalOccupyInsertDTO> insertDTOList = sioDTO.getInsertDTOList();
-        List<SeatIntervalOccupyUpdateDTO> updateDTOList = sioDTO.getUpdateDTOList();
+    public void updateSeatStatus(operateSeatIntervalOccupy sioDTO) {
+        List<SeatIntervalOccupyDTO> insertDTOList = sioDTO.getInsertDTOList();
+        List<SeatIntervalOccupyDTO> updateDTOList = sioDTO.getUpdateDTOList();
 
-        // 1.变动座区间占用记录
+        // 1.变动座位区间占用记录
         operateSeatIntervalOccupy(insertDTOList, updateDTOList);
 
-
         // 2.批量更新座位状态
+        batchUpdateSeatStatus(insertDTOList, updateDTOList);
+    }
+
+    private void batchUpdateSeatStatus(List<SeatIntervalOccupyDTO> insertDTOList, List<SeatIntervalOccupyDTO> updateDTOList) {
         // 构建更新条件
         List<UpdateSeatStatusDTO> updateSeatStatusDTOList = new ArrayList<>();
         if(insertDTOList != null && !insertDTOList.isEmpty()) {
@@ -497,7 +500,7 @@ public class TicketServiceImpl implements TicketService {
         trainSeatMapper.batchUpdateSeatStatus(seatStatusUpdateDTOList);
     }
 
-    private void operateSeatIntervalOccupy(List<SeatIntervalOccupyInsertDTO> insertDTOList, List<SeatIntervalOccupyUpdateDTO> updateDTOList) {
+    private void operateSeatIntervalOccupy(List<SeatIntervalOccupyDTO> insertDTOList, List<SeatIntervalOccupyDTO> updateDTOList) {
         // 1 先执行更新操作，避免一同修改新增的数据
         if (updateDTOList != null && !updateDTOList.isEmpty()) {
             List<SeatIntervalOccupyModifyDTO> occupyModifyDTOS = BeanUtils.copyToList(updateDTOList, SeatIntervalOccupyModifyDTO.class);

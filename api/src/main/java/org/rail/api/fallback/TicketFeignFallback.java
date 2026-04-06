@@ -5,7 +5,7 @@ import org.apache.ibatis.jdbc.Null;
 import org.rail.api.client.TicketFeignClient;
 import org.rail.api.dto.AvailableSeatDTO;
 import org.rail.api.dto.RandomSeatQueryDTO;
-import org.rail.api.dto.SeatIntervalOccupyDTO;
+import org.rail.api.dto.operateSeatIntervalOccupy;
 import org.rail.common.core.result.Result;
 import org.springframework.stereotype.Component;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -30,7 +30,7 @@ public class TicketFeignFallback implements TicketFeignClient {
     }
 
     @Override
-    public Result<Null> updateSeatStatus(@RequestBody SeatIntervalOccupyDTO sioDTO) {
+    public Result<Null> updateSeatStatus(@RequestBody operateSeatIntervalOccupy sioDTO) {
         log.error("服务临时不可用，请稍后重试");
         return Result.error("服务临时不可用，请稍后重试");
     }

@@ -1,8 +1,9 @@
 package org.rail.api.client;
 
+import org.apache.ibatis.jdbc.Null;
 import org.rail.api.dto.AvailableSeatDTO;
 import org.rail.api.dto.RandomSeatQueryDTO;
-import org.rail.api.dto.SeatIntervalOccupyDTO;
+import org.rail.api.dto.operateSeatIntervalOccupy;
 import org.rail.api.fallback.TicketFeignFallback;
 import org.rail.common.core.result.Result;
 import org.springframework.cloud.openfeign.FeignClient;
@@ -28,5 +29,5 @@ public interface TicketFeignClient {
      * @param sioDTO
      */
     @PutMapping("/api/ticket-service/ticket/seat-status/update")
-    Result updateSeatStatus(@RequestBody SeatIntervalOccupyDTO sioDTO);
+    Result<Null> updateSeatStatus(@RequestBody operateSeatIntervalOccupy sioDTO);
 }
