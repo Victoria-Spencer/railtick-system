@@ -1,8 +1,8 @@
 package org.rail.ticketservice.service;
 
 import org.rail.api.dto.AvailableSeatDTO;
+import org.rail.api.dto.BatchSeatIntervalInsertDTO;
 import org.rail.api.dto.RandomSeatQueryDTO;
-import org.rail.api.dto.operateSeatIntervalOccupy;
 import org.rail.ticketservice.pojo.dto.PlannedTicketQueryDTO;
 import org.rail.ticketservice.pojo.dto.TicketQueryDTO;
 import org.rail.ticketservice.pojo.vo.TicketQueryVO;
@@ -34,7 +34,7 @@ public interface TicketService {
 
     /**
      * 更新座位占用区间，并同步新的座位状态
-     * @param sioDTO 座位占用区间信息
+     * @param batchDTO 批量座位区间插入DTO，包含订单ID、订单类型、列车ID、出发站编码、到达站编码、席别类型列表、占用区间列表
      */
-    void updateSeatStatus(operateSeatIntervalOccupy sioDTO);
+    void updateSeatStatus(BatchSeatIntervalInsertDTO batchDTO);
 }

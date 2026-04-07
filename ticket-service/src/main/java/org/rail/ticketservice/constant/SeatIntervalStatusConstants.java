@@ -13,15 +13,15 @@ public final class SeatIntervalStatusConstants {
     /**
      * 锁定中
      */
-    public static final Integer LOCKED = 1;
+    public static final Integer LOCKED = 0;
 
     /**
      * 已售出
      */
-    public static final Integer ALREADY_SOLD = 2;
+    public static final Integer ALREADY_SOLD = 1;
 
     /**
      * 已释放
      */
-    public static final Integer RELEASED = 3;
+    public static final Integer RELEASED = 2;
 }

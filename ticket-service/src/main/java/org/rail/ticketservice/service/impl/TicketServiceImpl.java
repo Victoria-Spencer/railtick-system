@@ -6,6 +6,7 @@ import cn.hutool.core.lang.TypeReference;
 import com.alibaba.nacos.common.utils.CollectionUtils;
 import org.apache.commons.lang.StringUtils;
 import org.rail.api.constant.OrderTypeConstants;
+import org.rail.common.core.util.BeanConvertUtil;
 import org.rail.common.redis.api.ICacheClient;
 import org.rail.common.redis.constant.RedisConstants;
 import org.rail.common.core.exception.BusinessException;
@@ -464,31 +465,24 @@ public class TicketServiceImpl implements TicketService {
 
     /**
      * 更新座位占用区间，并同步新的座位状态
-     * @param sioDTO 座区间占用变动DTO，包含新增和更新的占用记录列表
-      *               - insertDTOList：新增的占用记录列表
-     *                - updateDTOList：更新的占用记录列表
      */
-    public void updateSeatStatus(operateSeatIntervalOccupy sioDTO) {
-        List<SeatIntervalOccupyDTO> insertDTOList = sioDTO.getInsertDTOList();
-        List<SeatIntervalOccupyDTO> updateDTOList = sioDTO.getUpdateDTOList();
-
+    public void updateSeatStatus(BatchSeatIntervalInsertDTO batchDTO) {
         // 1.变动座位区间占用记录
-        operateSeatIntervalOccupy(insertDTOList, updateDTOList);
+        operateSeatIntervalOccupy(batchDTO);
 
         // 2.批量更新座位状态
-        batchUpdateSeatStatus(insertDTOList, updateDTOList);
+        batchUpdateSeatStatus(batchDTO);
     }
 
-    private void batchUpdateSeatStatus(List<SeatIntervalOccupyDTO> insertDTOList, List<SeatIntervalOccupyDTO> updateDTOList) {
+    private void batchUpdateSeatStatus(BatchSeatIntervalInsertDTO batchDTO) {
         // 构建更新条件
         List<UpdateSeatStatusDTO> updateSeatStatusDTOList = new ArrayList<>();
-        if(insertDTOList != null && !insertDTOList.isEmpty()) {
-            List<UpdateSeatStatusDTO> insertConverted = BeanUtils.copyToList(insertDTOList, UpdateSeatStatusDTO.class);
-            updateSeatStatusDTOList.addAll(insertConverted);
-        }
-        if(updateDTOList != null && !updateDTOList.isEmpty()) {
-            List<UpdateSeatStatusDTO> updateConverted = BeanUtils.copyToList(updateDTOList, UpdateSeatStatusDTO.class);
-            updateSeatStatusDTOList.addAll(updateConverted);
+        if(batchDTO != null && CollectionUtils.isNotEmpty(batchDTO.getSeatList())) {
+            updateSeatStatusDTOList = BeanConvertUtil.copyWithCommonField(
+                    batchDTO,
+                    batchDTO.getSeatList(),
+                    UpdateSeatStatusDTO.class
+            );
         }
 
         // 获取座位状态集合
@@ -500,28 +494,28 @@ public class TicketServiceImpl implements TicketService {
         trainSeatMapper.batchUpdateSeatStatus(seatStatusUpdateDTOList);
     }
 
-    private void operateSeatIntervalOccupy(List<SeatIntervalOccupyDTO> insertDTOList, List<SeatIntervalOccupyDTO> updateDTOList) {
-        // 1 先执行更新操作，避免一同修改新增的数据
-        if (updateDTOList != null && !updateDTOList.isEmpty()) {
-            List<SeatIntervalOccupyModifyDTO> occupyModifyDTOS = BeanUtils.copyToList(updateDTOList, SeatIntervalOccupyModifyDTO.class);
-            if (CollectionUtils.isNotEmpty(occupyModifyDTOS)) {
-                seatIntervalOccupyMapper.batchUpdateSIOOccupyRecodes(occupyModifyDTOS);
-            }
-        }
-
-        // 2.新增操作
-        if (insertDTOList == null || insertDTOList.isEmpty()) {
+    private void operateSeatIntervalOccupy(BatchSeatIntervalInsertDTO batchDTO) {
+        if (batchDTO == null) {
             return;
         }
         // 查询开始站序，结束站序
-        SequenceQueryDTO sequenceQueryDTO = BeanUtil.copyProperties(insertDTOList.getFirst(), SequenceQueryDTO.class);
+        SequenceQueryDTO sequenceQueryDTO = BeanUtil.copyProperties(batchDTO, SequenceQueryDTO.class);
         SequenceDTO seqs = trainStopStationMapper.getSequenceInfo(sequenceQueryDTO);
+
         // 查询座位ID
-        List<SeatInfoQueryDTO> seatInfoQueryDTOList = BeanUtils.copyToList(insertDTOList, SeatInfoQueryDTO.class);
+        List<SeatInfoQueryDTO> seatInfoQueryDTOList = BeanConvertUtil.copyWithCommonField(
+                batchDTO,
+                batchDTO.getSeatList(),
+                SeatInfoQueryDTO.class
+        );
         List<Long> seatIdList = trainSeatMapper.getSeatIdByQueryDTO(seatInfoQueryDTOList);
 
-        // 新增条件构建
-        List<SeatIntervalOccupy> seatIntervalOccupyList = BeanUtils.copyToList(insertDTOList, SeatIntervalOccupy.class);
+        // 条件构建
+        List<SeatIntervalOccupy> seatIntervalOccupyList = BeanConvertUtil.copyWithCommonField(
+                batchDTO,
+                batchDTO.getSeatList(),
+                SeatIntervalOccupy.class
+        );
         for (int i = 0; i < seatIntervalOccupyList.size(); i++) {
             SeatIntervalOccupy seatIntervalOccupy = seatIntervalOccupyList.get(i);
 
@@ -531,9 +525,6 @@ public class TicketServiceImpl implements TicketService {
             seatIntervalOccupy.setStartSequence(seqs.getStartSequence());
             seatIntervalOccupy.setEndSequence(seqs.getEndSequence());
             seatIntervalOccupy.setCreateTime(LocalDateTime.now());
-            if (OrderTypeConstants.PREORDER.equals(seatIntervalOccupy.getOrderType())) {
-                seatIntervalOccupy.setExpireTime(calculateExpireTime());
-            }
         }
         if (CollectionUtils.isNotEmpty(seatIntervalOccupyList)) {
             seatIntervalOccupyMapper.batchInsertSIOOccupyRecords(seatIntervalOccupyList);
@@ -660,7 +651,7 @@ public class TicketServiceImpl implements TicketService {
      * 计算过期时间
      * @return 过期时间（当前时间 + 预订单有效期分钟数）
      */
-    public LocalDateTime calculateExpireTime() {
+    /*public LocalDateTime calculateExpireTime() {
         // 1. 获取当前时间
         LocalDateTime now = LocalDateTime.now();
 
@@ -669,5 +660,5 @@ public class TicketServiceImpl implements TicketService {
 
         // 3. 计算过期时间：当前时间 + 过期分钟数
         return now.plusMinutes(minutes);
-    }
+    }*/
 }

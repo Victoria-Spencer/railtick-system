@@ -28,5 +28,5 @@ public interface SeatIntervalOccupyMapper {
      * 批量更新座位区间占用记录
      * @param occupyModifyDTOS 包含要更新的座位区间占用记录信息的列表
      */
-    void batchUpdateSIOOccupyRecodes(List<SeatIntervalOccupyModifyDTO> occupyModifyDTOS);
+//    void batchUpdateSIOOccupyRecodes(List<SeatIntervalOccupyModifyDTO> occupyModifyDTOS);
 }

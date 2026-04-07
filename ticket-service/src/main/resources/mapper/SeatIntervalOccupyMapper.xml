@@ -93,7 +93,7 @@
         </foreach>
     </insert>
 
-    <update id="batchUpdateSIOOccupyRecodes"
+   <!-- <update id="batchUpdateSIOOccupyRecodes"
             parameterType="java.util.List">
         UPDATE seat_interval_occupy
         SET
@@ -106,5 +106,5 @@
             <foreach collection="list" item="item" open="(" close=")" separator=",">
                 (#{item.orderId},#{item.orderType})
             </foreach>
-    </update>
+    </update>-->
 </mapper>

@@ -11,17 +11,17 @@ public final class SeatIntervalStatusConstants {
     private SeatIntervalStatusConstants() {}
 
     /**
-     * 锁定中
+     * 预订单锁定
      */
-    public static final Integer LOCKED = 1;
+    public static final Integer LOCKED = 0;
 
     /**
-     * 已售出
+     * 正式订单已售
      */
-    public static final Integer ALREADY_SOLD = 2;
+    public static final Integer ALREADY_SOLD = 1;
 
     /**
-     * 已释放
+     * 已释放/取消订单
      */
-    public static final Integer RELEASED = 3;
+    public static final Integer RELEASED = 2;
 }

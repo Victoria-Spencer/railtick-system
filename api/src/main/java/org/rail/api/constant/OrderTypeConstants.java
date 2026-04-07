@@ -10,10 +10,10 @@ public final class OrderTypeConstants {
     /**
      * 预订单
      */
-    public static final Integer PREORDER = 1;
+    public static final Integer PREORDER = 0;
 
     /**
      * 订单
      */
-    public static final Integer ORDER = 2;
+    public static final Integer ORDER = 1;
 }
