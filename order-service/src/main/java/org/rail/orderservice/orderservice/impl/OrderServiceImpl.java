@@ -706,6 +706,10 @@ public class OrderServiceImpl implements OrderService {
         batchSeatDTO.setSeatList(new ArrayList<>());
     }
 
+    /*private void updateSeatStatus(BatchSeatIntervalInsertDTO batchSeatDTO) {
+
+    }*/
+
     private Double calculateTotalAmount(List<PassengerOrderDetailDTO> passengerList) {
         Double totalAmount = 0.0;
         for (PassengerOrderDetailDTO dto : passengerList) {
@@ -719,7 +723,7 @@ public class OrderServiceImpl implements OrderService {
      * 计算过期时间
      * @return 过期时间（当前时间 + 预设的过期分钟数，默认15分钟）
      */
-    public LocalDateTime calculateExpireTime() {
+    private LocalDateTime calculateExpireTime() {
         // 1. 获取当前时间
         LocalDateTime now = LocalDateTime.now();
 

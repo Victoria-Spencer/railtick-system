@@ -48,7 +48,8 @@ public class TicketServiceImpl implements TicketService {
     private TrainTypeDictMapper  trainTypeDictMapper;
     @Autowired
     private TrainSeatMapper trainSeatMapper;
-    @Autowired SeatIntervalOccupyMapper seatIntervalOccupyMapper;
+    @Autowired
+    private SeatIntervalOccupyMapper seatIntervalOccupyMapper;
     @Autowired
     private ICacheClient cacheClient;
 
@@ -614,21 +615,21 @@ public class TicketServiceImpl implements TicketService {
     /**
      * 判断站点是否为列车的始发站
      */
-    public boolean checkDepartureStation(Long trainId, Integer stationId) {
+    private boolean checkDepartureStation(Long trainId, Integer stationId) {
         return trainStopStationMapper.isDepartureStation(trainId, stationId);
     }
 
     /**
      * 判断站点是否为列车的终点站
      */
-    public boolean checkTerminalStation(Long trainId, Integer stationId) {
+    private boolean checkTerminalStation(Long trainId, Integer stationId) {
         return trainStopStationMapper.isTerminalStation(trainId, stationId);
     }
 
     /**
      * 计算历经时长
      */
-    public Integer calculateDurationInMinutes (LocalDateTime departureTime, LocalDateTime arrivalTime) {
+    private Integer calculateDurationInMinutes (LocalDateTime departureTime, LocalDateTime arrivalTime) {
         // 计算两个时间的差值（分钟）
         long minutesLong = Duration.between(departureTime, arrivalTime).toMinutes();
 
@@ -646,19 +647,4 @@ public class TicketServiceImpl implements TicketService {
         }
         return minutesInteger;
     }
-
-    /**
-     * 计算过期时间
-     * @return 过期时间（当前时间 + 预订单有效期分钟数）
-     */
-    /*public LocalDateTime calculateExpireTime() {
-        // 1. 获取当前时间
-        LocalDateTime now = LocalDateTime.now();
-
-        // 2. 处理null情况（避免空指针，设置默认值，例如15分钟）
-        int minutes = (preOrderExpireMinutes != null) ? preOrderExpireMinutes : 15;
-
-        // 3. 计算过期时间：当前时间 + 过期分钟数
-        return now.plusMinutes(minutes);
-    }*/
 }
