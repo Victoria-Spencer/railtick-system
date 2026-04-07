@@ -91,9 +91,22 @@
             AND NOT EXISTS (
                 SELECT 1
                 FROM seat_interval_occupy sio
+                <!-- 只对预订单LEFT JOIN预订单主表，正式订单自动为NULL -->
+                LEFT JOIN pre_order po
+                ON sio.order_id = po.id
+                AND sio.order_type = 1
+
                 WHERE sio.seat_id = ts.id
-                    AND sio.status IN (1, 2) -- 仅关联有效占用（锁定中/已售出，排除已释放）
-                    AND (sio.expire_time IS NULL OR sio.expire_time &gt; NOW()) -- 未过期
+                    -- 规则1：正式订单 → 永久有效
+                    (sio.order_type = 2)
+                    OR
+                    -- 规则2：预订单 → 未过期 + 未转正式订单
+                    (
+                        sio.order_type = 1
+                        AND sio.expire_time > NOW()
+                        AND po.status = 0
+                    )
+
                     <!-- 区间重叠的判断条件：目标区间与占用区间有交集 -->
                     AND tss_a.sequence &lt; sio.end_sequence -- 目标出发站 &lt; 占用区间终点
                     AND tss_b.sequence &gt; sio.start_sequence -- 目标到达站 &gt; 占用区间起点

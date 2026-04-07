@@ -346,7 +346,7 @@ public class OrderServiceImpl implements OrderService {
         operateSeatIntervalOccupy sioDTO = new operateSeatIntervalOccupy();
         List<PreOrderDetails> preDetailsList = orderMapper.getDetailsByPreOrderId(preOrder.getId());
 
-        // 释放预订单座位
+        // 更新预订单座位为订单座位
         List<SeatIntervalOccupyDTO> updateDTOList = BeanUtil.copyToList(
                 preDetailsList,
                 SeatIntervalOccupyDTO.class,
@@ -365,13 +365,13 @@ public class OrderServiceImpl implements OrderService {
         sioDTO.setUpdateDTOList(updateDTOList);
 
         // 锁定订单座位
-        List<SeatIntervalOccupyDTO> insertDTOList = BeanUtil.copyToList(detailsList, SeatIntervalOccupyDTO.class);
-        for (SeatIntervalOccupyDTO dto : insertDTOList) {
-            dto.setTrainId(order.getTrainId());
-            dto.setOrderType(OrderTypeConstants.ORDER);
-            dto.setStatus(SeatIntervalStatusConstants.LOCKED);
-        }
-        sioDTO.setInsertDTOList(insertDTOList);
+//        List<SeatIntervalOccupyDTO> insertDTOList = BeanUtil.copyToList(detailsList, SeatIntervalOccupyDTO.class);
+//        for (SeatIntervalOccupyDTO dto : insertDTOList) {
+//            dto.setTrainId(order.getTrainId());
+//            dto.setOrderType(OrderTypeConstants.ORDER);
+//            dto.setStatus(SeatIntervalStatusConstants.LOCKED);
+//        }
+//        sioDTO.setInsertDTOList(insertDTOList);
 
         return sioDTO;
     }
