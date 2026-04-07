@@ -20,8 +20,8 @@ public class CreateOrderDTO {
     private String arrivalCode;
     // 乘车日期
     private LocalDate ridingDate;
-    // 列车车次
-    private String trainNumber;
+    // 列车ID
+    private String trainId;
     // 出发时间
     private LocalDateTime departureTime;
     // 到达时间

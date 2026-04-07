@@ -7,9 +7,11 @@ import cn.hutool.core.util.ObjectUtil;
 import com.github.pagehelper.PageHelper;
 import io.seata.spring.annotation.GlobalTransactional;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.ibatis.jdbc.Null;
 import org.rail.api.client.TicketFeignClient;
 import org.rail.api.client.UserFeignClient;
 import org.rail.api.constant.OrderTypeConstants;
+import org.rail.common.core.util.BeanConvertUtil;
 import org.rail.common.redis.api.ICacheClient;
 import org.rail.common.redis.constant.RedisConstants;
 import org.rail.common.core.exception.BusinessException;
@@ -164,15 +166,14 @@ public class OrderServiceImpl implements OrderService {
             PreOrder oldPreOrder,
             List<PreOrderDetails> oldDetails) {
 
-        // TODO 释放逻辑修复：查询旧预订单的明细信息，构建座位释放DTO，调用票务服务接口释放座位锁
         if (ObjectUtil.isEmpty(oldDetails)) {
             return;
         }
 
-        List<SeatIntervalInsertDTO> insertDTOList = buildSeatReleaseDto(createPreOrderDTO, oldPreOrder, oldDetails);
+        BatchSeatIntervalInsertDTO batchSeatDTO = buildSeatReleaseDto(createPreOrderDTO, oldPreOrder, oldDetails);
         try {
-            if (!insertDTOList.isEmpty()) {
-                ticketFeignClient.updateSeatStatus(insertDTOList);
+            if (ObjectUtil.isNotNull(batchSeatDTO) && ObjectUtil.isNotNull(batchSeatDTO.getSeatList())) {
+                ticketFeignClient.updateSeatStatus(batchSeatDTO);
             }
         } catch (Exception e) {
             log.error("释放预订单座位锁失败，预订单ID：{}", oldPreOrder.getId(), e);
@@ -184,32 +185,25 @@ public class OrderServiceImpl implements OrderService {
     /**
      * 构建座位释放DTO
      */
-    private List<SeatIntervalInsertDTO> buildSeatReleaseDto(
+    private BatchSeatIntervalInsertDTO buildSeatReleaseDto(
             CreatePreOrderDTO createPreOrderDTO,
             PreOrder oldPreOrder,
             List<PreOrderDetails> oldDetails) {
 
-        List<SeatIntervalInsertDTO> insertDTOList = BeanUtil.copyToList(
-                oldDetails,
-                SeatIntervalInsertDTO.class,
-                CopyOptions.create()
-                        .setFieldMapping(new HashMap<>() {{
-                            put("preOrderId", "orderId");  // 预订单ID映射为票务服务的orderId
-                            put("tempSeatNo", "seatNo");    // 临时座位号映射为正式座位号
-                        }})
-        );
+        // 初始化批量座位占用DTO
+        BatchSeatIntervalInsertDTO batchSeatDTO = new BatchSeatIntervalInsertDTO();
+        buildBatchSeatIntervalInsertDTO(createPreOrderDTO, oldPreOrder.getId(), batchSeatDTO, SeatIntervalStatusConstants.RELEASED);
 
-        // 填充公共字段
-        Long trainId = oldPreOrder.getTrainId();
-        for (SeatIntervalInsertDTO insertDTO : insertDTOList) {
-            insertDTO.setDepartureCode(createPreOrderDTO.getDepartureCode());
-            insertDTO.setArrivalCode(createPreOrderDTO.getArrivalCode());
-            insertDTO.setTrainId(trainId);
-            insertDTO.setOrderType(OrderTypeConstants.PREORDER);    // 标记为预订单类型（区分正式订单）
-            insertDTO.setStatus(SeatIntervalStatusConstants.RELEASED);
+        for (PreOrderDetails oldDetail : oldDetails) {
+            SeatBaseDTO seatBaseDTO = new SeatBaseDTO();
+            seatBaseDTO.setSeatType(oldDetail.getSeatType());
+            seatBaseDTO.setCarriageNumber(oldDetail.getCarriageNumber());
+            seatBaseDTO.setSeatNo(oldDetail.getTempSeatNo());
+
+            batchSeatDTO.getSeatList().add(seatBaseDTO);
         }
 
-        return insertDTOList;
+        return batchSeatDTO;
     }
 
     /**
@@ -319,12 +313,12 @@ public class OrderServiceImpl implements OrderService {
             orderDetails.setOrderId(order.getId());
         }
 
-        List<SeatIntervalInsertDTO> insertDTOList = handleOrderSeat(preOrder, order, detailsList);
+        BatchSeatIntervalInsertDTO batchSeatDTO = handleOrderSeat(order, detailsList);
 
         orderMapper.batchInsertOrderDetails(detailsList);
         // 修改区间和更新座位的状态
-        if (!insertDTOList.isEmpty()) {
-            ticketFeignClient.updateSeatStatus(insertDTOList);
+        if (ObjectUtil.isNotEmpty(batchSeatDTO) && ObjectUtil.isNotEmpty(batchSeatDTO.getSeatList())) {
+            ticketFeignClient.updateSeatStatus(batchSeatDTO);
         }
         return detailsList;
     }
@@ -332,8 +326,7 @@ public class OrderServiceImpl implements OrderService {
     /**
      * 处理订单座位分配逻辑
      */
-    private List<SeatIntervalInsertDTO> handleOrderSeat(PreOrder preOrder, Order order, List<OrderDetails> detailsList) {
-//        SeatIntervalOccupyDTO sioDTO = new SeatIntervalOccupyDTO();
+    private BatchSeatIntervalInsertDTO handleOrderSeat(Order order, List<OrderDetails> detailsList) {
         // 判断座位是否为空，若为空，则随机分配
         String seatNo = detailsList.getFirst().getSeatNo();
 
@@ -341,50 +334,31 @@ public class OrderServiceImpl implements OrderService {
             return handleRandomSeat(order, detailsList);
         } else {
             // 释放预订单座位 + 锁定订单座位
-            return handleExistSeat(preOrder, order, detailsList);
+            return handleExistSeat(detailsList);
         }
     }
 
     /**
      * 处理已有选座
      */
-    private List<SeatIntervalInsertDTO> handleExistSeat(PreOrder preOrder, Order order, List<OrderDetails> detailsList) {
-
-        // TODO 更新逻辑修复
-        List<PreOrderDetails> preDetailsList = orderMapper.getDetailsByPreOrderId(preOrder.getId());
-
-        // 更新预订单座位为订单座位
-        List<SeatIntervalInsertDTO> updateDTOList = BeanUtil.copyToList(
-                preDetailsList,
-                SeatIntervalInsertDTO.class,
-                CopyOptions
-                        .create()
-                        .setFieldMapping(new HashMap<>(){{
-                            put("tempSeatNo", "seatNo");
-                            put("preOrderId", "orderId");
-                        }})
+    private BatchSeatIntervalInsertDTO handleExistSeat(List<OrderDetails> detailsList) {
+        BatchSeatIntervalInsertDTO batchSeatDTO = BeanConvertUtil.convertToBatchDto(
+                detailsList,
+                BatchSeatIntervalInsertDTO.class,
+                SeatBaseDTO.class,
+                "seatList"
         );
-        for (SeatIntervalInsertDTO dto : updateDTOList) {
-            dto.setTrainId(preOrder.getTrainId());
-            dto.setOrderType(OrderTypeConstants.PREORDER);
-            dto.setStatus(SeatIntervalStatusConstants.RELEASED);
-        }
 
-        // 锁定订单座位
-        List<SeatIntervalInsertDTO> insertDTOList = BeanUtil.copyToList(detailsList, SeatIntervalInsertDTO.class);
-        for (SeatIntervalInsertDTO dto : insertDTOList) {
-            dto.setTrainId(order.getTrainId());
-            dto.setOrderType(OrderTypeConstants.ORDER);
-            dto.setStatus(SeatIntervalStatusConstants.LOCKED);
-        }
+        batchSeatDTO.setOrderType(OrderTypeConstants.ORDER);
+        batchSeatDTO.setStatus(SeatIntervalStatusConstants.ALREADY_SOLD);
 
-        return insertDTOList;
+        return batchSeatDTO;
     }
 
     /**
      * 随机分配座位
      */
-    private List<SeatIntervalInsertDTO> handleRandomSeat(Order order, List<OrderDetails> detailsList) {
+    private BatchSeatIntervalInsertDTO handleRandomSeat(Order order, List<OrderDetails> detailsList) {
         Map<Integer, List<SeatDTO>> seatTypeToSeatsMap = getSeatTypeToSeatsMap(order, detailsList);
 
         // 分配座位
@@ -403,14 +377,17 @@ public class OrderServiceImpl implements OrderService {
         }
 
         // 锁定座位
-        List<SeatIntervalInsertDTO> insertDTOList = BeanUtil.copyToList(detailsList, SeatIntervalInsertDTO.class);
-        for (SeatIntervalInsertDTO dto : insertDTOList) {
-            dto.setTrainId(order.getTrainId());
-            dto.setOrderType(OrderTypeConstants.ORDER);
-            dto.setStatus(SeatIntervalStatusConstants.LOCKED);
-        }
+        BatchSeatIntervalInsertDTO batchSeatDTO = BeanConvertUtil.convertToBatchDto(
+                detailsList,
+                BatchSeatIntervalInsertDTO.class,
+                SeatBaseDTO.class,
+                "seatList"
+        );
+        batchSeatDTO.setTrainId(order.getTrainId());
+        batchSeatDTO.setOrderType(OrderTypeConstants.ORDER);
+        batchSeatDTO.setStatus(SeatIntervalStatusConstants.ALREADY_SOLD);
 
-        return insertDTOList;
+        return batchSeatDTO;
     }
 
     private Order createOrderMain(PreOrder preOrder) {
@@ -680,7 +657,7 @@ public class OrderServiceImpl implements OrderService {
 
         // 初始化批量座位占用DTO
         BatchSeatIntervalInsertDTO batchSeatDTO = new BatchSeatIntervalInsertDTO();
-        buildBatchSeatIntervalInsertDTO(createPreOrderDTO, preOrderId, batchSeatDTO);
+        buildBatchSeatIntervalInsertDTO(createPreOrderDTO, preOrderId, batchSeatDTO, SeatIntervalStatusConstants.LOCKED);
 
         // 构建明细
         for (int i = 0; i < passengerList.size(); i++) {
@@ -707,16 +684,24 @@ public class OrderServiceImpl implements OrderService {
      * @param createPreOrderDTO 预订单创建参数（包含用户ID、列车ID、乘客信息、选座信息等）
      * @param preOrderId 预订单ID（用于关联座位锁定记录）
      * @param batchSeatDTO 批量座位占用DTO（将被填充公共字段和座位列表，用于后续批量锁定座位）
+     * @param status 座位状态（锁定或释放），用于区分是新预订单锁座还是旧预订单释放座位
      */
-    private void buildBatchSeatIntervalInsertDTO(CreatePreOrderDTO createPreOrderDTO, Long preOrderId, BatchSeatIntervalInsertDTO batchSeatDTO) {
+    private void buildBatchSeatIntervalInsertDTO(
+            CreatePreOrderDTO createPreOrderDTO,
+            Long preOrderId,
+            BatchSeatIntervalInsertDTO batchSeatDTO,
+            Integer status
+    ) {
         // 设置 公共字段 ，所有座位完全一致，只赋值1次
         batchSeatDTO.setTrainId(createPreOrderDTO.getTrainId());
         batchSeatDTO.setOrderId(preOrderId);
         batchSeatDTO.setOrderType(OrderTypeConstants.PREORDER);
-        batchSeatDTO.setStatus(SeatIntervalStatusConstants.LOCKED);
         batchSeatDTO.setDepartureCode(createPreOrderDTO.getDepartureCode());
         batchSeatDTO.setArrivalCode(createPreOrderDTO.getArrivalCode());
-        batchSeatDTO.setExpireTime(LocalDateTime.now().plusMinutes(preOrderExpireMinutes));
+        // 动态字段：状态 + 过期时间
+        batchSeatDTO.setStatus(status);
+        LocalDateTime expireTime = SeatIntervalStatusConstants.LOCKED.equals(status) ? calculateExpireTime() : null;
+        batchSeatDTO.setExpireTime(expireTime);
         // 初始化座位列表
         batchSeatDTO.setSeatList(new ArrayList<>());
     }
