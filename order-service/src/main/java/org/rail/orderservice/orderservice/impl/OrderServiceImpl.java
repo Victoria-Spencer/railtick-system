@@ -7,7 +7,6 @@ import cn.hutool.core.util.ObjectUtil;
 import com.github.pagehelper.PageHelper;
 import io.seata.spring.annotation.GlobalTransactional;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.ibatis.jdbc.Null;
 import org.rail.api.client.TicketFeignClient;
 import org.rail.api.client.UserFeignClient;
 import org.rail.api.constant.OrderTypeConstants;
@@ -446,6 +445,17 @@ public class OrderServiceImpl implements OrderService {
      * @return 订单分页数据（分页结果 + 依赖的单表Key列表，用于构建聚合缓存）
      */
     public PageResult<OrderPageQueryVO> orderPageQuery(OrderPageQueryDTO orderPageQueryDTO) {
+        return queryOrderPageCache(orderPageQueryDTO);
+        // 分页查询
+        /*PageHelper.startPage(orderPageQueryDTO.getPageNumber(), orderPageQueryDTO.getPageSize());
+        List<OrderPageQueryVO> orderPageQueryVOList = orderMapper.getOrderPageByQueryDTO(orderPageQueryDTO);
+        return new PageResult<>(orderPageQueryVOList);*/
+    }
+
+    /**
+     * 订单分页查询 聚合缓存调用
+     */
+    private PageResult<OrderPageQueryVO> queryOrderPageCache(OrderPageQueryDTO orderPageQueryDTO) {
         String aggKey = buildOrderPageCacheKey(orderPageQueryDTO);
         // 缓存订单分页查询信息
         TypeReference<PageResult<OrderPageQueryVO>> typeRef = new TypeReference<>() {};
@@ -458,10 +468,6 @@ public class OrderServiceImpl implements OrderService {
                 RedisConstants.RAIL_DEFAULT_TTL,
                 TimeUnit.MINUTES
         );
-        // 分页查询
-        /*PageHelper.startPage(orderPageQueryDTO.getPageNumber(), orderPageQueryDTO.getPageSize());
-        List<OrderPageQueryVO> orderPageQueryVOList = orderMapper.getOrderPageByQueryDTO(orderPageQueryDTO);
-        return new PageResult<>(orderPageQueryVOList);*/
     }
 
     /**
@@ -524,6 +530,13 @@ public class OrderServiceImpl implements OrderService {
      */
     @GlobalTransactional
     public PageResult<SelfTicketPageVO> selfTicketPageQuery(FrontSelfTicketPageDTO frontSelfTicketPageDTO) {
+        return querySelfTicketPageCache(frontSelfTicketPageDTO);
+    }
+
+    /**
+     * 本人车票分页查询 聚合缓存调用
+     */
+    private PageResult<SelfTicketPageVO> querySelfTicketPageCache(FrontSelfTicketPageDTO frontSelfTicketPageDTO) {
         String aggKey = buildSelfTicketCacheKey(frontSelfTicketPageDTO);
         TypeReference<PageResult<SelfTicketPageVO>> typeRef = new TypeReference<>() {};
         return cacheClient.queryAggCacheWithNullCache(

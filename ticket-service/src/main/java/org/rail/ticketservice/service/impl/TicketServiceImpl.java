@@ -82,8 +82,19 @@ public class TicketServiceImpl implements TicketService {
         // 1. 转换入参：TrainDetailVO -> SeatQueryDTO
         List<SeatQueryDTO> seatQueryDTOList = BeanUtil.copyToList(trainDetailVOList, SeatQueryDTO.class);
 
-        // 2. 定义【聚合缓存Key生成器】：为每个SeatQueryDTO生成唯一缓存Key
-        // Key规则：rail:agg:seat_class:列车ID:出发站序:到达站序（确保唯一性）
+        // 2. 核心：构建「trainId → SeatQueryDTO列表」的映射（仅一次遍历，预处理）
+        // 目的：后续通过VO的trainId快速拿到对应DTO
+        Map<Long, List<SeatQueryDTO>> trainId2DtosMap = seatQueryDTOList.stream()
+                .collect(Collectors.groupingBy(SeatQueryDTO::getTrainId)); // 按trainId分组
+
+        // 3. 查缓存
+        return batchQuerySeatClassCache(seatQueryDTOList, trainId2DtosMap);
+    }
+
+    /**
+     * 席别批量聚合缓存调用
+     */
+    private List<SeatClassVO> batchQuerySeatClassCache(List<SeatQueryDTO> seatQueryDTOList, Map<Long, List<SeatQueryDTO>> trainId2DtosMap) {
         Function<SeatQueryDTO, String> keyGenerator = dto ->
                 String.format("%s%d:%d:%d",
                         RedisConstants.RAIL_AGG_SEAT_CLASS,
@@ -91,15 +102,8 @@ public class TicketServiceImpl implements TicketService {
                         dto.getStartSequence(),
                         dto.getEndSequence());
 
-        // 3. 核心：构建「trainId → SeatQueryDTO列表」的映射（仅一次遍历，预处理）
-        // 目的：后续通过VO的trainId快速拿到对应DTO
-        Map<Long, List<SeatQueryDTO>> trainId2DtosMap = seatQueryDTOList.stream()
-                .collect(Collectors.groupingBy(SeatQueryDTO::getTrainId)); // 按trainId分组
-
-        // 4. 定义返回类型（单个SeatClassVO）
         TypeReference<SeatClassVO> typeRef = new TypeReference<>() {};
 
-        // 5. 调用缓存工具类
         return cacheClient.batchQueryAggCache(
                 keyGenerator,
                 seatQueryDTOList,
@@ -266,23 +270,8 @@ public class TicketServiceImpl implements TicketService {
         // 遍历所有出发/到达站组合（适配多站点查询）
         for (String depCode : departureCodes) {
             for (String arrCode : arrivalCodes) {
-                // 构建基础车次缓存Key
-                String aggKey = buildTrainBaseKey(departureDate, depCode, arrCode);
-                if (StringUtils.isEmpty(aggKey)) {
-                    continue; // 避免空Key导致缓存操作失败
-                }
-                // 缓存订单分页查询信息
-                TypeReference<List<TrainDetailVO>> typeRef = new TypeReference<>() {};
-                List<TrainDetailVO> detailVOS = cacheClient.queryAggCacheWithNullCache(
-                        aggKey,
-                        typeRef,
-                        // 缓存未命中时，查库
-                        dto -> queryTrainDetailDb(dto, departureDate, depCode, arrCode),
-                        ticketQueryDTO,
-                        RedisConstants.RAIL_TRAIN_BASE_CACHE_TTL,
-                        TimeUnit.MINUTES
-                );
-
+                List<TrainDetailVO> detailVOS = queryTrainDetailCache(ticketQueryDTO, depCode, arrCode, departureDate);
+                if (detailVOS == null) continue; // 避免空Key导致缓存操作失败
                 trainDetailVOList.addAll(detailVOS);
             }
         }
@@ -302,6 +291,29 @@ public class TicketServiceImpl implements TicketService {
                     .collect(Collectors.toList());
         }
         return trainDetailVOList;
+    }
+
+    /**
+     * 车次路线聚合缓存调用
+     */
+    private List<TrainDetailVO> queryTrainDetailCache(TicketQueryDTO ticketQueryDTO, String depCode, String arrCode, LocalDate departureDate) {
+        // 构建基础车次缓存Key
+        String aggKey = buildTrainBaseKey(departureDate, depCode, arrCode);
+        if (StringUtils.isEmpty(aggKey)) {
+            return null;
+        }
+        // 缓存订单分页查询信息
+        TypeReference<List<TrainDetailVO>> typeRef = new TypeReference<>() {};
+        List<TrainDetailVO> detailVOS = cacheClient.queryAggCacheWithNullCache(
+                aggKey,
+                typeRef,
+                // 缓存未命中时，查库
+                dto -> queryTrainDetailDb(dto, departureDate, depCode, arrCode),
+                ticketQueryDTO,
+                RedisConstants.RAIL_TRAIN_BASE_CACHE_TTL_HOURS,
+                TimeUnit.HOURS
+        );
+        return detailVOS;
     }
 
     /**

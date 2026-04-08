@@ -13,7 +13,7 @@ public final class RedisConstants {
     public static final String DEP_PREFIX = "dep:";
 
     public static final Long RAIL_DEFAULT_TTL = 15L;
-    public static final Long RAIL_TRAIN_BASE_CACHE_TTL = 3600L;
+    public static final Long RAIL_TRAIN_BASE_CACHE_TTL_HOURS = 24L;
     public static final Long RAIL_AGG_SEAT_CLASS_CACHE_TTL_SECONDS = 5L;
 
     // =================== 预订单表 ====================
