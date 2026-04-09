@@ -19,7 +19,7 @@ import java.util.concurrent.TimeUnit;
  */
 @Slf4j
 @Component
-public class StationLocalCacheManager {
+public class StationLocalCacheTask {
 
     // ========== 配置注入 ==========
     @Value("${station.cache.schedule.enable:false}")

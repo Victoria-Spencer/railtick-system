@@ -3,28 +3,28 @@
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
-<mapper namespace="org.rail.ticketservice.mapper.TrainSeatMapper">
+<mapper namespace="org.rail.ticketservice.mapper.SeatMapper">
 
     <update id="batchUpdateSeatStatus"
             parameterType="java.util.List">
-        UPDATE train_seat ts
+        UPDATE seat s
         INNER JOIN train_seat_class tsc
-            ON ts.train_seat_class_id = tsc.id
+            ON s.train_seat_class_id = tsc.id
         INNER JOIN seat_class sc
             ON tsc.seat_class_id = sc.id
-        SET ts.status = CASE
+        SET s.status = CASE
             <foreach collection="list" item="detail" separator="">
                 WHEN tsc.train_id = #{detail.trainId}
                     AND sc.type = #{detail.seatType}
                     AND tsc.carriage_number = #{detail.carriageNumber}
-                    AND ts.seat_no = #{detail.seatNo}
+                    AND s.seat_no = #{detail.seatNo}
                 THEN #{detail.status}
             </foreach>
-        ELSE ts.status  -- 不匹配条件的记录保持原状态
+        ELSE s.status  -- 不匹配条件的记录保持原状态
         END
         <where>
             <if test="list != null and list.size() > 0">
-                (tsc.train_id, sc.type, tsc.carriage_number, ts.seat_no) IN
+                (tsc.train_id, sc.type, tsc.carriage_number, s.seat_no) IN
                 <foreach collection="list" item="detail" open="(" separator="," close=")">
                     (#{detail.trainId}, #{detail.seatType}, #{detail.carriageNumber}, #{detail.seatNo})
                 </foreach>
@@ -35,14 +35,14 @@
     <select id="getSeatIdByQueryDTO" resultType="java.lang.Long"
             parameterType="java.util.List">
         SELECT
-            ts.id
-        FROM train_seat ts
+            s.id
+        FROM seat s
         INNER JOIN train_seat_class tsc
-            ON ts.train_seat_class_id = tsc.id
+            ON s.train_seat_class_id = tsc.id
         INNER JOIN seat_class sc
             ON tsc.seat_class_id = sc.id
         WHERE
-            (tsc.train_id, sc.type, tsc.carriage_number, ts.seat_no) IN
+            (tsc.train_id, sc.type, tsc.carriage_number, s.seat_no) IN
             <foreach collection="list" item="item" open="(" close=")" separator=",">
                 (
                     #{item.trainId},

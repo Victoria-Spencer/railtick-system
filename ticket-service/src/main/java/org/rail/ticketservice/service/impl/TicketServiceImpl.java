@@ -47,7 +47,7 @@ public class TicketServiceImpl implements TicketService {
     @Autowired
     private TrainTypeDictMapper  trainTypeDictMapper;
     @Autowired
-    private TrainSeatMapper trainSeatMapper;
+    private SeatMapper seatMapper;
     @Autowired
     private SeatIntervalOccupyMapper seatIntervalOccupyMapper;
     @Autowired
@@ -504,7 +504,7 @@ public class TicketServiceImpl implements TicketService {
             throw new BusinessException("待更新的座位状态列表为空");
         }
         // 批量更新座位状态
-        trainSeatMapper.batchUpdateSeatStatus(seatStatusUpdateDTOList);
+        seatMapper.batchUpdateSeatStatus(seatStatusUpdateDTOList);
     }
 
     private void operateSeatIntervalOccupy(BatchSeatIntervalInsertDTO batchDTO) {
@@ -521,7 +521,7 @@ public class TicketServiceImpl implements TicketService {
                 batchDTO.getSeatList(),
                 SeatInfoQueryDTO.class
         );
-        List<Long> seatIdList = trainSeatMapper.getSeatIdByQueryDTO(seatInfoQueryDTOList);
+        List<Long> seatIdList = seatMapper.getSeatIdByQueryDTO(seatInfoQueryDTOList);
 
         // 条件构建
         List<SeatIntervalOccupy> seatIntervalOccupyList = BeanConvertUtil.copyWithCommonField(

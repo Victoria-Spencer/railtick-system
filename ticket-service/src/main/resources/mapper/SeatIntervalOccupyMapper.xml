@@ -30,23 +30,23 @@
             tsc.train_id AS trainId,
             sc.type AS seatType,
             tsc.carriage_number AS carriageNumber,
-            ts.seat_no AS seatNo,
+            s.seat_no AS seatNo,
             sio.start_sequence,  <!-- 区间起点字段 -->
             sio.end_sequence,     <!-- 区间终点字段 -->
-            CONCAT(tsc.train_id, '_', sc.type, '_', tsc.carriage_number, '_', ts.seat_no) AS unique_key
+            CONCAT(tsc.train_id, '_', sc.type, '_', tsc.carriage_number, '_', s.seat_no) AS unique_key
         FROM seat_class sc
         INNER JOIN train_seat_class tsc
             ON sc.id = tsc.seat_class_id
-        INNER JOIN train_seat ts
-            ON tsc.id = ts.train_seat_class_id
+        INNER JOIN seat s
+            ON tsc.id = s.train_seat_class_id
         LEFT JOIN seat_interval_occupy sio
-            ON ts.id = sio.seat_id
+            ON s.id = sio.seat_id
             AND sio.status IN (1, 2)  -- 仅查有效占用区间（1=锁定中，2=已售出）
             AND (sio.expire_time IS NULL OR sio.expire_time &gt; NOW()) -- 未过期
             AND (sio.start_sequence &lt; sio.end_sequence)
         <where>
             <if test="list != null and list.size() > 0">
-                (tsc.train_id, sc.type, tsc.carriage_number, ts.seat_no) IN
+                (tsc.train_id, sc.type, tsc.carriage_number, s.seat_no) IN
                 <foreach collection="list" item="item" open="("  separator="," close=")">
                     (#{item.trainId}, #{item.seatType}, #{item.carriageNumber}, #{item.seatNo})
                 </foreach>
@@ -59,10 +59,10 @@
             <foreach collection="list" item="item" separator=",">
                 CONCAT(#{item.trainId}, '_', #{item.seatType}, '_', #{item.carriageNumber}, '_', #{item.seatNo})
             </foreach>
-            ), tsc.carriage_number, ts.seat_no, sio.start_sequence  <!-- 次级排序规则（兜底排序） -->
+            ), tsc.carriage_number, s.seat_no, sio.start_sequence  <!-- 次级排序规则（兜底排序） -->
         </if>
         <if test="list == null or list.size() == 0">
-            ORDER BY tsc.carriage_number, ts.seat_no, sio.start_sequence
+            ORDER BY tsc.carriage_number, s.seat_no, sio.start_sequence
         </if>
     </select>
 

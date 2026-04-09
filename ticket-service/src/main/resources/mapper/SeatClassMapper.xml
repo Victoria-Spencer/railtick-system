@@ -45,8 +45,8 @@
             FROM train_seat_class tsc
             -- 子查询关联临时表：获取当前train_id的区间参数
             INNER JOIN query_params qp ON tsc.train_id = qp.train_id
-            INNER JOIN train_seat ts ON tsc.id = ts.train_seat_class_id
-            INNER JOIN seat_interval_occupy sio ON ts.id = sio.seat_id
+            INNER JOIN seat s ON tsc.id = s.train_seat_class_id
+            INNER JOIN seat_interval_occupy sio ON s.id = sio.seat_id
             WHERE
                 -- 仅统计有效占用（锁定中或已售出，排除已释放）
                 sio.status IN (1, 2)
@@ -67,12 +67,12 @@
         SELECT
             sc.type AS seatType,
             tsc.carriage_number AS carriageNumber,
-            ts.seat_no AS seatNo
+            s.seat_no AS seatNo
         FROM seat_class sc
         INNER JOIN train_seat_class tsc
             ON sc.id = tsc.seat_class_id
-        INNER JOIN train_seat ts
-            ON tsc.id = ts.train_seat_class_id
+        INNER JOIN seat s
+            ON tsc.id = s.train_seat_class_id
         INNER JOIN train_stop_station tss_a
             ON tsc.train_id = tss_a.train_id
         INNER JOIN train_stop_station tss_b
@@ -96,7 +96,7 @@
                 ON sio.order_id = po.id
                 AND sio.order_type = 0
 
-                WHERE sio.seat_id = ts.id
+                WHERE sio.seat_id = s.id
                     AND (
                             -- 规则1：正式订单 → 永久有效
                             (
@@ -116,7 +116,7 @@
                     AND tss_b.sequence &gt; sio.start_sequence -- 目标到达站 &gt; 占用区间起点
             )
         -- 按车厢号+座位号排序，确保返回结果有序
-        ORDER BY tsc.carriage_number, ts.seat_no
+        ORDER BY tsc.carriage_number, s.seat_no
         LIMIT #{requiredCount} -- 限制返回数量
     </select>
 </mapper>

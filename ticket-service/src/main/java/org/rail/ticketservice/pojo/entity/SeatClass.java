@@ -1,10 +1,13 @@
 package org.rail.ticketservice.pojo.entity;
 
+import lombok.Data;
+
 import java.time.LocalDateTime;
 
 /**
  * 席别实体集合
  */
+@Data
 public class SeatClass {
 
     private Long id;

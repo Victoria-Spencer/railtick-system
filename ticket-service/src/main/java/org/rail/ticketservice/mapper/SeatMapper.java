@@ -7,7 +7,7 @@ import org.rail.ticketservice.pojo.dto.SeatStatusUpdateConditionDTO;
 import java.util.List;
 
 @Mapper
-public interface TrainSeatMapper {
+public interface SeatMapper {
 
     /**
      * 批量更新座位状态

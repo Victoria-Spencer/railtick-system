@@ -8,7 +8,7 @@ import org.rail.ticketservice.pojo.entity.Station;
 import org.rail.ticketservice.pojo.vo.StationPageQueryVO;
 import org.rail.ticketservice.pojo.vo.TrainStopStationVO;
 import org.rail.ticketservice.service.StationService;
-import org.rail.ticketservice.task.StationLocalCacheManager;
+import org.rail.ticketservice.task.StationLocalCacheTask;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -26,7 +26,7 @@ public class StationServiceImpl implements StationService {
     @Autowired
     private StationMapper stationMapper;
     @Autowired
-    private StationLocalCacheManager stationLocalCacheManager;
+    private StationLocalCacheTask stationLocalCacheTask;
 
     /**
      * 根据查询类型或名称分页查询站点列表
@@ -35,7 +35,7 @@ public class StationServiceImpl implements StationService {
      */
     public PageResult<StationPageQueryVO> pageQueryStations(StationPageQueryDTO dto) {
         // 1. 从本地缓存获取全量站点数据
-        List<Station> allStations = stationLocalCacheManager.getAllStations();
+        List<Station> allStations = stationLocalCacheTask.getAllStations();
         if (allStations.isEmpty()) {
             log.warn("站点本地缓存为空，返回空结果");
             return null;
