@@ -14,7 +14,6 @@ public class UserLoginDTO {
     // 用户名/邮箱/手机号码
     @NotBlank(message = "用户名/邮箱/手机号不能为空")
     private String usernameOrMailOrPhone;
-    // 密码
     @NotBlank(message = "密码不能为空")
     private String password;
 }

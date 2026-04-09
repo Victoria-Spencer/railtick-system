@@ -13,7 +13,6 @@ import org.springframework.web.servlet.HandlerInterceptor;
 public class CommonRequestInterceptor implements HandlerInterceptor {
 
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
-        // 从请求头中提取user-id
         String userId = request.getHeader("user-id");
         if (userId == null || userId.trim().isEmpty()) {
             // 返回 401 状态码
@@ -30,7 +29,6 @@ public class CommonRequestInterceptor implements HandlerInterceptor {
     }
 
     public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) throws Exception {
-        // 清理 ThreadLocal，避免内存泄漏
         ThreadLocalUtils.remove();
     }
 }

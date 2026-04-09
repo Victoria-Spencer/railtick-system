@@ -9,28 +9,17 @@ import java.util.List;
 @Data
 public class OrderPageQueryVO {
 
-    // 订单号
     private String orderSn;
-    // 出发站点
     private String departure;
-    // 到达站点
     private String arrival;
-    // 出发站编码
     private String departureCode;
-    // 到达站编码
     private String arrivalCode;
-    // 出行日期
     private LocalDate ridingDate;
-    // 列车车次
     private String trainNumber;
-    // 出发时间
     private LocalDateTime departureTime;
-    // 到达时间
     private LocalDateTime arrivalTime;
     // 订单状态（0-待支付，1-已支付，2-已取消，3-部分退票，4-全部退票）
     private Integer status;
-    // 订票日期
     private LocalDate orderDate;
-    // 乘车人订单详情列表
     private List<OrderDetailsVO> orderDetailsVOList;
 }

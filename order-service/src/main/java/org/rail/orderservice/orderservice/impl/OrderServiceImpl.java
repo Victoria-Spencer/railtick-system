@@ -86,16 +86,16 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @GlobalTransactional
     public String createPreOrder(CreatePreOrderDTO createPreOrderDTO) {
-        // 1. 根据用户ID和列车ID，查询是否已存在预订单
+        // 根据用户ID和列车ID，查询是否已存在预订单
         String preOrderKey = buildPreOrderKey(createPreOrderDTO.getUserId(), createPreOrderDTO.getTrainId());
         PreOrder preOrder = cacheClient.get(preOrderKey);
 //        PreOrder preOrder = orderMapper.getByPreOrderUserIdAndTrainId(createPreOrderDTO.getUserId(), createPreOrderDTO.getTrainId());
 
         if(ObjectUtil.isNotNull(preOrder)) {
-            // 2. 存在旧预订单：更新逻辑
+            // 存在旧预订单：更新逻辑
             return updateExistPreOrder(createPreOrderDTO, preOrder);
         } else {
-            // 3. 无旧预订单：创建新预订单+新明细
+            // 无旧预订单：创建新预订单+新明细
             return createNewPreOrder(createPreOrderDTO);
         }
     }
@@ -112,21 +112,21 @@ public class OrderServiceImpl implements OrderService {
      * 更新已存在的预订单，保留主记录，仅替换明细
      */
     private String updateExistPreOrder(CreatePreOrderDTO createPreOrderDTO, PreOrder preOrder) {
-        // 1 释放旧明细关联的座位锁
+        // 释放旧明细关联的座位锁
         String detailsKey = buildPreOrderDetailsKey(preOrder.getId());
         Set<PreOrderDetails> oldSet = cacheClient.getSetMembers(detailsKey);
         List<PreOrderDetails> oldDetails = oldSet.stream().toList();
 //        List<PreOrderDetails> oldDetails = orderMapper.getTempSeatInfoByPreOrderId(preOrder.getId());
         releaseOldPreOrderSeatLock(createPreOrderDTO, preOrder, oldDetails);
 
-        // 2 删除旧明细（仅删明细，不删主记录）
+        // 删除旧明细（仅删明细，不删主记录）
         cacheClient.delete(detailsKey);
 //        orderMapper.deletePreOrderDetailsByPreOrderId(preOrder.getId());
 
-        // 3 更新预订单主记录（重置过期时间、状态）
+        // 更新预订单主记录（重置过期时间、状态）
         updatePreOrderMainInfo(createPreOrderDTO, preOrder);
 
-        // 4 插入新明细
+        // 插入新明细
         insertNewPreOrderDetails(createPreOrderDTO, preOrder.getId());
 
         log.info("预订单更新成功，预订单号：{}", preOrder.getPreOrderSn());
@@ -257,24 +257,24 @@ public class OrderServiceImpl implements OrderService {
     public CreateOrderVO createOrder(CreateOrderDTO createOrderDTO) {
         log.info("开始创建正式订单，预订单号：{}", createOrderDTO.getPreOrderSn());
 
-        // 1. 查询预订单
+        // 查询预订单
         String preOrderSn = createOrderDTO.getPreOrderSn();
         PreOrder preOrder = orderMapper.getByPreOrderSn(preOrderSn);
         if(ObjectUtil.isNull(preOrder)){
             throw new OrderNotFoundException("预订单不存在！");
         }
 
-        // 2. 创建订单主表
+        // 创建订单主表
         Order order = createOrderMain(preOrder);
 
-        // 3. 处理订单明细 & 座位分配
+        // 处理订单明细 & 座位分配
         List<OrderDetails> orderDetailsList = handleOrderDetails(createOrderDTO, preOrder, order);
 
-        // 4. 标记预订单为已转为正式订单
+        // 标记预订单为已转为正式订单
         markPreOrderStatus2(preOrder.getId());
 
         log.info("正式订单创建成功，订单号：{}", order.getOrderSn());
-        // 5. 封装返回结果
+        // 封装返回结果
         return buildCreateOrderVo(createOrderDTO, orderDetailsList);
     }
 
@@ -630,7 +630,7 @@ public class OrderServiceImpl implements OrderService {
      * 创建全新预订单
      */
     private String createNewPreOrder(CreatePreOrderDTO createPreOrderDTO) {
-        // 1. 构建预订单主表
+        //  构建预订单主表
         Long preOrderId = SnowflakeIdGenerator.nextId();
         String preOrderSn = SnowflakeIdGenerator.generatePreOrderSn();
         Double totalAmount = calculateTotalAmount(createPreOrderDTO.getPassengerOrderDetailDTOList());
@@ -642,12 +642,12 @@ public class OrderServiceImpl implements OrderService {
         preOrder.setCreateTime(LocalDateTime.now());
         preOrder.setTotalAmount(totalAmount);
 
-        // 2. 插入预订单主表
+        // 插入预订单主表
         String preOrderKey = buildPreOrderKey(preOrder.getUserId(), preOrder.getTrainId());
         cacheClient.set(preOrderKey, preOrder, RedisConstants.RAIL_DEFAULT_TTL, TimeUnit.MINUTES);
 //        orderMapper.insertPreOrder(preOrder);
 
-        // 3. 插入明细
+        // 插入明细
         insertNewPreOrderDetails(createPreOrderDTO, preOrderId);
 
         log.info("新预订单创建成功，预订单号：{}", preOrder.getPreOrderSn());
@@ -661,7 +661,6 @@ public class OrderServiceImpl implements OrderService {
         List<PassengerOrderDetailDTO> passengerList = createPreOrderDTO.getPassengerOrderDetailDTOList();
         List<ChooseSeatDTO> chooseSeats = createPreOrderDTO.getChooseSeats();
 
-        // 非空校验
         if (ObjectUtil.isEmpty(passengerList)) {
             throw new IllegalArgumentException("预订单详情列表不能为空");
         }
@@ -726,7 +725,6 @@ public class OrderServiceImpl implements OrderService {
     private Double calculateTotalAmount(List<PassengerOrderDetailDTO> passengerList) {
         Double totalAmount = 0.0;
         for (PassengerOrderDetailDTO dto : passengerList) {
-            // 计算总金额
             totalAmount += dto.getAmount();
         }
         return totalAmount;
@@ -737,13 +735,8 @@ public class OrderServiceImpl implements OrderService {
      * @return 过期时间（当前时间 + 预设的过期分钟数，默认15分钟）
      */
     private LocalDateTime calculateExpireTime() {
-        // 1. 获取当前时间
         LocalDateTime now = LocalDateTime.now();
-
-        // 2. 处理null情况（避免空指针，设置默认值，例如15分钟）
         int minutes = (preOrderExpireMinutes != null) ? preOrderExpireMinutes : 15;
-
-        // 3. 计算过期时间：当前时间 + 过期分钟数
         return now.plusMinutes(minutes);
     }
 }

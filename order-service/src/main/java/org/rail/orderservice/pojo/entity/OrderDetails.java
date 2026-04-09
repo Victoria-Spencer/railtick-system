@@ -10,44 +10,28 @@ import java.time.LocalDateTime;
 @Data
 public class OrderDetails {
 
-    // 订单明细id
     private Long id;
-    // 订单id（逻辑外键）
     private Long orderId;
-    // 关联的预订单明细
     private Long preOrderDetailId;
-    // 出发站点
     private String departure;
-    // 到达站点
     private String arrival;
-    // 出发站编码
     private String departureCode;
-    // 到达站编码
     private String arrivalCode;
-    // 乘车日期
     private LocalDateTime ridingDate;
-    // 列车ID
     private String trainId;
-    // 出发时间
     private LocalDateTime departureTime;
-    // 到达时间
     private LocalDateTime arrivalTime;
-    // 席别类型
+    // 席别类型：0-商等座 1-一等座 2-二务座...
     private Integer seatType;
-    // 车厢号
     private String carriageNumber;
-    // 座位号
     private String seatNo;
-    // 真实姓名
     private String realName;
-    // 证件类型
+    // 证件类型：0-身份证 1-护照 2-港澳通行证
     private Integer idType;
-    // 证件号码
     private String idCard;
-    // 车票类型（学生票、成人票等）
+    // 车票类型：0-成人票 1-儿童票 2-学生票 3-残疾军人
     private Integer ticketType;
-    // 订单金额
     private Double amount;
-    // 退票状态
+    // 退票状态：0-未退票 1已退票
     private Integer refundStatus;
 }

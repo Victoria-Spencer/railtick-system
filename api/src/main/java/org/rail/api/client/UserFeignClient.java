@@ -13,8 +13,8 @@ public interface UserFeignClient {
 
     /**
      * 查询用户的证件类型和证件号码
-     * @param id
-     * @return
+     * @param id 用户id
+     * @return 用户的证件类型和证件号码
      */
     @GetMapping("/api/user-service/user/{id}")
     Result<UserIdCardDTO> getIdCardInfo(@PathVariable Long id);

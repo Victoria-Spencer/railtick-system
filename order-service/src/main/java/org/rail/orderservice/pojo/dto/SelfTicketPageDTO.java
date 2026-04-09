@@ -13,14 +13,10 @@ public class SelfTicketPageDTO extends PageQuery {
 
     // 车票类型（0：成人，1：儿童，2：学生，3：残疾军人）
     private Integer ticketType;
-    // 开始日期
     private LocalDate startDate;
-    // 结束日期
     private LocalDate endDate;
-    // 列车车次
     private String trainNumber;
-    // 证件类型
+    // 证件类型：0-身份证 1-护照 2-港澳通行证
     private Integer idType;
-    // 证件号码
     private String idCard;
 }

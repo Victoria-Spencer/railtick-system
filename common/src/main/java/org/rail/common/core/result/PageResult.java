@@ -18,19 +18,13 @@ public class PageResult<T> implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    /**
-     * 总条数
-     */
+    /** 总条数 **/
     private Long total = 0L;
 
-    /**
-     * 分页数据列表
-     */
+    /** 分页数据列表 **/
     private List<T> records;
 
-    /**
-     * 总页数
-     */
+    /** 总页数 **/
     private Integer pages = 0;
 
     /**

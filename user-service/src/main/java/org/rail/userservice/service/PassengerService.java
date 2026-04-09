@@ -11,40 +11,40 @@ public interface PassengerService {
 
     /**
      * 分页查询
-     * @param psgrPageQueryDTO
-     * @return
+     * @param psgrPageQueryDTO 分页查询参数
+     * @return 分页结果
      */
     PageResult<Passenger> pageQuery(PsgrPageQueryDTO psgrPageQueryDTO);
 
     /**
      * 根据用户id查询所有乘车人信息
-     * @param userId
-     * @return
+     * @param userId 用户id
+     * @return 乘车人列表
      */
     List<Passenger> getByUserId(Long userId);
 
     /**
      * 根据乘车人id查询乘车人信息
-     * @param id
-     * @return
+     * @param id 乘车人id
+     * @return 乘车人信息
      */
     Passenger getById(Long id);
 
     /**
      * 添加新的乘车人
-     * @param passenger
+     * @param passenger 乘车人信息
      */
     void save(Passenger passenger);
 
     /**
      * 更新乘车人信息
-     * @param psgrUpdateDTO
+     * @param psgrUpdateDTO 乘车人更新信息
      */
     void update(PsgrUpdateDTO psgrUpdateDTO);
 
     /**
      * 根据ids移除乘车人
-     * @param ids
+     * @param ids 乘车人id列表
      */
     void deleteByIds(List<Long> ids);
 }

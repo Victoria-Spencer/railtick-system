@@ -32,7 +32,7 @@ public class TicketFeignFallback implements TicketFeignClient {
     /**
      * 修改占用区间，并同步新的座位状态，请求失败处理
      * @param batchDTO 批量座位区间插入DTO，包含订单ID、订单类型、列车ID、出发站编码、到达站编码、席别类型列表、占用区间列表
-     * @return
+     * @return 错误提示
      */
     @Override
     public Result<Null> updateSeatStatus(@RequestBody BatchSeatIntervalInsertDTO batchDTO) {

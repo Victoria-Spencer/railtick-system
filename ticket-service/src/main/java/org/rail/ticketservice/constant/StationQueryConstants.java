@@ -6,39 +6,24 @@ package org.rail.ticketservice.constant;
  */
 public final class StationQueryConstants {
 
-    /**
-     * 私有构造方法，防止类被实例化
-     */
     private StationQueryConstants() {}
 
-    /**
-     * 热门
-     */
+    /** 热门 **/
     public static final Integer HOT = 0;
 
-    /**
-     * A-E
-     */
+    /** A-E **/
     public static final Integer A_E = 1;
 
-    /**
-     * F-J
-     */
+    /** F-J **/
     public static final Integer F_J = 2;
 
-    /**
-     * K-O
-     */
+    /** K-O **/
     public static final Integer K_O = 3;
 
-    /**
-     * P-T
-     */
+    /** P-T **/
     public static final Integer P_T = 4;
 
-    /**
-     * U-Z
-     */
+    /** U-Z **/
     public static final Integer U_Z = 5;
 
 }

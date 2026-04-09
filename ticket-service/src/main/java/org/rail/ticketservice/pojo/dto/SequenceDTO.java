@@ -5,8 +5,6 @@ import lombok.Data;
 @Data
 public class SequenceDTO {
 
-    // 出发站站序
     private Integer startSequence;
-    // 到达站站序
     private Integer endSequence;
 }

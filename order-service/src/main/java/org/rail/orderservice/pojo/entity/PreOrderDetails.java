@@ -8,24 +8,17 @@ import lombok.Data;
 @Data
 public class PreOrderDetails {
 
-    // 预订单明细ID
     private Long id;
-    // 预订单ID（外键）
     private Long preOrderId;
-    // 乘客姓名
     private String realName;
-    // 证件类型
+    // 证件类型：0-身份证 1-护照 2-港澳通行证
     private Long idType;
-    // 证件号码
     private String idCard;
-    // 票种（学生票等）
+    // 车票类型：0-成人票 1-儿童票 2-学生票 3-残疾军人
     private Integer ticketType;
-    // 席别类型
+    // 席别类型：0-商等座 1-一等座 2-二务座...
     private Integer seatType;
-    // 车厢号
     private String carriageNumber;
-    // 临时座位号
     private String tempSeatNo;
-    // 总金额
     private Double amount;
 }

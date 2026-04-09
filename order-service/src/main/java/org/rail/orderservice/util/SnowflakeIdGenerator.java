@@ -16,9 +16,9 @@ import org.springframework.stereotype.Component;
 public class SnowflakeIdGenerator {
 
     @Value("${snowflake.datacenter-id:1}")
-    private long datacenterId; // 数据中心ID（配置/默认值，无随机）
+    private long datacenterId;
     @Value("${snowflake.worker-id:-1}")
-    private long workerId;     // 机器ID（优先配置，-1则自动生成）
+    private long workerId;
 
     // 静态变量存储最终可用的参数和Snowflake实例
     private static long finalWorkerId;
@@ -34,18 +34,16 @@ public class SnowflakeIdGenerator {
     public void init() {
         // 初始化机器ID：配置优先，无配置则基于IP生成
         finalWorkerId = (workerId == -1) ? generateWorkerId() : workerId;
-        // 初始化数据中心ID：直接用注入值（无随机）
+        // 初始化数据中心ID：直接用注入值
         finalDatacenterId = datacenterId;
 
         // 校验参数范围（0~31），避免初始化失败
         validateIdRange(finalWorkerId, "机器ID");
         validateIdRange(finalDatacenterId, "数据中心ID");
 
-        // 创建Snowflake实例（仅创建一次，复用）
         snowflake = IdUtil.createSnowflake(finalWorkerId, finalDatacenterId);
     }
 
-    // 私有化构造方法，禁止外部实例化
     private SnowflakeIdGenerator() {}
 
     // ============================== 辅助方法 ==============================
@@ -57,7 +55,7 @@ public class SnowflakeIdGenerator {
             // 优先获取宿主机IP，失败则返回默认值0
             return Math.abs(NetUtil.ipv4ToLong(NetUtil.getLocalhostStr()) % 32);
         } catch (Exception e) {
-            return 0L; // 兜底值，保证不崩溃
+            return 0L;
         }
     }
 

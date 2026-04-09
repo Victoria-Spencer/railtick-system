@@ -5,12 +5,9 @@ import lombok.Data;
 @Data
 public class SeatInfoQueryDTO {
 
-    // 列车ID
     private Long trainId;
-    // 列车席别类型
+    // 席别类型：0-商等座 1-一等座 2-二务座...
     private Integer seatType;
-    // 车厢号
     private String carriageNumber;
-    // 座位号
     private String seatNo;
 }

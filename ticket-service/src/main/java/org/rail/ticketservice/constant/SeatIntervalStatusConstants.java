@@ -5,23 +5,14 @@ package org.rail.ticketservice.constant;
  */
 public final class SeatIntervalStatusConstants {
 
-    /**
-     * 私有构造方法，防止类被实例化
-     */
     private SeatIntervalStatusConstants() {}
 
-    /**
-     * 锁定中
-     */
+    /**  锁定中 **/
     public static final Integer LOCKED = 0;
 
-    /**
-     * 已售出
-     */
+    /** 已售出 **/
     public static final Integer ALREADY_SOLD = 1;
 
-    /**
-     * 已释放
-     */
+    /** 已释放 **/
     public static final Integer RELEASED = 2;
 }

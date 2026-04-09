@@ -26,8 +26,8 @@ public class UserServiceImpl implements UserService {
 
     /**
      * 登录
-     * @param userLoginDTO
-     * @return
+     * @param userLoginDTO 登录信息
+     * @return 登录成功的用户信息
      */
     public UserVO login(UserLoginDTO userLoginDTO) {
         // 根据用户名查询用户信息
@@ -67,8 +67,8 @@ public class UserServiceImpl implements UserService {
 
     /**
      * 注册
-     * @param userRegisterDTO
-     * @return
+     * @param userRegisterDTO 注册信息
+     * @return 注册成功的用户信息
      */
     public UserVO register(UserRegisterDTO userRegisterDTO) {
         // 根据用户名查询用户信息
@@ -94,8 +94,8 @@ public class UserServiceImpl implements UserService {
 
     /**
      * 更新用户信息
-     * @param userUpdateInfoDTO
-     * @return
+     * @param userUpdateInfoDTO 更新信息
+     * @return 更新后的用户信息
      */
     public UserVO update(UserUpdateInfoDTO userUpdateInfoDTO) {
         // 根据用户名查询用户信息
@@ -115,8 +115,8 @@ public class UserServiceImpl implements UserService {
 
     /**
      * 查询证类型和证件件号
-     * @param id
-     * @return
+     * @param id 用户id
+     * @return 证件类型和证件号
      */
     public UserIdCardDTO getIdCardInfoById(Long id) {
         User user = userMapper.getById(id);

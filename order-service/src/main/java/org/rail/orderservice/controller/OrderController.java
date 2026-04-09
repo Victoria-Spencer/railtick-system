@@ -22,7 +22,6 @@ public class OrderController {
 
     @PostMapping("/pre-order/create")
     public Result<String> createPreOrder(@RequestBody CreatePreOrderDTO createPreOrderDTO) {
-        // 返回预订单号
         String preOrderSn = orderService.createPreOrder(createPreOrderDTO);
         return Result.success(preOrderSn);
     }

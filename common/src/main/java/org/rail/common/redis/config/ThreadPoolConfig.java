@@ -57,7 +57,7 @@ public class ThreadPoolConfig {
                 CACHE_CORE_SIZE, CACHE_MAX_SIZE, CACHE_KEEP_ALIVE, TimeUnit.SECONDS,
                 new ArrayBlockingQueue<>(CACHE_QUEUE_SIZE),
                 threadFactory,
-                new ThreadPoolExecutor.CallerRunsPolicy() // 拒绝策略：调用者执行（安全）
+                new ThreadPoolExecutor.CallerRunsPolicy() // 拒绝策略：调用者执行
         );
         return cacheRebuildExecutor;
     }
@@ -74,7 +74,7 @@ public class ThreadPoolConfig {
                 BUSINESS_CORE_SIZE, BUSINESS_MAX_SIZE, BUSINESS_KEEP_ALIVE, TimeUnit.SECONDS,
                 new ArrayBlockingQueue<>(BUSINESS_QUEUE_SIZE),
                 threadFactory,
-                new ThreadPoolExecutor.CallerRunsPolicy() // 拒绝策略：调用者执行（安全）
+                new ThreadPoolExecutor.CallerRunsPolicy() // 拒绝策略：调用者执行
         );
         return businessAsyncExecutor;
     }

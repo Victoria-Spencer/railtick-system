@@ -5,22 +5,20 @@ import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Select;
 import org.rail.userservice.pojo.entity.User;
-import org.rail.userservice.pojo.vo.UserVO;
 
 @Mapper
 public interface UserMapper {
 
     /**
      * 根据id查询用户信息
-     * @param usernameOrMailOrPhone
-     * @return
+     * @param usernameOrMailOrPhone 用户名、邮箱或手机号
+     * @return 用户信息
      */
     User findByUsernameOrMailOrPhone(String usernameOrMailOrPhone);
 
     /**
      * 新增用户
-     * @param user
-     * @return
+     * @param user 用户信息
      */
     @Insert("insert into" +
             " user(username, real_name, password, " +
@@ -31,7 +29,7 @@ public interface UserMapper {
 
     /**
      * 更新用户信息
-     * @param user
+     * @param user 用户信息
      */
     void update(User user);
 

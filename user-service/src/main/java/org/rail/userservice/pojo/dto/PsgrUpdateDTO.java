@@ -11,7 +11,6 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class PsgrUpdateDTO {
 
-    // 乘客id
     private Long id;
     private String phone;
 }

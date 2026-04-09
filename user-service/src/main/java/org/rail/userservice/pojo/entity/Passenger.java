@@ -12,33 +12,17 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class Passenger {
 
-    // 乘车人id
     private Long id;
-
-    // 所属用户（逻辑外键）
     private Long userId;
-
-    // 真实姓名
     private String realName;
-
-    // 证件类型,0：身份证号
+    // 证件类型：0-身份证 1-护照 2-港澳通行证
     private Integer idType;
-
-    // 证件编号
     private String idCard;
-
-    // 优惠类型
+    // 优惠类型，0-3 区分成人、儿童、学生、残疾军人
     private Integer discountType;
-
-    // 手机号
     private String phone;
-
-    // 审核状态
+    // 审核状态：0-待审核 1-审核通过 2-审核不通过
     private Integer verifyStatus;
-
-    // 创建时间
     private LocalDateTime createTime;
-
-    // 更新时间
     private LocalDateTime updateTime;
 }

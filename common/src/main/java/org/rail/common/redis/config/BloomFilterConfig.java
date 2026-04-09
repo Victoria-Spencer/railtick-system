@@ -26,11 +26,11 @@ public class BloomFilterConfig {
      */
     @Bean
     public RBloomFilter<String> aggCacheBloomFilter(RedissonClient redissonClient) {
-        // 1. 获取布隆过滤器实例
+        // 获取布隆过滤器实例
         RBloomFilter<String> bloomFilter = redissonClient.getBloomFilter(
                 RedisConstants.BLOOM_FILTER_PREFIX + RedisConstants.AGG_CACHE_ORDER_BIZ_TYPE
         );
-        // 2. 仅在不存在时初始化（配置类完成初始化）
+        // 仅在不存在时初始化（配置类完成初始化）
         if (!bloomFilter.isExists()) {
             bloomFilter.tryInit(expectedInsertions, fpp);
         }

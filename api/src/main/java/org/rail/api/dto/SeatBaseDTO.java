@@ -7,7 +7,7 @@ import lombok.Data;
  */
 @Data
 public class SeatBaseDTO {
-    private Integer seatType;    // 席别
-    private String carriageNumber; // 车厢号
-    private String seatNo;      // 座位号
+    private Integer seatType;
+    private String carriageNumber;
+    private String seatNo;
 }

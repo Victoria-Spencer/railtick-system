@@ -7,13 +7,9 @@ public final class OrderTypeConstants {
 
     private OrderTypeConstants() {}
 
-    /**
-     * 预订单
-     */
+    /** 预订单 **/
     public static final Integer PREORDER = 0;
 
-    /**
-     * 订单
-     */
+    /** 订单 **/
     public static final Integer ORDER = 1;
 }

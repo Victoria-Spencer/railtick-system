@@ -10,15 +10,12 @@ import org.rail.common.core.pageQuery.PageQuery;
 @AllArgsConstructor
 public class PsgrPageQueryDTO extends PageQuery {
 
-    // 用户id
     private Long userId;
-    // 真实姓名
     private String realName;
     // 审核状态
     private Integer verifyStatus;
-    // 优惠类型，区分成人、儿童、学生
+    // 优惠类型，0-3 区分成人、儿童、学生、残疾军人
     private Integer discountType;
-    // 排序字段
     private String sortField;
     // 排序方式(0：asc，1：desc)
     private Integer sortOrder;

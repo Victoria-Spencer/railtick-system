@@ -9,8 +9,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class PageQuery {
 
-    // 页码
     private Integer pageNumber = 1;
-    // 每页记录数
     private Integer pageSize = 10;
 }

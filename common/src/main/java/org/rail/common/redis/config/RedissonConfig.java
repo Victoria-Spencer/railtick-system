@@ -15,15 +15,16 @@ import java.time.Duration;
 @Configuration
 public class RedissonConfig {
 
-    // 直接注入SpringBoot自动封装的Redis配置类
     @Autowired
     private RedisProperties redisProperties;
     @Autowired
     private JsonJacksonCodec redissonJsonCodec;
 
+    /**
+     * 初始化 Redisson 客户端（单节点模式）
+     */
     @Bean
     public RedissonClient redissonClient() {
-        // 单节点配置
         Config config = new Config();
 
         // 设置全局JSON序列化（替换默认二进制序列化）
@@ -31,21 +32,16 @@ public class RedissonConfig {
 
         SingleServerConfig serverConfig = config.useSingleServer();
 
-        // 1. 拼接Redis地址
         String address = "redis://" + redisProperties.getHost() + ":" + redisProperties.getPort();
         serverConfig.setAddress(address);
 
-        // 2. 数据库索引、密码
         serverConfig.setDatabase(redisProperties.getDatabase());
-        // 无密码自动传null，有密码自动读取
         serverConfig.setPassword(redisProperties.getPassword());
 
-        // 3. 超时时间
         Duration timeout = redisProperties.getTimeout();
         serverConfig.setConnectTimeout((int) timeout.toMillis());
         serverConfig.setTimeout((int) timeout.toMillis());
 
-        // 4. 连接池
         RedisProperties.Pool pool = redisProperties.getLettuce().getPool();
         serverConfig.setConnectionPoolSize(pool.getMaxActive());
         serverConfig.setConnectionMinimumIdleSize(pool.getMinIdle());

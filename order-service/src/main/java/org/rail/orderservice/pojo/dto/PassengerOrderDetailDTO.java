@@ -5,16 +5,13 @@ import lombok.Data;
 @Data
 public class PassengerOrderDetailDTO {
 
-    // 乘车人姓名
     private String realName;
-    // 证件类型
+    // 证件类型：0-身份证 1-护照 2-港澳通行证
     private Integer idType;
-    // 证件号码
     private String idCard;
-    // 车票类型
+    // 车票类型：0-成人票 1-儿童票 2-学生票 3-残疾军人
     private Integer ticketType;
-    // 席别类型（0：商务座，1：一等座...）
+    // 席别类型：0-商等座 1-一等座 2-二务座...
     private Integer seatType;
-    // 金额
     private Double amount;
 }

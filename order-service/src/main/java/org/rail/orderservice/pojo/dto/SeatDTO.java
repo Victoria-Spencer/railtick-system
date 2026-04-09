@@ -9,8 +9,6 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class SeatDTO {
 
-    // 车厢号
     private String carriageNumber;
-    // 座位号
     private String seatNo;
 }

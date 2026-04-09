@@ -7,16 +7,11 @@ import java.time.LocalDateTime;
  */
 public class SeatClass {
 
-    // 席别id
     private Long id;
-    // 席别类型
+    // 席别类型：0-商等座 1-一等座 2-二务座...
     private Integer type;
-    // 席别名称
     private String name;
-    // 席别价格
     private Integer price;
-    // 创建时间
     private LocalDateTime createTime;
-    // 更新时间
     private LocalDateTime updateTime;
 }

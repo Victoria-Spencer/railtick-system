@@ -16,20 +16,12 @@ import java.time.LocalTime;
 @AllArgsConstructor
 public class TrainStopStation {
 
-    // id
     private Long id;
-    // 列车id
     private Long trainId;
-    // 站点id
     private Long stationId;
-    // 站序
     private Integer sequence;
-    // 站名名称
     private String stationName;
-    // 到站时间
     private LocalDateTime arrivalTime;
-    // 出发时间
     private LocalDateTime departureTime;
-    // 停留时间
     private Long stopoverTime;
 }

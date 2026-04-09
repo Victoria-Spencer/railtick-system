@@ -33,8 +33,8 @@ public class PassengerServiceImpl implements PassengerService {
 
     /**
      * 分页查询（管理员）
-     * @param psgrPageQueryDTO
-     * @return
+     * @param psgrPageQueryDTO 分页查询参数
+     * @return 分页结果
      */
     public PageResult<Passenger> pageQuery(PsgrPageQueryDTO psgrPageQueryDTO) {
         // 1. 开启分页（pageNum：页码，pageSize：每页条数）
@@ -51,8 +51,8 @@ public class PassengerServiceImpl implements PassengerService {
 
     /**
      * 根据用户id查询所有乘车人信息
-     * @param userId
-     * @return
+     * @param userId 用户id
+     * @return 乘车人列表
      */
     public List<Passenger> getByUserId(Long userId) {
         if (userId == null) {
@@ -74,8 +74,8 @@ public class PassengerServiceImpl implements PassengerService {
 
     /**
      * 根据乘车人id查询乘车人信息
-     * @param id
-     * @return
+     * @param id 乘车人id
+     * @return 乘车人信息
      */
     public Passenger getById(Long id) {
         return passengerMapper.getById(id);
@@ -83,7 +83,7 @@ public class PassengerServiceImpl implements PassengerService {
 
     /**
      * 添加新的乘车人
-     * @param passenger
+     * @param passenger 乘车人信息
      */
     public void save(Passenger passenger) {
         // 从线程中获取乘车人对应的用户标识
@@ -102,7 +102,7 @@ public class PassengerServiceImpl implements PassengerService {
 
     /**
      * 更新乘车人信息
-     * @param psgrUpdateDTO
+     * @param psgrUpdateDTO 乘车人更新信息
      */
     /*@AutoClearAggCache(
             keySource = AutoClearAggCache.KeySource.THREAD_LOCAL,
@@ -122,7 +122,7 @@ public class PassengerServiceImpl implements PassengerService {
 
     /**
      * 根据ids移除乘车人
-     * @param ids
+     * @param ids 乘车人id列表
      */
     /*@AutoClearAggCache(
             keySource = AutoClearAggCache.KeySource.THREAD_LOCAL,

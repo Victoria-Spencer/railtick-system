@@ -15,8 +15,8 @@ public class UserFeignFallback implements UserFeignClient {
 
     /**
      * 查询用户的证件类型和证件号码，请求失败处理
-     * @param id
-     * @return
+     * @param id 用户 ID
+     * @return 错误提示信息
      */
     public Result<UserIdCardDTO> getIdCardInfo(Long id) {
         log.error("服务临时不可用，请稍后重试");

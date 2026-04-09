@@ -8,40 +8,25 @@ import java.time.LocalDateTime;
 @Data
 public class SelfTicketPageVO {
 
-    // 订单明细ID
     private Integer id;
-    // 出发站点
     private String departure;
-    // 到达站点
     private String arrival;
-    // 出发站点
     private String departureCode;
-    // 到达站点
     private String arrivalCode;
-    // 乘车日期
     private LocalDate ridingDate;
-    // 列车车次
     private String trainNumber;
-    // 出发时间
     private LocalDateTime departureTime;
-    // 到达时间
     private LocalDateTime arrivalTime;
-    // 席别类型
+    // 席别类型：0-商等座 1-一等座 2-二务座...
     private Integer seatType;
-    // 车厢号
     private String carriageNumber;
-    // 座位号
     private String seatNo;
-    // 真实姓名
     private String realName;
-    // 车票类型
     private Integer ticketType;
-    // 订单金额
     private Integer amount;
-    // 证件类型
+    // 证件类型：0-身份证 1-护照 2-港澳通行证
     private Integer idType;
-    // 证件号
     private String idCard;
-    // 退票状态
+    // 退票状态：0-未退票 1已退票
     private Boolean refundStatus;
 }

@@ -5,24 +5,17 @@ import lombok.Data;
 @Data
 public class OrderDetailsVO {
 
-    // 订单明细ID
     private Integer id;
-    // 席别类型
     private Integer seatType;
-    // 车厢号
     private String carriageNumber;
-    // 座位号
     private String seatNo;
-    // 真实姓名
     private String realName;
-    // 证件类型
+    // 证件类型：0-身份证 1-护照 2-港澳通行证
     private Integer idType;
-    // 证件号码
     private String idCard;
-    // 票种
+    // 车票类型：0-成人票 1-儿童票 2-学生票 3-残疾军人
     private Integer ticketType;
-    // 票价
     private Double amount;
-    // 退票状态
+    // 退票状态：0-未退票 1已退票
     private Boolean refundStatus;
 }

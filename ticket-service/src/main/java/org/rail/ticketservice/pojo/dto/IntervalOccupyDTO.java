@@ -7,14 +7,10 @@ import java.util.List;
 @Data
 public class IntervalOccupyDTO {
 
-    // 列车类型
     private Long trainId;
-    // 席别类型
+    // 席别类型：0-商等座 1-一等座 2-二务座...
     private Integer seatType;
-    // 车厢号
     private String carriageNumber;
-    // 座位号
     private String seatNo;
-    // 占用区间
     private List<SequenceDTO> intervalList;
 }

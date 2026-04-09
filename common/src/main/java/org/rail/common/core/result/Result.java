@@ -17,7 +17,7 @@ public class Result<T> implements Serializable {
     private String requestId; // 请求id
     private boolean success; // 是否成功
 
-    //快速返回操作成功响应结果
+    // 快速返回操作成功响应结果
     public static <T> Result<T> success() {
         Result<T> result = new Result<T>();
         result.code = "0";
@@ -28,7 +28,7 @@ public class Result<T> implements Serializable {
         return result;
     }
 
-    //快速返回操作成功响应结果(带响应数据)
+    // 快速返回操作成功响应结果(带响应数据)
     public static <T> Result<T> success(T data) {
         Result<T> result = new Result<T>();
         result.code = "0";

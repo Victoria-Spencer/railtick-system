@@ -7,10 +7,10 @@ public final class PreOrderStatusConstants {
 
     private PreOrderStatusConstants() {}
 
-    // 有效
+    /** 预订单：有效（待支付/未过期） */
     public static final Integer VALID  = 0;
-    // 已过期
+    /** 预订单：已过期 */
     public static final Integer EXPIRED = 1;
-    // 已转为正式订单
+    /** 预订单：已转为正式订单 */
     public static final Integer CONVERTED_TO_ORDER = 2;
 }

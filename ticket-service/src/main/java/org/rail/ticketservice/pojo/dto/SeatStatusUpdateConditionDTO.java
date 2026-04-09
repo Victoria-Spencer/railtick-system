@@ -5,14 +5,11 @@ import lombok.Data;
 @Data
 public class SeatStatusUpdateConditionDTO {
 
-    // 列车ID
     private Long trainId;
-    // 席别类型
+    // 席别类型：0-商等座 1-一等座 2-二务座...
     private Integer seatType;
-    // 车厢号
     private String carriageNumber;
-    // 座位号
     private String seatNo;
-    // 座位状态
+    // 占用状态：0-完全可选 1-部分占用 2-全区间已售
     private Integer status;
 }

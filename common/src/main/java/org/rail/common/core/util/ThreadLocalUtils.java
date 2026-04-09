@@ -4,7 +4,6 @@ public class ThreadLocalUtils {
 
     private static final ThreadLocal<Object> THREAD_LOCAL = new ThreadLocal<>();
 
-    // 私有构造方法，禁止外部new实例
     private ThreadLocalUtils() {
     }
 

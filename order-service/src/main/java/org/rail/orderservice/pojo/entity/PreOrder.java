@@ -10,20 +10,13 @@ import java.time.LocalDateTime;
 @Data
 public class PreOrder {
 
-    // 预订单ID
     private Long id;
-    // 预订单号（唯一标识）
     private String preOrderSn;
-    // 用户ID
     private Long userId;
-    // 列车ID
     private Long trainId;
-    // 总金额
     private Double totalAmount;
-    // 过期时间
     private LocalDateTime expireTime;
-    // 预订单状态
+    // 状态：0-有效 1-已过期 2-已转为正式订单
     private Integer status;
-    // 创建时间
     private LocalDateTime createTime;
 }
