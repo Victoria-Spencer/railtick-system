@@ -1,5 +1,6 @@
 package org.rail.orderservice.controller;
 
+import org.apache.ibatis.jdbc.Null;
 import org.rail.common.core.result.PageResult;
 import org.rail.common.core.result.Result;
 import org.rail.orderservice.orderservice.OrderService;
@@ -45,7 +46,7 @@ public class OrderController {
     }
 
     @DeleteMapping("/order/cancel")
-    public Result cancel(@RequestParam String orderSn) {
+    public Result<Null> cancel(@RequestParam String orderSn) {
         orderService.cancelOrder(orderSn);
         return Result.success();
     }

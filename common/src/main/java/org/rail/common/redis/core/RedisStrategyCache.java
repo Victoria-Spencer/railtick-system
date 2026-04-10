@@ -90,4 +90,5 @@ public interface RedisStrategyCache {
             Long time,
             TimeUnit timeUnit
     );
+
 }

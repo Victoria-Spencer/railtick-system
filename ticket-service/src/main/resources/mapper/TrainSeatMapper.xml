@@ -52,4 +52,16 @@
                 )
             </foreach>
     </select>
+
+    <select id="selectAllSeatDetails" resultType="org.rail.common.core.pojo.vo.SeatDetailVO">
+        SELECT
+            s.id,
+            s.train_seat_class_id,
+            s.seat_no,
+            s.status,
+            tsc.train_id AS trainId
+        FROM seat s
+        INNER JOIN train_seat_class tsc
+            ON s.train_seat_class_id = tsc.id
+    </select>
 </mapper>

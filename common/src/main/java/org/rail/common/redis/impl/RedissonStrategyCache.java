@@ -549,7 +549,7 @@ public class RedissonStrategyCache implements RedisStrategyCache {
             }
         }
 
-        // 5. 处理未命中的DTO（同步查库）
+        // 处理未命中的DTO（同步查库）
         if (!CollectionUtil.isEmpty(missDtos)) {
             log.debug("批量逻辑过期策略-未命中数:{}，同步查询数据库", missDtos.size());
             Map<DTO, D> missDbMap = batchDbFallback.apply(missDtos);
@@ -569,7 +569,6 @@ public class RedissonStrategyCache implements RedisStrategyCache {
 
         return resultMap;
     }
-
 
     /**
      * 构建结果Map

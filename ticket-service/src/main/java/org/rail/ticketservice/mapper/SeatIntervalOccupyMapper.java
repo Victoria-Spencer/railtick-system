@@ -25,6 +25,12 @@ public interface SeatIntervalOccupyMapper {
     void batchInsertSIOOccupyRecords(List<SeatIntervalOccupy> seatIntervalOccupyList);
 
     /**
+     * 查询所有有效的座位区间占用记录
+     * @return 包含有效座位区间占用记录的列表
+     */
+    List<SeatIntervalOccupy> selectValidAll();
+
+    /**
      * 批量更新座位区间占用记录
      * @param occupyModifyDTOS 包含要更新的座位区间占用记录信息的列表
      */

@@ -444,6 +444,7 @@ public class OrderServiceImpl implements OrderService {
      * @param orderPageQueryDTO 订单分页查询参数（包含用户ID、订单状态、订单类型、日期范围、车次等查询条件，以及分页参数）
      * @return 订单分页数据（分页结果 + 依赖的单表Key列表，用于构建聚合缓存）
      */
+    @Override
     public PageResult<OrderPageQueryVO> orderPageQuery(OrderPageQueryDTO orderPageQueryDTO) {
         return queryOrderPageCache(orderPageQueryDTO);
         // 分页查询
@@ -528,6 +529,7 @@ public class OrderServiceImpl implements OrderService {
      * @param frontSelfTicketPageDTO 本人车票分页查询参数（包含用户ID、车票状态、日期范围、车次等查询条件，以及分页参数）
      * @return 本人车票分页数据（分页结果 + 依赖的单表Key列表）
      */
+    @Override
     @GlobalTransactional
     public PageResult<SelfTicketPageVO> selfTicketPageQuery(FrontSelfTicketPageDTO frontSelfTicketPageDTO) {
         return querySelfTicketPageCache(frontSelfTicketPageDTO);
@@ -609,6 +611,7 @@ public class OrderServiceImpl implements OrderService {
      * 取消车票订单
      * @param orderSn 订单号
      */
+    @Override
     public void cancelOrder(String orderSn) {
         orderMapper.updateOrderByOrderSn(orderSn);
         // 自动清理订单及相关聚合key

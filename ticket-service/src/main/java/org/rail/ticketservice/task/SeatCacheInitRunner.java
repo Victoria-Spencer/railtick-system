@@ -1,10 +1,11 @@
 package org.rail.ticketservice.task;
 
 import lombok.extern.slf4j.Slf4j;
+import org.rail.common.core.exception.CacheInitException;
 import org.rail.ticketservice.service.SeatService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
-import jakarta.annotation.Resource;
 
 /**
  * 座位缓存初始化任务
@@ -14,7 +15,7 @@ import jakarta.annotation.Resource;
 @Component
 public class SeatCacheInitRunner implements CommandLineRunner {
 
-    @Resource
+    @Autowired
     private SeatService seatService;
 
     /**
@@ -22,17 +23,17 @@ public class SeatCacheInitRunner implements CommandLineRunner {
      */
     @Override
     public void run(String... args) {
-        log.info("===== 开始初始化【列车座位】Redis缓存 =====");
+        log.info("开始初始化列车座位Redis缓存...");
         try {
-            // 1. 初始化座位基础信息 (Hash)
+            // 初始化座位基础信息 (Hash)
             seatService.initAllTrainSeatCache();
 
-            // 2. 初始化占用区间 (Bitmap)
+            // 初始化占用区间 (Bitmap)
             seatService.initAllSeatOccupancyBitmap();
-            log.info("===== 【列车座位】Redis缓存初始化完成 =====");
+            log.info("列车座位Redis缓存初始化完成");
         } catch (Exception e) {
-            log.error("===== 【列车座位】Redis缓存初始化失败 =====", e);
-            // 座位缓存非启动核心依赖，不抛出异常阻止服务启动
+            log.error("列车座位Redis缓存初始化失败", e);
+            throw new CacheInitException("列车座位Redis缓存初始化失败", e);
         }
     }
 }

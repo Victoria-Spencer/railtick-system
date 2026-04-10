@@ -33,6 +33,7 @@ public class StationServiceImpl implements StationService {
      * @param dto 站点分页查询参数（包含queryType、keyword、pageNumber、pageSize）
      * @return 分页结果（包含总记录数和当前页数据列表）
      */
+    @Override
     public PageResult<StationPageQueryVO> pageQueryStations(StationPageQueryDTO dto) {
         // 1. 从本地缓存获取全量站点数据
         List<Station> allStations = stationLocalCacheTask.getAllStations();
@@ -116,6 +117,7 @@ public class StationServiceImpl implements StationService {
      * 根据列车id查询列车经停站信息
      * @return 列车经停站信息列表
      */
+    @Override
     public List<TrainStopStationVO> getStopsByTrainId(Long trainId) {
         // 获取列车经停站列表
         List<TrainStopStationVO> TrainStopStationVOS = stationMapper.batchQueryByTrainId(trainId);

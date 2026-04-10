@@ -11,7 +11,7 @@ public class OpenFeignException extends RuntimeException {
     private static final long serialVersionUID = 1L;
 
     public OpenFeignException() {
-        super();
+        super("远程调用失败");
     }
 
     public OpenFeignException(String message) {

@@ -1,6 +1,7 @@
 package org.rail.ticketservice.mapper;
 
 import org.apache.ibatis.annotations.Mapper;
+import org.rail.common.core.pojo.vo.SeatDetailVO;
 import org.rail.ticketservice.pojo.dto.SeatInfoQueryDTO;
 import org.rail.ticketservice.pojo.dto.SeatStatusUpdateConditionDTO;
 
@@ -21,4 +22,10 @@ public interface SeatMapper {
      * @return 座位ID列表
      */
     List<Long> getSeatIdByQueryDTO(List<SeatInfoQueryDTO> seatInfoQueryDTOList);
+
+    /**
+     * 全量查询所有座位详情列表
+     * @return 座位详情列表
+     */
+    List<SeatDetailVO> selectAllSeatDetails();
 }

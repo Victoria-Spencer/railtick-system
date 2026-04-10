@@ -120,7 +120,7 @@ public class CacheClient implements ICacheClient {
      * 向Set缓存添加单个成员，并设置过期时间
      */
     @Override
-    public <T> void addSetMemberWithExpire(String key, T value, long expireTime, TimeUnit timeUnit) {
+    public <T> void addSetMemberWithExpire(String key, T value, Long expireTime, TimeUnit timeUnit) {
         redisCache.addSetMemberWithExpire(key, value, expireTime, timeUnit);
     }
 
@@ -128,7 +128,7 @@ public class CacheClient implements ICacheClient {
      * 向Set缓存批量添加成员，并设置过期时间
      */
     @Override
-    public <T> void addSetMembersWithExpire(String key, Collection<T> values, long expireTime, TimeUnit timeUnit) {
+    public <T> void addSetMembersWithExpire(String key, Collection<T> values, Long expireTime, TimeUnit timeUnit) {
         redisCache.addSetMembersWithExpire(key, values, expireTime, timeUnit);
     }
 
@@ -138,6 +138,174 @@ public class CacheClient implements ICacheClient {
     @Override
     public <T> Set<T> getSetMembers(String key) {
         return redisCache.getSetMembers(key);
+    }
+
+    // =============================== Bitmap 操作实现 ===============================
+
+    /**
+     * 设置Bitmap指定偏移量的值
+     */
+    @Override
+    public void setBit(String key, long offset, boolean value) {
+        redisCache.setBit(key, offset, value);
+    }
+
+    /**
+     * 获取Bitmap指定偏移量的值
+     */
+    @Override
+    public boolean getBit(String key, long offset) {
+       return redisCache.getBit(key, offset);
+    }
+
+    /**
+     * 统计Bitmap中1的数量
+     */
+    @Override
+    public long bitCount(String key) {
+        return redisCache.bitCount(key);
+    }
+
+    /**
+     * 批量设置Bitmap多个偏移量为指定值
+     */
+    @Override
+    public void batchSetBits(String key, Collection<Long> offsets, boolean value) {
+        redisCache.batchSetBits(key, offsets, value);
+    }
+
+    /**
+     * 设置Bitmap指定区间 [startOffset, endOffset) 所有位为指定值
+     * 注意：RBitSet的set/clear是左闭右开区间
+     */
+    @Override
+    public void setRangeBits(String key, long startOffset, long endOffset, boolean value) {
+        redisCache.setRangeBits(key, startOffset, endOffset, value);
+    }
+
+    /**
+     * 清空整个Bitmap（删除key）
+     */
+    @Override
+    public void clearBitmap(String key) {
+        redisCache.clearBitmap(key);
+    }
+
+    /**
+     * 判断Bitmap指定区间[startOffset, endOffset)（左闭右开）是否全为0
+     * 统计区间内1的数量，数量为0则代表全0
+     */
+    @Override
+    public boolean isRangeAllZero(String key, long startOffset, long endOffset) {
+        return redisCache.isRangeAllZero(key, startOffset, endOffset);
+    }
+
+    // =============================== Hash 操作实现 =================================
+
+    /**
+     * Hash 存入单个字段
+     */
+    @Override
+    public <T> void hPut(String key, String hashKey, T value) {
+        redisCache.hPut(key, hashKey, value);
+    }
+
+    /**
+     * Hash 存入单个字段（带独立过期时间）
+     * 效果：仅当前hashKey到期删除，其他field正常保留
+     */
+    @Override
+    public <T> void hPut(String key, String hashKey, T value, Long expireTime, TimeUnit timeUnit) {
+        redisCache.hPut(key, hashKey, value, expireTime, timeUnit);
+    }
+
+    /**
+     * Hash 批量存入字段
+     */
+    @Override
+    public <T> void hPutAll(String key, Map<String, T> map) {
+        redisCache.hPutAll(key, map);
+    }
+
+    /**
+     * Hash 批量存入字段（带过期时间）
+     */
+    @Override
+    public <T> void hPutAll(String key, Map<String, T> map, Long expireTime, TimeUnit timeUnit) {
+        redisCache.hPutAll(key, map, expireTime, timeUnit);
+    }
+
+    /**
+     * Hash批量存入字段 + 给【整个Hash】设置过期时间
+     * 效果：到期后 → 整个Hash被删除，所有字段全部清空
+     */
+    @Override
+    public <T> void hPutAllWholeExpire(String key, Map<String, T> map, Long expireTime, TimeUnit timeUnit) {
+        redisCache.hPutAllWholeExpire(key, map, expireTime, timeUnit);
+    }
+
+    /**
+     * Hash 获取单个字段
+     */
+    @Override
+    public <T> T hGet(String key, String hashKey) {
+        return redisCache.hGet(key, hashKey);
+    }
+
+    /**
+     * Hash 批量获取多个字段
+     */
+    @Override
+    public <T> List<T> hMultiGet(String key, Collection<String> hashKeys) {
+        return redisCache.hMultiGet(key, hashKeys);
+    }
+
+    /**
+     * Hash 获取所有字段和值
+     */
+    @Override
+    public <T> Map<String, T> hEntries(String key) {
+        return redisCache.hEntries(key);
+    }
+
+    /**
+     * Hash 获取所有字段名
+     */
+    @Override
+    public Set<String> hKeys(String key) {
+        return redisCache.hKeys(key);
+    }
+
+    /**
+     * Hash 获取所有字段值
+     */
+    @Override
+    public <T> List<T> hValues(String key) {
+        return redisCache.hValues(key);
+    }
+
+    /**
+     * Hash 删除指定字段
+     */
+    @Override
+    public Long hDelete(String key, String... hashKeys) {
+        return redisCache.hDelete(key, hashKeys);
+    }
+
+    /**
+     * 判断 Hash 中是否存在指定字段
+     */
+    @Override
+    public Boolean hExists(String key, String hashKey) {
+        return redisCache.hExists(key, hashKey);
+    }
+
+    /**
+     * Hash 字段数值自增/自减
+     */
+    @Override
+    public Long hIncr(String key, String hashKey, long delta) {
+        return redisCache.hIncr(key, hashKey, delta);
     }
 
     // ========================== 缓存删除封装（String、Set通用） =========================

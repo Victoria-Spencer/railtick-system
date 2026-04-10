@@ -11,7 +11,7 @@ public class BusinessException extends RuntimeException { // 继承RuntimeExcept
     private static final long serialVersionUID = 1L;
 
     public BusinessException() {
-        super();
+        super("业务异常");
     }
 
     public BusinessException(String message) {

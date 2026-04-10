@@ -29,6 +29,7 @@ public class UserServiceImpl implements UserService {
      * @param userLoginDTO 登录信息
      * @return 登录成功的用户信息
      */
+    @Override
     public UserVO login(UserLoginDTO userLoginDTO) {
         // 根据用户名查询用户信息
         User user = userMapper.findByUsernameOrMailOrPhone(userLoginDTO.getUsernameOrMailOrPhone());
@@ -61,6 +62,7 @@ public class UserServiceImpl implements UserService {
     /**
      * 退出登录
      */
+    @Override
     public void logout() {
         // TODO 清除token
     }
@@ -70,6 +72,7 @@ public class UserServiceImpl implements UserService {
      * @param userRegisterDTO 注册信息
      * @return 注册成功的用户信息
      */
+    @Override
     public UserVO register(UserRegisterDTO userRegisterDTO) {
         // 根据用户名查询用户信息
         User existingUser  = userMapper.findByUsernameOrMailOrPhone(userRegisterDTO.getUsername());
@@ -97,6 +100,7 @@ public class UserServiceImpl implements UserService {
      * @param userUpdateInfoDTO 更新信息
      * @return 更新后的用户信息
      */
+    @Override
     public UserVO update(UserUpdateInfoDTO userUpdateInfoDTO) {
         // 根据用户名查询用户信息
         User user = userMapper.findByUsernameOrMailOrPhone(userUpdateInfoDTO.getUsername());
@@ -109,6 +113,7 @@ public class UserServiceImpl implements UserService {
     /**
      * 根据用户id查询用户信息
      */
+    @Override
     public User getById(Long userId) {
         return userMapper.getById(userId);
     }
@@ -118,6 +123,7 @@ public class UserServiceImpl implements UserService {
      * @param id 用户id
      * @return 证件类型和证件号
      */
+    @Override
     public UserIdCardDTO getIdCardInfoById(Long id) {
         User user = userMapper.getById(id);
         return BeanUtil.copyProperties(user, UserIdCardDTO.class);

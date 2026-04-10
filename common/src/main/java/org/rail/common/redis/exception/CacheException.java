@@ -11,7 +11,7 @@ public class CacheException extends RuntimeException {
     private static final long serialVersionUID = 1L;
 
     public CacheException() {
-        super();
+        super("缓存操作异常");
     }
 
     public CacheException(String message) {

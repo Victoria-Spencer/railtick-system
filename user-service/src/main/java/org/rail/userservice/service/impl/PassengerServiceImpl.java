@@ -36,6 +36,7 @@ public class PassengerServiceImpl implements PassengerService {
      * @param psgrPageQueryDTO 分页查询参数
      * @return 分页结果
      */
+    @Override
     public PageResult<Passenger> pageQuery(PsgrPageQueryDTO psgrPageQueryDTO) {
         // 1. 开启分页（pageNum：页码，pageSize：每页条数）
         PageHelper.startPage(psgrPageQueryDTO.getPageNumber(), psgrPageQueryDTO.getPageSize());
@@ -54,6 +55,7 @@ public class PassengerServiceImpl implements PassengerService {
      * @param userId 用户id
      * @return 乘车人列表
      */
+    @Override
     public List<Passenger> getByUserId(Long userId) {
         if (userId == null) {
             log.warn("查询乘客列表失败：userId 不能为空");
@@ -77,6 +79,7 @@ public class PassengerServiceImpl implements PassengerService {
      * @param id 乘车人id
      * @return 乘车人信息
      */
+    @Override
     public Passenger getById(Long id) {
         return passengerMapper.getById(id);
     }
@@ -85,6 +88,7 @@ public class PassengerServiceImpl implements PassengerService {
      * 添加新的乘车人
      * @param passenger 乘车人信息
      */
+    @Override
     public void save(Passenger passenger) {
         // 从线程中获取乘车人对应的用户标识
         Long userId = Long.valueOf(ThreadLocalUtils.get());
@@ -108,6 +112,7 @@ public class PassengerServiceImpl implements PassengerService {
             keySource = AutoClearAggCache.KeySource.THREAD_LOCAL,
             singleKeyPrefix = RedisConstants.RAIL_PASSENGER_LIST_USER_PREFIX
     )*/
+    @Override
     public void update(PsgrUpdateDTO psgrUpdateDTO) {
         Passenger passenger = BeanUtil.copyProperties(psgrUpdateDTO, Passenger.class);
         passenger.setUpdateTime(LocalDateTime.now());
@@ -128,6 +133,7 @@ public class PassengerServiceImpl implements PassengerService {
             keySource = AutoClearAggCache.KeySource.THREAD_LOCAL,
             singleKeyPrefix = RedisConstants.RAIL_PASSENGER_LIST_USER_PREFIX
     )*/
+    @Override
     public void deleteByIds(List<Long> ids) {
         passengerMapper.batchDelete(ids);
 

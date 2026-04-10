@@ -62,6 +62,7 @@ public class TicketServiceImpl implements TicketService {
      * @param ticketQueryDTO 购票查询参数DTO
      * @return 购票列表VO
      */
+    @Override
     public List<TicketQueryVO> queryTicket(TicketQueryDTO ticketQueryDTO) {
         // 查询车次基础信息
         List<TrainDetailVO> trainDetailVOList = getTrainDetailVOS(ticketQueryDTO);
@@ -395,6 +396,7 @@ public class TicketServiceImpl implements TicketService {
      * @param plannedTicketQueryDTO 拟购票查询参数DTO
      * @return 拟购票信息VO
      */
+    @Override
     public TicketQueryVO queryPlannedTicket(PlannedTicketQueryDTO plannedTicketQueryDTO) {
         TicketQueryVO ticketQueryVO = new TicketQueryVO();
 
@@ -446,6 +448,7 @@ public class TicketServiceImpl implements TicketService {
      * @param randomSeatQueryDTO 随机选座查询参数DTO
      * @return 可用座位列表DTO
      */
+    @Override
     public List<AvailableSeatDTO> getAvailableSeats(RandomSeatQueryDTO randomSeatQueryDTO) {
         List<AvailableSeatDTO> availableSeatDTOList = new ArrayList<>();
 
@@ -479,6 +482,7 @@ public class TicketServiceImpl implements TicketService {
     /**
      * 更新座位占用区间，并同步新的座位状态
      */
+    @Override
     public void updateSeatStatus(BatchSeatIntervalInsertDTO batchDTO) {
         // 1.变动座位区间占用记录
         operateSeatIntervalOccupy(batchDTO);

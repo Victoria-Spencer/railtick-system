@@ -1,6 +1,5 @@
 package org.rail.common.redis.impl;
 
-
 import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.map.MapUtil;
 import cn.hutool.core.util.StrUtil;
@@ -15,6 +14,7 @@ import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import java.util.stream.LongStream;
 
 /**
  * 基础操作
@@ -161,7 +161,7 @@ public class RedissonCache implements RedisCache {
             RBuckets buckets = redissonClient.getBuckets();
             String[] keyArray = validKeys.toArray(String[]::new);
             // 泛型返回，和单条get逻辑一致
-            return buckets.<T>get(keyArray);
+            return buckets.get(keyArray);
         } catch (Exception e) {
             throw new CacheException("批量缓存获取失败", e);
         }
@@ -217,8 +217,8 @@ public class RedissonCache implements RedisCache {
      * 向Set缓存添加单个成员，并设置过期时间
      */
     @Override
-    public <T> void addSetMemberWithExpire(String key, T value, long expireTime, TimeUnit timeUnit) {
-        if (StrUtil.isBlank(key) || value == null || expireTime <= 0) {
+    public <T> void addSetMemberWithExpire(String key, T value, Long expireTime, TimeUnit timeUnit) {
+        if (StrUtil.isBlank(key) || value == null || expireTime == null || expireTime <= 0) {
             return;
         }
         try {
@@ -235,8 +235,8 @@ public class RedissonCache implements RedisCache {
      * 向Set缓存批量添加成员，并设置过期时间
      */
     @Override
-    public <T> void addSetMembersWithExpire(String key, Collection<T> values, long expireTime, TimeUnit timeUnit) {
-        if (StrUtil.isBlank(key) || CollectionUtil.isEmpty(values) || expireTime <= 0) {
+    public <T> void addSetMembersWithExpire(String key, Collection<T> values, Long expireTime, TimeUnit timeUnit) {
+        if (StrUtil.isBlank(key) || CollectionUtil.isEmpty(values) || expireTime == null || expireTime <= 0) {
             return;
         }
         try {
@@ -262,6 +262,366 @@ public class RedissonCache implements RedisCache {
             return set.readAll();
         } catch (Exception e) {
             throw new CacheException("获取Set缓存成员失败", e);
+        }
+    }
+
+    // =============================== Bitmap 操作实现 ===============================
+
+    /**
+     * 设置Bitmap指定偏移量的值
+     */
+    @Override
+    public void setBit(String key, long offset, boolean value) {
+        if (StrUtil.isBlank(key)) {
+            return;
+        }
+        try {
+            RBitSet bitSet = redissonClient.getBitSet(key);
+            bitSet.set(offset, value);
+        } catch (Exception e) {
+            throw new CacheException("Bitmap设置位失败", e);
+        }
+    }
+
+    /**
+     * 获取Bitmap指定偏移量的值
+     */
+    @Override
+    public boolean getBit(String key, long offset) {
+        if (StrUtil.isBlank(key)) {
+            return false;
+        }
+        try {
+            RBitSet bitSet = redissonClient.getBitSet(key);
+            return bitSet.get(offset);
+        } catch (Exception e) {
+            throw new CacheException("Bitmap获取位失败", e);
+        }
+    }
+
+    /**
+     * 统计Bitmap中1的数量
+     */
+    @Override
+    public long bitCount(String key) {
+        if (StrUtil.isBlank(key)) {
+            return 0;
+        }
+        try {
+            RBitSet bitSet = redissonClient.getBitSet(key);
+            // cardinality() 等价于Redis原生BITCOUNT，统计整个Bitmap中1的数量
+            return bitSet.cardinality();
+        } catch (Exception e) {
+            throw new CacheException("Bitmap统计位数失败", e);
+        }
+    }
+
+    /**
+     * 批量设置Bitmap多个偏移量为指定值
+     */
+    @Override
+    public void batchSetBits(String key, Collection<Long> offsets, boolean value) {
+        if (StrUtil.isBlank(key) || CollectionUtil.isEmpty(offsets)) {
+            return;
+        }
+        try {
+            RBitSet bitSet = redissonClient.getBitSet(key);
+            offsets.forEach(offset -> bitSet.set(offset, value));
+        } catch (Exception e) {
+            throw new CacheException("Bitmap批量设置位失败", e);
+        }
+    }
+
+    /**
+     * 设置Bitmap指定区间 [startOffset, endOffset) 所有位为指定值
+     * 注意：RBitSet的set/clear是左闭右开区间
+     */
+    @Override
+    public void setRangeBits(String key, long startOffset, long endOffset, boolean value) {
+        if (StrUtil.isBlank(key) || startOffset < 0 || endOffset < startOffset) {
+            return;
+        }
+        try {
+            RBitSet bitSet = redissonClient.getBitSet(key);
+            if (value) {
+                bitSet.set(startOffset, endOffset);
+            } else {
+                bitSet.clear(startOffset, endOffset);
+            }
+        } catch (Exception e) {
+            throw new CacheException("Bitmap区间批量设置位失败", e);
+        }
+    }
+
+    /**
+     * 清空整个Bitmap（删除key）
+     */
+    @Override
+    public void clearBitmap(String key) {
+        delete(key);
+    }
+
+    /**
+     * 判断Bitmap指定区间[startOffset, endOffset)（左闭右开）是否全为0
+     * 统计区间内1的数量，数量为0则代表全0
+     */
+    @Override
+    public boolean isRangeAllZero(String key, long startOffset, long endOffset) {
+        if (StrUtil.isBlank(key) || startOffset < 0 || endOffset < startOffset) {
+            return false;
+        }
+        try {
+            RBitSet bitSet = redissonClient.getBitSet(key);
+            long[] indexes = LongStream.range(startOffset, endOffset).toArray();
+            boolean[] bits = bitSet.get(indexes);
+
+            for (boolean bit : bits) {
+                if (bit) {
+                    return false;
+                }
+            }
+            return true;
+        } catch (Exception e) {
+            throw new CacheException("Bitmap区间全0判断失败", e);
+        }
+    }
+
+    // =============================== Hash 操作实现 =================================
+
+    /**
+     * Hash 存入单个字段
+     */
+    @Override
+    public <T> void hPut(String key, String hashKey, T value) {
+        if (StrUtil.isBlank(key) || StrUtil.isBlank(hashKey)) {
+            return;
+        }
+        try {
+            RMap<String, T> map = redissonClient.getMap(key);
+            map.put(hashKey, value == null ? (T) "" : value);
+        } catch (Exception e) {
+            throw new CacheException("Hash存入单个字段失败", e);
+        }
+    }
+
+    /**
+     * Hash 存入单个字段（带独立过期时间）
+     * 效果：仅当前hashKey到期删除，其他field正常保留
+     */
+    @Override
+    public <T> void hPut(String key, String hashKey, T value, Long expireTime, TimeUnit timeUnit) {
+        if (StrUtil.isBlank(key) || StrUtil.isBlank(hashKey)) {
+            return;
+        }
+        try {
+            // 用RMapCache替代普通RMap，支持单个entry设置TTL
+            RMapCache<String, T> mapCache = redissonClient.getMapCache(key);
+            mapCache.put(
+                    hashKey,
+                    value == null ? (T) "" : value,
+                    expireTime,
+                    timeUnit
+            );
+        } catch (Exception e) {
+            throw new CacheException("Hash单个字段带过期时间存入失败", e);
+        }
+    }
+
+    /**
+     * Hash 批量存入字段
+     */
+    @Override
+    public <T> void hPutAll(String key, Map<String, T> map) {
+        if (StrUtil.isBlank(key) || MapUtil.isEmpty(map)) {
+            return;
+        }
+        try {
+            RMap<String, T> rMap = redissonClient.getMap(key);
+            Map<String, T> finalMap = handleNullValue(map);
+            rMap.putAll(finalMap);
+        } catch (Exception e) {
+            throw new CacheException("Hash批量存入字段失败", e);
+        }
+    }
+
+    /**
+     * Hash 批量存入字段（带过期时间）
+     */
+    @Override
+    public <T> void hPutAll(String key, Map<String, T> map, Long expireTime, TimeUnit timeUnit) {
+        if (StrUtil.isBlank(key) || MapUtil.isEmpty(map)) {
+            return;
+        }
+        try {
+            RMapCache<String, T> mapCache = redissonClient.getMapCache(key);
+            Map<String, T> finalMap = handleNullValue(map);
+            mapCache.putAll(finalMap, expireTime, timeUnit);
+        } catch (Exception e) {
+            throw new CacheException("Hash批量带过期时间存入失败", e);
+        }
+    }
+
+    /**
+     * Hash批量存入字段 + 给【整个Hash】设置过期时间
+     * 效果：到期后 → 整个Hash被删除，所有字段全部清空
+     */
+    @Override
+    public <T> void hPutAllWholeExpire(String key, Map<String, T> map, Long expireTime, TimeUnit timeUnit) {
+        if (StrUtil.isBlank(key) || MapUtil.isEmpty(map)) {
+            return;
+        }
+        try {
+            RMap<String, T> rMap = redissonClient.getMap(key);
+            Map<String, T> finalMap = handleNullValue(map);
+            rMap.putAll(finalMap);
+
+            if (expireTime != null && expireTime > 0 && timeUnit != null) {
+                rMap.expire(expireTime, timeUnit);
+            }
+        } catch (Exception e) {
+            throw new CacheException("Hash批量存入+整体过期设置失败", e);
+        }
+    }
+
+    /**
+     * Hash 获取单个字段
+     */
+    @Override
+    public <T> T hGet(String key, String hashKey) {
+        if (StrUtil.isBlank(key) || StrUtil.isBlank(hashKey)) {
+            return null;
+        }
+        try {
+            RMap<String, T> map = redissonClient.getMap(key);
+            T data = map.get(hashKey);
+            // 空字符串转回null
+            return "".equals(data) ? null : data;
+        } catch (Exception e) {
+            throw new CacheException("Hash获取单个字段失败", e);
+        }
+    }
+
+    /**
+     * Hash 批量获取多个字段
+     */
+    @Override
+    public <T> List<T> hMultiGet(String key, Collection<String> hashKeys) {
+        if (StrUtil.isBlank(key) || CollectionUtil.isEmpty(hashKeys)) {
+            return Collections.emptyList();
+        }
+        try {
+            RMap<String, T> map = redissonClient.getMap(key);
+            Set<String> keySet = new HashSet<>(hashKeys);
+            Map<String, T> multiGet = map.getAll(keySet);
+            return multiGet.values().stream()
+                    .map(v -> "".equals(v) ? null : v)
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            throw new CacheException("Hash批量获取字段失败", e);
+        }
+    }
+
+    /**
+     * Hash 获取所有字段和值
+     */
+    @Override
+    public <T> Map<String, T> hEntries(String key) {
+        if (StrUtil.isBlank(key)) {
+            return Collections.emptyMap();
+        }
+        try {
+            RMap<String, T> map = redissonClient.getMap(key);
+            // 处理空值
+            return map.entrySet().stream()
+                    .collect(Collectors.toMap(
+                            Map.Entry::getKey,
+                            e -> "".equals(e.getValue()) ? null : e.getValue()
+                    ));
+        } catch (Exception e) {
+            throw new CacheException("Hash获取所有键值对失败", e);
+        }
+    }
+
+    /**
+     * Hash 获取所有字段名
+     */
+    @Override
+    public Set<String> hKeys(String key) {
+        if (StrUtil.isBlank(key)) {
+            return Collections.emptySet();
+        }
+        try {
+            RMap<String, Object> map = redissonClient.getMap(key);
+            return map.keySet();
+        } catch (Exception e) {
+            throw new CacheException("Hash获取所有字段名失败", e);
+        }
+    }
+
+    /**
+     * Hash 获取所有字段值
+     */
+    @Override
+    public <T> List<T> hValues(String key) {
+        if (StrUtil.isBlank(key)) {
+            return Collections.emptyList();
+        }
+        try {
+            RMap<String, T> map = redissonClient.getMap(key);
+            // 处理空值
+            return map.values().stream()
+                    .map(v -> "".equals(v) ? null : v)
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            throw new CacheException("Hash获取所有值失败", e);
+        }
+    }
+
+    /**
+     * Hash 删除指定字段
+     */
+    @Override
+    public Long hDelete(String key, String... hashKeys) {
+        if (StrUtil.isBlank(key) || hashKeys == null || hashKeys.length == 0) {
+            return 0L;
+        }
+        try {
+            RMap<String, Object> map = redissonClient.getMap(key);
+            return map.fastRemove(hashKeys);
+        } catch (Exception e) {
+            throw new CacheException("Hash删除字段失败", e);
+        }
+    }
+
+    /**
+     * 判断 Hash 中是否存在指定字段
+     */
+    @Override
+    public Boolean hExists(String key, String hashKey) {
+        if (StrUtil.isBlank(key) || StrUtil.isBlank(hashKey)) {
+            return false;
+        }
+        try {
+            RMap<String, Object> map = redissonClient.getMap(key);
+            return map.containsKey(hashKey);
+        } catch (Exception e) {
+            throw new CacheException("Hash判断字段是否存在失败", e);
+        }
+    }
+
+    /**
+     * Hash 字段数值自增/自减
+     */
+    @Override
+    public Long hIncr(String key, String hashKey, long delta) {
+        if (StrUtil.isBlank(key) || StrUtil.isBlank(hashKey)) {
+            return 0L;
+        }
+        try {
+            RMap<String, Long> map = redissonClient.getMap(key);
+            return map.addAndGet(hashKey, delta);
+        } catch (Exception e) {
+            throw new CacheException("Hash字段自增失败", e);
         }
     }
 

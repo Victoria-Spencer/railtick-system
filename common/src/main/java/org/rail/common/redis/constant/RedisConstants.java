@@ -16,6 +16,11 @@ public final class RedisConstants {
     public static final Long RAIL_TRAIN_BASE_CACHE_TTL_HOURS = 24L;
     public static final Long RAIL_AGG_SEAT_CLASS_CACHE_TTL_SECONDS = 5L;
 
+    // =================== 座位状态缓存（Bitmap + Hash）===================
+    public static final String RAIL_BITMAP_SEAT_FORMAL_PREFIX = "rail:bitmap:seat:formal:"; // 正式售出座位Bitmap + trainId + seatId
+    public static final String RAIL_BITMAP_SEAT_TEMP_LOCK_PREFIX = "rail:bitmap:seat:temp_lock:"; // 临时锁座Bitmap + trainId + seatId
+    public static final String RAIL_HASH_SEAT_INFO_PREFIX = "rail:hash:seat:info:";
+
     // =================== 预订单表 ====================
     public static final String RAIL_PRE_ORDER_PREFIX = "rail:pre:order:";
     public static final String RAIL_PRE_ORDER_DETAILS_PREFIX = "rail:pre:order:details:";
