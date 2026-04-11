@@ -9,10 +9,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class StationPageQueryVO {
 
-    // 站点名称
     private String name;
-    // 站点编码
     private String code;
-    // 站点拼音
     private String spell;
 }

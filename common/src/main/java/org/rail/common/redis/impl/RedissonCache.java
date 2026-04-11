@@ -7,6 +7,7 @@ import org.rail.common.redis.core.RedisCache;
 import org.rail.common.redis.exception.CacheException;
 import org.rail.common.redis.result.RedisData;
 import org.redisson.api.*;
+import org.redisson.client.codec.ByteArrayCodec;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -136,6 +137,32 @@ public class RedissonCache implements RedisCache {
                 return null;
             }
             return data;
+        } catch (Exception e) {
+            throw new CacheException("缓存获取失败", e);
+        }
+    }
+
+    /**
+     * 单条获取缓存，支持传入类型
+     */
+    @Override
+    public <T> T get(String key, Class<T> type) {
+        if (StrUtil.isBlank(key)) {
+            return null;
+        }
+        try {
+            if (type == byte[].class) {
+                RBucket<byte[]> bucket = redissonClient.getBucket(key, ByteArrayCodec.INSTANCE);
+                byte[] data = bucket.get();
+                return data == null || data.length == 0 ? null : (T) data;
+            } else {
+                RBucket<T> bucket = redissonClient.getBucket(key);
+                T data = bucket.get();
+                if ("".equals(data)) {
+                    return null;
+                }
+                return data;
+            }
         } catch (Exception e) {
             throw new CacheException("缓存获取失败", e);
         }
@@ -309,7 +336,6 @@ public class RedissonCache implements RedisCache {
         }
         try {
             RBitSet bitSet = redissonClient.getBitSet(key);
-            // cardinality() 等价于Redis原生BITCOUNT，统计整个Bitmap中1的数量
             return bitSet.cardinality();
         } catch (Exception e) {
             throw new CacheException("Bitmap统计位数失败", e);

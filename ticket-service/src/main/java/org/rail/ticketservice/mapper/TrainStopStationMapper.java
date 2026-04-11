@@ -6,6 +6,7 @@ import org.rail.ticketservice.pojo.dto.PlannedTicketQueryDTO;
 import org.rail.ticketservice.pojo.dto.SequenceDTO;
 import org.rail.ticketservice.pojo.dto.SequenceQueryDTO;
 import org.rail.ticketservice.pojo.dto.StopInfoDTO;
+import org.rail.ticketservice.pojo.entity.TrainStopStation;
 
 import java.util.List;
 
@@ -61,4 +62,17 @@ public interface TrainStopStationMapper {
      * @return 出发站站序和到达站站序
      */
     SequenceDTO getSequenceInfo(SequenceQueryDTO sequenceQueryDTO);
+
+    /**
+     * 查询所有的站点信息
+     * @return 所有的站点信息
+     */
+    List<TrainStopStation> selectAll();
+
+    /**
+     * 根据列车ID查询站点信息
+     * @param trainId 列车ID
+     * @return 站点信息列表
+     */
+    List<TrainStopStation> selectByTrainId(Long trainId);
 }

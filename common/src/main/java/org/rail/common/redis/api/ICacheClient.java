@@ -24,6 +24,8 @@ public interface ICacheClient {
 
     <T> T get(String key);
 
+    <T> T get(String key, Class<T> type);
+
     <T> Map<String, T> batchGet(Collection<String> keys);
 
     boolean exists(String key);

@@ -49,4 +49,22 @@
             AND s_start.code = #{departureCode}
             AND s_end.code = #{arrivalCode}
     </select>
+
+    <select id="selectAll" resultType="org.rail.ticketservice.pojo.entity.TrainStopStation">
+        SELECT
+            train_id,
+            station_id,
+            sequence
+        FROM train_stop_station
+    </select>
+
+    <select id="selectByTrainId" resultType="org.rail.ticketservice.pojo.entity.TrainStopStation">
+        SELECT
+            train_id,
+            station_id,
+            sequence
+        FROM train_stop_station
+        WHERE train_id = #{trainId}
+        ORDER BY sequence
+    </select>
 </mapper>

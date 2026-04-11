@@ -3,7 +3,8 @@ package org.rail.ticketservice.service.impl;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.bean.copier.CopyOptions;
 import cn.hutool.core.lang.TypeReference;
-import com.alibaba.nacos.common.utils.CollectionUtils;
+import cn.hutool.core.map.MapUtil;
+import cn.hutool.core.util.StrUtil;
 import org.apache.commons.lang.StringUtils;
 import org.rail.api.constant.OrderTypeConstants;
 import org.rail.common.core.util.BeanConvertUtil;
@@ -18,12 +19,16 @@ import org.rail.ticketservice.constant.SeatStatusConstants;
 import org.rail.ticketservice.mapper.*;
 import org.rail.ticketservice.pojo.dto.*;
 import org.rail.ticketservice.pojo.entity.SeatIntervalOccupy;
+import org.rail.ticketservice.pojo.entity.Station;
 import org.rail.ticketservice.pojo.entity.Train;
 import org.rail.ticketservice.pojo.vo.*;
 import org.rail.ticketservice.service.TicketService;
+import org.rail.ticketservice.task.StationLocalCacheTask;
+import org.rail.ticketservice.task.TrainStopStationLocalCacheTask;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
 
 import java.time.Duration;
 import java.time.LocalDate;
@@ -47,11 +52,11 @@ public class TicketServiceImpl implements TicketService {
     @Autowired
     private TrainTypeDictMapper  trainTypeDictMapper;
     @Autowired
-    private SeatMapper seatMapper;
-    @Autowired
-    private SeatIntervalOccupyMapper seatIntervalOccupyMapper;
-    @Autowired
     private ICacheClient cacheClient;
+    @Autowired
+    private StationLocalCacheTask stationCacheTask;
+    @Autowired
+    private TrainStopStationLocalCacheTask trainStopCacheTask;
 
     // 从配置文件注入预订单有效期（分钟）
     @Value("${order.pre.expire-minutes : 15}") // 默认15分钟
@@ -305,7 +310,7 @@ public class TicketServiceImpl implements TicketService {
         }
         // 缓存订单分页查询信息
         TypeReference<List<TrainDetailVO>> typeRef = new TypeReference<>() {};
-        List<TrainDetailVO> detailVOS = cacheClient.queryAggCacheWithNullCache(
+        return cacheClient.queryAggCacheWithNullCache(
                 aggKey,
                 typeRef,
                 // 缓存未命中时，查库
@@ -314,7 +319,6 @@ public class TicketServiceImpl implements TicketService {
                 RedisConstants.RAIL_TRAIN_BASE_CACHE_TTL_HOURS,
                 TimeUnit.HOURS
         );
-        return detailVOS;
     }
 
     /**
@@ -491,10 +495,12 @@ public class TicketServiceImpl implements TicketService {
         batchUpdateSeatStatus(batchDTO);
     }
 
+    /**
+     * 批量更新座位状态（根据最新的占用区间记录，重新计算每个座位的状态，并更新到Redis缓存）
+     */
     private void batchUpdateSeatStatus(BatchSeatIntervalInsertDTO batchDTO) {
-        // 构建更新条件
         List<UpdateSeatStatusDTO> updateSeatStatusDTOList = new ArrayList<>();
-        if(batchDTO != null && CollectionUtils.isNotEmpty(batchDTO.getSeatList())) {
+        if(batchDTO != null && !CollectionUtils.isEmpty(batchDTO.getSeatList())) {
             updateSeatStatusDTOList = BeanConvertUtil.copyWithCommonField(
                     batchDTO,
                     batchDTO.getSeatList(),
@@ -502,39 +508,179 @@ public class TicketServiceImpl implements TicketService {
             );
         }
 
-        // 获取座位状态集合
-        List<SeatStatusUpdateConditionDTO> seatStatusUpdateDTOList = checkSeatIntervalOccupationStatus(updateSeatStatusDTOList);
-        if (seatStatusUpdateDTOList == null || seatStatusUpdateDTOList.isEmpty()) {
-            throw new BusinessException("待更新的座位状态列表为空");
+        if(batchDTO == null || CollectionUtils.isEmpty(updateSeatStatusDTOList)) {
+            return;
         }
-        // 批量更新座位状态
-        seatMapper.batchUpdateSeatStatus(seatStatusUpdateDTOList);
+        Long trainId = batchDTO.getTrainId();
+        List<SeatBaseDTO> seatList = batchDTO.getSeatList();
+
+        List<Long> seatIdList = getSeatIdListBySeatNos(seatList, trainId);
+        Map<Long, Integer> seatStatusMap = calculateSeatStatusMap(trainId, seatIdList);
+
+        Map<String, Object> statusUpdateMap = buildStatusUpdateMap(seatStatusMap);
+        if (!CollectionUtils.isEmpty(statusUpdateMap)) {
+            String hashKey = buildSeatHashKey(trainId);
+            cacheClient.hPutAll(hashKey, statusUpdateMap);
+        }
     }
 
+    /**
+     * 构建Redis Hash结构的座位状态批量更新数据
+     * @param seatStatusMap 座位ID-状态映射
+     * @return Redis Hash批量更新的键值对
+     */
+    private Map<String, Object> buildStatusUpdateMap(Map<Long, Integer> seatStatusMap) {
+        if (MapUtil.isEmpty(seatStatusMap)) {
+            return new HashMap<>();
+        }
+
+        Map<String, Object> statusUpdateMap = new HashMap<>(seatStatusMap.size());
+        for (Map.Entry<Long, Integer> entry : seatStatusMap.entrySet()) {
+            Long seatId = entry.getKey();
+            Integer status = entry.getValue();
+
+            String fieldStatus = buildSeatFieldKey(seatId, "status");
+            statusUpdateMap.put(fieldStatus, status);
+        }
+
+        return statusUpdateMap;
+    }
+
+    /**
+     * 构建单字段的Field名称：seatId:字段名
+     */
+    private String buildSeatFieldKey(Long seatId, String fieldName) {
+        return String.format("SeatId:%d:%s", seatId, fieldName);
+    }
+
+    /**
+     * 批量计算座位的最新状态
+     */
+    private Map<Long, Integer> calculateSeatStatusMap(Long trainId, List<Long> seatIdList) {
+        Map<Long, Integer> statusMap = new HashMap<>(seatIdList.size());
+        for (Long seatId : seatIdList) {
+            // 从Redis查询该座位的所有占用区间，计算状态（复用你原有的getSeatStatus逻辑）
+            Integer status = calculateSeatStatusFromRedis(trainId, seatId);
+            statusMap.put(seatId, status);
+        }
+        return statusMap;
+    }
+
+    /**
+     * 从Redis计算单个座位的状态
+     */
+    private Integer calculateSeatStatusFromRedis(Long trainId, Long seatId) {
+        Integer terminalSeq = getTrainTerminalSeqFromCache(trainId);
+        int minOffset = 1;
+        int maxOffset = terminalSeq - 1;
+
+        // 读取该座位的正式订单Bitmap（永久占用）
+        String formalKey = RedisConstants.RAIL_BITMAP_SEAT_FORMAL_PREFIX + "trainId:" + trainId + ":seatId:" + seatId;
+        // 读取该座位的预订单Bitmap（临时占用）
+        String tempKey = RedisConstants.RAIL_BITMAP_SEAT_TEMP_LOCK_PREFIX + "trainId:" + trainId + ":seatId:" + seatId;
+
+        byte[] formalBytes = cacheClient.get(formalKey, byte[].class);
+        byte[] tempBytes = cacheClient.get(tempKey, byte[].class);
+
+        byte[] mergedBytes = mergeBytesOr(formalBytes, tempBytes);
+
+        long occupiedCount = countBitsInRange(mergedBytes, minOffset, maxOffset);
+
+        if (occupiedCount == 0) {
+            return SeatStatusConstants.AVAILABLE;
+        } else if (occupiedCount == terminalSeq - 1) {
+            return SeatStatusConstants.FULLY_OCCUPIED;
+        } else {
+            return SeatStatusConstants.PARTIALLY_OCCUPIED;
+        }
+    }
+
+    /**
+     * 从缓存获取列车终点站序列
+     */
+    private Integer getTrainTerminalSeqFromCache(Long trainId) {
+        return trainStopCacheTask.getTrainTerminalSeq(trainId);
+    }
+
+    /**
+     * 统计 Bitmap 字节数组中 [startOffset, endOffset] 范围内 bit=1 的数量
+     * 兼容Redis大端存储
+     */
+    private long countBitsInRange(byte[] bytes, int startOffset, int endOffset) {
+        if (bytes == null || bytes.length == 0 || startOffset > endOffset) {
+            return 0;
+        }
+
+        long count = 0;
+        for (int offset = startOffset; offset <= endOffset; offset++) {
+            if (getBit(bytes, offset)) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    /**
+     * 获取指定offset的位值
+     */
+    private boolean getBit(byte[] bytes, int offset) {
+        if (offset < 0) return false;
+        int byteIdx = offset / 8;
+        int bitPos = 7 - (offset % 8); // 大端存储：最高位优先
+
+        if (byteIdx >= bytes.length) return false;
+        return (bytes[byteIdx] & (1 << bitPos)) != 0;
+    }
+
+    /**
+     * 两个字节数组 按位或 合并
+     * null 视为全0字节数组
+     */
+    private byte[] mergeBytesOr(byte[] a, byte[] b) {
+        if (a == null) return b == null ? new byte[0] : b;
+        if (b == null) return a;
+
+        int maxLen = Math.max(a.length, b.length);
+        byte[] result = new byte[maxLen];
+
+        for (int i = 0; i < maxLen; i++) {
+            byte b1 = i < a.length ? a[i] : 0;
+            byte b2 = i < b.length ? b[i] : 0;
+            result[i] = (byte) (b1 | b2);
+        }
+        return result;
+    }
+
+    /**
+     * 操作座位区间占用记录（新增/更新），并同步到Redis Bitmap和占用记录缓存
+     */
     private void operateSeatIntervalOccupy(BatchSeatIntervalInsertDTO batchDTO) {
         if (batchDTO == null) {
             return;
         }
-        // 查询开始站序，结束站序
-        SequenceQueryDTO sequenceQueryDTO = BeanUtil.copyProperties(batchDTO, SequenceQueryDTO.class);
-        SequenceDTO seqs = trainStopStationMapper.getSequenceInfo(sequenceQueryDTO);
+        Long trainId = batchDTO.getTrainId();
+        List<SeatBaseDTO> seatList = batchDTO.getSeatList();
 
-        // 查询座位ID
-        List<SeatInfoQueryDTO> seatInfoQueryDTOList = BeanConvertUtil.copyWithCommonField(
-                batchDTO,
-                batchDTO.getSeatList(),
-                SeatInfoQueryDTO.class
-        );
-        List<Long> seatIdList = seatMapper.getSeatIdByQueryDTO(seatInfoQueryDTOList);
+        // 获取站点序列 + 座位ID列表
+        SequenceDTO seqs = getStationSequence(batchDTO);
+        List<Long> seatIdList = getSeatIdListBySeatNos(seatList, trainId);
 
-        // 条件构建
-        List<SeatIntervalOccupy> seatIntervalOccupyList = BeanConvertUtil.copyWithCommonField(
+        List<SeatIntervalOccupy> occupyList = BeanConvertUtil.copyWithCommonField(
                 batchDTO,
                 batchDTO.getSeatList(),
                 SeatIntervalOccupy.class
         );
-        for (int i = 0; i < seatIntervalOccupyList.size(); i++) {
-            SeatIntervalOccupy seatIntervalOccupy = seatIntervalOccupyList.get(i);
+
+        batchCacheSeatOccupy(occupyList, seatIdList, seqs, trainId);
+    }
+
+    /**
+     * 批量缓存：Bitmap区间标记 + String占用记录
+     */
+    private void batchCacheSeatOccupy(List<SeatIntervalOccupy> occupyList, List<Long> seatIdList, SequenceDTO seqs, Long trainId) {
+        Map<String, Object> cacheMap = new HashMap<>();
+        for (int i = 0; i < occupyList.size(); i++) {
+            SeatIntervalOccupy seatIntervalOccupy = occupyList.get(i);
 
             // 设置其它属性
             Long seatId = seatIdList.get(i);
@@ -542,39 +688,176 @@ public class TicketServiceImpl implements TicketService {
             seatIntervalOccupy.setStartSequence(seqs.getStartSequence());
             seatIntervalOccupy.setEndSequence(seqs.getEndSequence());
             seatIntervalOccupy.setCreateTime(LocalDateTime.now());
+
+            // 1. 更新Bitmap占用标记
+            String bitmapKey = buildSeatBitmapKey(seatIntervalOccupy);
+            cacheClient.setRangeBits(bitmapKey, seatIntervalOccupy.getStartSequence(), seatIntervalOccupy.getEndSequence(), true);
+
+            // 2. 存储占用元数据
+            String recordKey = buildSeatOccupyRecordKey(trainId, seatId);
+            cacheMap.put(recordKey, seatIntervalOccupy);
         }
-        if (CollectionUtils.isNotEmpty(seatIntervalOccupyList)) {
-            seatIntervalOccupyMapper.batchInsertSIOOccupyRecords(seatIntervalOccupyList);
+
+        if (!CollectionUtils.isEmpty(occupyList)) {
+            cacheClient.batchSet(cacheMap);
         }
     }
 
     /**
-     * 查看区间状态
-     * @param updateSeatStatusDTOList 待更新座位状态的DTO列表（包含trainId、seatId、startSequence、endSequence等核心查询维度）
-     * @return 座位状态更新条件DTO列表（包含trainId、seatId、startSequence、endSequence、status等属性）
+     * 根据座位号列表批量查询座位ID
      */
-    private List<SeatStatusUpdateConditionDTO> checkSeatIntervalOccupationStatus(List<UpdateSeatStatusDTO> updateSeatStatusDTOList) {
-        // 查询列车下指定的席别类型下的指定座位的占用区间
-        List<IntervalOccupyDTO> intervalOccupyDTOList = seatIntervalOccupyMapper.getIntervalOccupy(updateSeatStatusDTOList);
-        // 合并区间，修改座位状态
-        if(intervalOccupyDTOList == null || intervalOccupyDTOList.isEmpty()) {
-            throw new BusinessException("占用区间列表为空");
+    private List<Long> getSeatIdListBySeatNos(List<SeatBaseDTO> seatList, Long trainId) {
+        if (CollectionUtils.isEmpty(seatList)) {
+            return Collections.emptyList();
+        }
+        return batchGetSeatIdBySeatNo(trainId, seatList);
+    }
+
+    /**
+     * 获取站点序列信息
+     */
+    private SequenceDTO getStationSequence(BatchSeatIntervalInsertDTO batchDTO) {
+        Long trainId = batchDTO.getTrainId();
+        String departureCode = batchDTO.getDepartureCode();
+        String arrivalCode = batchDTO.getArrivalCode();
+        List<Station> allStations = stationCacheTask.getAllStations();
+
+        Long fromStationId = getStationIdByCode(allStations, departureCode, "出发站");
+        Long toStationId = getStationIdByCode(allStations, arrivalCode, "到达站");
+
+        Map<Long, Integer> stationId2SeqMap = trainStopCacheTask.getCacheByTrainId(trainId)
+                                                    .getStationId2SeqMap();
+
+        validateStationSequence(stationId2SeqMap, fromStationId, toStationId, trainId, departureCode, arrivalCode);
+
+        SequenceDTO sequenceDTO = new SequenceDTO();
+        sequenceDTO.setStartSequence(stationId2SeqMap.get(fromStationId));
+        sequenceDTO.setEndSequence(stationId2SeqMap.get(toStationId));
+        return sequenceDTO;
+    }
+
+    /**
+     * 根据站点编码获取ID
+     */
+    private Long getStationIdByCode(List<Station> allStations, String stationCode, String stationType) {
+        return allStations.stream()
+                .filter(station -> stationCode.equals(station.getCode()))
+                .findFirst()
+                .orElseThrow(() -> new BusinessException(stationType + "编码不存在：" + stationCode))
+                .getId();
+    }
+
+    /**
+     * 业务校验
+     */
+    private void validateStationSequence(Map<Long, Integer> stationId2SeqMap,
+                                         Long fromStationId,
+                                         Long toStationId,
+                                         Long trainId,
+                                         String departureCode,
+                                         String arrivalCode) {
+        if (!stationId2SeqMap.containsKey(fromStationId)) {
+            throw new BusinessException(trainId + "车次不包含出发站：" + departureCode);
+        }
+        if (!stationId2SeqMap.containsKey(toStationId)) {
+            throw new BusinessException(trainId + "车次不包含到达站：" + arrivalCode);
+        }
+        Integer startSeq = stationId2SeqMap.get(fromStationId);
+        Integer endSeq = stationId2SeqMap.get(toStationId);
+        if (startSeq >= endSeq) {
+            throw new BusinessException("站点顺序异常：出发站序列不能大于等于到达站序列");
+        }
+    }
+
+    /**
+     * 构建座位占用记录元数据的String类型Redis Key
+     */
+    private String buildSeatOccupyRecordKey(Long trainId, Long seatId) {
+        return String.format("%strainId:%d:seatId:%d",
+                RedisConstants.RAIL_SEAT_OCCUPY_RECORD_PREFIX,
+                trainId,
+                seatId);
+    }
+
+
+    /**
+     * 构建Bitmap缓存Key
+     */
+    private String buildSeatBitmapKey(SeatIntervalOccupy occupancy) {
+        String prefix = OrderTypeConstants.PREORDER.equals(occupancy.getOrderType())
+                ? RedisConstants.RAIL_BITMAP_SEAT_TEMP_LOCK_PREFIX
+                : RedisConstants.RAIL_BITMAP_SEAT_FORMAL_PREFIX;
+
+        return String.format("%strainId:%d:seatId:%d",
+                prefix,
+                occupancy.getTrainId(),
+                occupancy.getSeatId());
+    }
+
+    /**
+     * 批量根据【车次+座位号】查询座位ID
+     * @param trainId    车次ID
+     * @param seatList 座位号列表
+     * @return 座位ID列表
+     */
+    private List<Long> batchGetSeatIdBySeatNo(Long trainId, List<SeatBaseDTO> seatList) {
+        String hashKey = buildSeatHashKey(trainId);
+        if (CollectionUtils.isEmpty(seatList)) {
+            return Collections.emptyList();
         }
 
-        // 返回的状态集合
-        Long trainId = intervalOccupyDTOList.getFirst().getTrainId();
-        List<SeatStatusUpdateConditionDTO> seatStatusUpdateConditionDTOList = BeanUtil
-                        .copyToList(intervalOccupyDTOList, SeatStatusUpdateConditionDTO.class);
+        // 批量构建反向映射Field ：SeatNoReverse:车厢号:座位号
+        List<String> reverseFields = seatList.stream()
+                .filter(seat -> StrUtil.isNotBlank(seat.getCarriageNumber()) && StrUtil.isNotBlank(seat.getSeatNo()))
+                .map(seat -> buildSeatReverseFieldKey(seat.getCarriageNumber(), seat.getSeatNo()))
+                .collect(Collectors.toList());
 
-        for (int i = 0; i < intervalOccupyDTOList.size(); i++) {
-            IntervalOccupyDTO intervalOccupyDTO = intervalOccupyDTOList.get(i);
-            List<SequenceDTO> intervalList = intervalOccupyDTO.getIntervalList();
+        List<String> seatUniqueDescList = seatList.stream()
+                .map(seat -> seat.getCarriageNumber() + "车厢-" + seat.getSeatNo())
+                .toList();
 
-            Integer seatStatus = getSeatStatus(intervalList, trainId);
+        // 批量获取座位ID
+        List<Object> seatIdObjList = cacheClient.hMultiGet(hashKey, reverseFields);
+        return convertAndCheckSeatIds(trainId, seatUniqueDescList, seatIdObjList);
+    }
 
-            seatStatusUpdateConditionDTOList.get(i).setStatus(seatStatus);
+    /**
+     * 构建座位反向映射的全局唯一键
+     */
+    private String buildSeatReverseFieldKey(String carriageNumber, String seatNo) {
+        String safeCarriage = StrUtil.trimToEmpty(carriageNumber);
+        String safeSeatNo = StrUtil.trimToEmpty(seatNo);
+        return String.format("SeatNoReverse:%s:%s", safeCarriage, safeSeatNo);
+    }
+
+    /**
+     * 进行结果校验, 并将Object类型的座位ID转换为Long类型，最终返回座位ID列表
+     */
+    private List<Long> convertAndCheckSeatIds(Long trainId, List<String> seatUniqueDescList, List<Object> seatIdObjList) {
+        List<Long> seatIdList = new ArrayList<>(seatUniqueDescList.size());
+
+        for (int i = 0; i < seatUniqueDescList.size(); i++) {
+            String seatUniqueDesc = seatUniqueDescList.get(i);
+            Object seatIdObj = seatIdObjList.get(i);
+
+            if (seatIdObj == null) {
+                throw new BusinessException(String.format("%d车次-%s不存在座位", trainId, seatUniqueDesc));
+            }
+            if (!(seatIdObj instanceof Long)) {
+                throw new BusinessException(String.format("%d车次-%s数据异常", trainId, seatUniqueDesc));
+            }
+
+            seatIdList.add((Long) seatIdObj);
         }
-        return seatStatusUpdateConditionDTOList;
+        return seatIdList;
+    }
+
+
+    /**
+     * 构建座位Hash的Redis Key
+     */
+    private String buildSeatHashKey(Long trainId) {
+        return String.format("%strainId:%d", RedisConstants.RAIL_HASH_SEAT_INFO_PREFIX, trainId);
     }
 
     /**

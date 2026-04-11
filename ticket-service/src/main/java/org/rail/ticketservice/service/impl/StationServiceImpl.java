@@ -26,7 +26,7 @@ public class StationServiceImpl implements StationService {
     @Autowired
     private StationMapper stationMapper;
     @Autowired
-    private StationLocalCacheTask stationLocalCacheTask;
+    private StationLocalCacheTask stationCacheTask;
 
     /**
      * 根据查询类型或名称分页查询站点列表
@@ -36,7 +36,7 @@ public class StationServiceImpl implements StationService {
     @Override
     public PageResult<StationPageQueryVO> pageQueryStations(StationPageQueryDTO dto) {
         // 1. 从本地缓存获取全量站点数据
-        List<Station> allStations = stationLocalCacheTask.getAllStations();
+        List<Station> allStations = stationCacheTask.getAllStations();
         if (allStations.isEmpty()) {
             log.warn("站点本地缓存为空，返回空结果");
             return null;

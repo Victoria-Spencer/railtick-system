@@ -13,37 +13,19 @@ import java.util.List;
 @NoArgsConstructor
 public class TicketQueryVO {
 
-    /**
-     * 列车属性
-     */
     private Train train;
 
-    // 出发时间
     private LocalDateTime departureTime;
-    // 到达时间
     private LocalDateTime arrivalTime;
-    // 历时
     private Integer duration;
-    // 出发站点
     private String departure;
-    // 到达站点
     private String arrival;
-    // 出发站编码
     private String departureCode;
-    // 到达站编码
     private String arrivalCode;
-    // 始发站标识
     private boolean departureFlag;
-    // 终点站标识
     private boolean arrivalFlag;
 
-    /**
-     * 席别信息
-     */
     private List<SeatClassFrontVO> seatClassFrontVOList;
 
-    /**
-     * 列车类型
-     */
     private List<TrainTypeVO>  trainTypeVOList;
 }

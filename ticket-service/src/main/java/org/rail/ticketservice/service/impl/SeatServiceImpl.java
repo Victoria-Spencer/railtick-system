@@ -1,9 +1,10 @@
 package org.rail.ticketservice.service.impl;
 
+import cn.hutool.core.util.StrUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.rail.api.constant.OrderTypeConstants;
 import org.rail.common.core.exception.CacheInitException;
-import org.rail.common.core.pojo.vo.SeatDetailVO;
+import org.rail.ticketservice.pojo.vo.SeatDetailVO;
 import org.rail.common.redis.constant.RedisConstants;
 import org.rail.common.redis.util.CacheClient;
 import org.rail.ticketservice.mapper.SeatIntervalOccupyMapper;
@@ -17,7 +18,6 @@ import org.springframework.util.CollectionUtils;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -77,10 +77,14 @@ public class SeatServiceImpl implements SeatService {
     }
 
     /**
-     * 将座位对象拆分为 Redis Hash 字段格式："SeatId" : seatId : 字段名 -> 字段值
+     * 将座位对象拆分为 Redis Hash 字段格式：
+     * 1. 正向：SeatId:{seatId}:{字段名} -> 字段值
+     * 2. 反向：SeatNo:{seatNo} -> seatId（用于seatNo→seatId映射）
      */
     private Map<String, Object> convertSeatToFieldMap(SeatDetailVO seat) {
         Map<String, Object> fieldMap = new HashMap<>();
+
+        // ============================= 正向映射 =============================
         // 座位ID
         String fieldId = buildSeatFieldKey(seat.getId(), "id");
         fieldMap.put(fieldId, seat.getId());
@@ -97,6 +101,10 @@ public class SeatServiceImpl implements SeatService {
         String fieldStatus = buildSeatFieldKey(seat.getId(), "status");
         fieldMap.put(fieldStatus, seat.getStatus());
 
+        // ============================= 反向映射 =============================
+        String reverseField = buildSeatReverseFieldKey(seat.getCarriageNumber(), seat.getSeatNo());
+        fieldMap.put(reverseField, seat.getId());
+
         return fieldMap;
     }
 
@@ -112,6 +120,15 @@ public class SeatServiceImpl implements SeatService {
      */
     private String buildSeatFieldKey(Long seatId, String fieldName) {
         return String.format("SeatId:%d:%s", seatId, fieldName);
+    }
+
+    /**
+     * 构建座位反向映射的全局唯一键
+     */
+    private String buildSeatReverseFieldKey(String carriageNumber, String seatNo) {
+        String safeCarriage = StrUtil.trimToEmpty(carriageNumber);
+        String safeSeatNo = StrUtil.trimToEmpty(seatNo);
+        return String.format("SeatNoReverse:%s:%s", safeCarriage, safeSeatNo);
     }
 
     /**

@@ -22,6 +22,8 @@ public interface RedisCache {
 
     <T> T get(String key);
 
+    <T> T get(String key, Class<T> type);
+
     <T> Map<String, T> batchGet(Collection<String> keys);
 
     <T> void addSetMember(String key, T value);

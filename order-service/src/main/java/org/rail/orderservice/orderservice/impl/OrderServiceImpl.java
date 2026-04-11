@@ -209,7 +209,6 @@ public class OrderServiceImpl implements OrderService {
      * 处理选座逻辑
      */
     private void handleChooseSeat(
-            CreatePreOrderDTO createPreOrderDTO,
             List<ChooseSeatDTO> chooseSeats,
             int i,
             PreOrderDetails preOrderDetails,
@@ -678,7 +677,7 @@ public class OrderServiceImpl implements OrderService {
         for (int i = 0; i < passengerList.size(); i++) {
             PreOrderDetails details = buildPreOrderDetail(preOrderId, passengerList.get(i));
             // 处理选座
-            handleChooseSeat(createPreOrderDTO, chooseSeats, i, details, batchSeatDTO);
+            handleChooseSeat(chooseSeats, i, details, batchSeatDTO);
             detailsList.add(details);
         }
 
@@ -720,10 +719,6 @@ public class OrderServiceImpl implements OrderService {
         // 初始化座位列表
         batchSeatDTO.setSeatList(new ArrayList<>());
     }
-
-    /*private void updateSeatStatus(BatchSeatIntervalInsertDTO batchSeatDTO) {
-
-    }*/
 
     private Double calculateTotalAmount(List<PassengerOrderDetailDTO> passengerList) {
         Double totalAmount = 0.0;

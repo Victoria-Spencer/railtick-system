@@ -20,6 +20,7 @@ public final class RedisConstants {
     public static final String RAIL_BITMAP_SEAT_FORMAL_PREFIX = "rail:bitmap:seat:formal:"; // 正式售出座位Bitmap + trainId + seatId
     public static final String RAIL_BITMAP_SEAT_TEMP_LOCK_PREFIX = "rail:bitmap:seat:temp_lock:"; // 临时锁座Bitmap + trainId + seatId
     public static final String RAIL_HASH_SEAT_INFO_PREFIX = "rail:hash:seat:info:";
+    public static final String RAIL_SEAT_OCCUPY_RECORD_PREFIX = "rail:seat:occupy:record:"; // 座位占用记录元数据（String类型）前缀
 
     // =================== 预订单表 ====================
     public static final String RAIL_PRE_ORDER_PREFIX = "rail:pre:order:";

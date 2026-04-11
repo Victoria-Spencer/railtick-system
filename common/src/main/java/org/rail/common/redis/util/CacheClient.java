@@ -1,13 +1,17 @@
 package org.rail.common.redis.util;
 
 import cn.hutool.core.lang.TypeReference;
+import cn.hutool.core.util.StrUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.rail.common.redis.api.ICacheClient;
 import org.rail.common.redis.core.RedisAggCache;
 import org.rail.common.redis.core.RedisCache;
 import org.rail.common.redis.core.RedisStrategyCache;
+import org.rail.common.redis.exception.CacheException;
 import org.rail.common.redis.result.AggBatchResult;
 import org.rail.common.redis.result.AggCacheResult;
+import org.redisson.api.RBucket;
+import org.redisson.client.codec.ByteArrayCodec;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -81,6 +85,14 @@ public class CacheClient implements ICacheClient {
     @Override
     public <T> T get(String key) {
         return redisCache.get(key);
+    }
+
+    /**
+     * 单条获取缓存，支持传入类型
+     */
+    @Override
+    public <T> T get(String key, Class<T> type) {
+       return redisCache.get(key, type);
     }
 
     /**
