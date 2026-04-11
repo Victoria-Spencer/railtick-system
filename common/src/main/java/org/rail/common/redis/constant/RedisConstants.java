@@ -4,8 +4,9 @@ public final class RedisConstants {
 
     private RedisConstants() {}
 
-    /*public static final String LOGIN_CODE_KEY = "login:code:";
-    public static final Long LOGIN_CODE_TTL = 2L;*/
+    // ====================== 分布式锁Key ======================
+    public static final String SEAT_CACHE_INIT_LOCK = "lock:cache:seat:init";
+
     // =================== 公共常量 ===================
     public static final String LOCK_PREFIX = "lock:";
     public static final Long LOCK_TTL = 10L;  // （秒）分布式锁默认过期时间，防止死锁

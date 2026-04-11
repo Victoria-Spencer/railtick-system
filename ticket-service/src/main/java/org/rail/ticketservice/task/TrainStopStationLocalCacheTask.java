@@ -43,6 +43,7 @@ public class TrainStopStationLocalCacheTask {
         log.info("开始初始化列车经停站本地缓存...");
         try {
             loadAllStopStationsToCache();
+            log.info("列车经停站缓存初始化完成");
         } catch (Exception e) {
             log.error("列车经停站缓存初始化失败", e);
             throw new CacheInitException("经停站缓存初始化失败", e);
