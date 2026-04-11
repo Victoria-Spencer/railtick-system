@@ -14,7 +14,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * 座位缓存初始化任务
- * 服务启动时：加载所有列车座位信息到 Redis（info、group、bitmap）
+ * 服务启动时：加载所有列车座位信息到 Redis（info、bitmap）
  */
 @Slf4j
 @Component
@@ -45,7 +45,7 @@ public class SeatCacheInitRunner implements CommandLineRunner {
                 seatService.initAllSeatOccupancyBitmap();
                 log.info("列车座位Redis缓存初始化完成");
             } else {
-                log.info("其他实例开始座位缓存初始化，当前实例跳过执行");
+                log.info("其他实例已开始座位缓存初始化，当前实例跳过执行");
             }
         } catch (InterruptedException e) {
             log.error("座位缓存初始化分布式锁获取中断", e);
