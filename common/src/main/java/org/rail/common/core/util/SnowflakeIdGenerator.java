@@ -1,4 +1,4 @@
-package org.rail.orderservice.util;
+package org.rail.common.core.util;
 
 import cn.hutool.core.lang.Snowflake;
 import cn.hutool.core.net.NetUtil;

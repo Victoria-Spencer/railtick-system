@@ -7,7 +7,9 @@ import cn.hutool.core.map.MapUtil;
 import cn.hutool.core.util.StrUtil;
 import org.apache.commons.lang.StringUtils;
 import org.rail.api.constant.OrderTypeConstants;
+import org.rail.api.constant.SeatIntervalStatusConstants;
 import org.rail.common.core.util.BeanConvertUtil;
+import org.rail.common.core.util.SnowflakeIdGenerator;
 import org.rail.common.redis.api.ICacheClient;
 import org.rail.common.redis.constant.RedisConstants;
 import org.rail.common.core.exception.BusinessException;
@@ -37,6 +39,9 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+
+import static org.rail.common.redis.constant.RedisConstants.RAIL_SEAT_OCCUPY_FORMAL_EXPIRE_MINUTES;
+import static org.rail.common.redis.constant.RedisConstants.RAIL_SEAT_OCCUPY_LOCK_EXPIRE_MINUTES;
 
 @Service
 public class TicketServiceImpl implements TicketService {
@@ -678,29 +683,72 @@ public class TicketServiceImpl implements TicketService {
      * 批量缓存：Bitmap区间标记 + String占用记录
      */
     private void batchCacheSeatOccupy(List<SeatIntervalOccupy> occupyList, List<Long> seatIdList, SequenceDTO seqs, Long trainId) {
-        Map<String, Object> cacheMap = new HashMap<>();
+        if(CollectionUtils.isEmpty(occupyList)) return;
+
+        String recordKey = buildSeatOccupyHashKey(trainId);
+        Map<String, Object> batchHashMap = new HashMap<>();
+
+        boolean isLockedBatch = SeatIntervalStatusConstants.LOCKED.equals(occupyList.getFirst().getStatus());
+
         for (int i = 0; i < occupyList.size(); i++) {
-            SeatIntervalOccupy seatIntervalOccupy = occupyList.get(i);
+            SeatIntervalOccupy occupy = occupyList.get(i);
+            Long seatId = seatIdList.get(i);
+            String lockId = String.valueOf(SnowflakeIdGenerator.nextId());
 
             // 设置其它属性
-            Long seatId = seatIdList.get(i);
-            seatIntervalOccupy.setSeatId(seatId);
-            seatIntervalOccupy.setStartSequence(seqs.getStartSequence());
-            seatIntervalOccupy.setEndSequence(seqs.getEndSequence());
-            seatIntervalOccupy.setCreateTime(LocalDateTime.now());
+            fillSeatOccupyCommonFields(seqs, occupy, seatId, lockId);
 
             // 1. 更新Bitmap占用标记
-            String bitmapKey = buildSeatBitmapKey(seatIntervalOccupy);
-            cacheClient.setRangeBits(bitmapKey, seatIntervalOccupy.getStartSequence(), seatIntervalOccupy.getEndSequence(), true);
+            String bitmapKey = buildSeatBitmapKey(occupy);
+            cacheClient.setRangeBits(bitmapKey, occupy.getStartSequence(), occupy.getEndSequence(), true);
 
             // 2. 存储占用元数据
-            String recordKey = buildSeatOccupyRecordKey(trainId, seatId);
-            cacheMap.put(recordKey, seatIntervalOccupy);
+            String field = buildSeatLockFieldKey(seatId, lockId);
+            batchHashMap.put(field, occupy);
+
+            // 3. 仅锁定中：单条发送延迟释放消息
+            if (isLockedBatch) {
+                sendDelayReleaseMsg(trainId, seatId, lockId);
+            }
         }
 
-        if (!CollectionUtils.isEmpty(occupyList)) {
-            cacheClient.batchSet(cacheMap);
+        if (isLockedBatch) {
+            cacheClient.hPutAll(recordKey, batchHashMap, RAIL_SEAT_OCCUPY_LOCK_EXPIRE_MINUTES, TimeUnit.MINUTES);
+        } else {
+            cacheClient.hPutAll(recordKey, batchHashMap, RAIL_SEAT_OCCUPY_FORMAL_EXPIRE_MINUTES, TimeUnit.MINUTES);
+            // 非锁定状态：发送1次批量落库消息
+            sendBatchSyncDbMsg(occupyList);
         }
+    }
+
+    /**
+     * 填充座位占用记录的公共属性
+     */
+    private void fillSeatOccupyCommonFields(SequenceDTO seqs, SeatIntervalOccupy occupy, Long seatId, String lockId) {
+        occupy.setSeatId(seatId);
+        occupy.setStartSequence(seqs.getStartSequence());
+        occupy.setEndSequence(seqs.getEndSequence());
+        occupy.setCreateTime(LocalDateTime.now());
+        occupy.setLockId(lockId);
+    }
+
+    /**
+     * TODO 普通队列消息：批量落库 + 批量删除Hash
+     *  触发时机：正式订单占用（立即发送）+预订单占用（延迟发送）
+     */
+    private void sendBatchSyncDbMsg(List<SeatIntervalOccupy> occupyList) {
+        // TODO 实现：发送批量MQ消息
+        //  消费者：批量入库 → 批量删除Redis Hash字段
+    }
+
+    /**
+     *   TODO 延迟消息队列：发送延迟消息到队列，消息内容包含 trainId + seatId + lockId
+     *    整的逻辑：发送 (key, lockId) 到队列 → 批量取出 → 进入普通队列 →
+     *    消息处理器根据 key 从 Redis 获取占用记录 → 如果记录存在且 lockId 匹配，则说明锁过期，进行解锁处理（删除占用记录 + 更新Bitmap）
+     */
+    private void sendDelayReleaseMsg(Long trainId, Long seatId, String lockId) {
+        // TODO 实现：发送延迟MQ消息(trainId+seatId+lockId)
+        //  消费者：校验lockId → 存在则释放座位 → 发送普通队列落库
     }
 
     /**
@@ -770,13 +818,19 @@ public class TicketServiceImpl implements TicketService {
     }
 
     /**
-     * 构建座位占用记录元数据的String类型Redis Key
+     * 构建座位占用记录的Hash Key
      */
-    private String buildSeatOccupyRecordKey(Long trainId, Long seatId) {
-        return String.format("%strainId:%d:seatId:%d",
+    private String buildSeatOccupyHashKey(Long trainId) {
+        return String.format("%strainId:%d",
                 RedisConstants.RAIL_SEAT_OCCUPY_RECORD_PREFIX,
-                trainId,
-                seatId);
+                trainId);
+    }
+
+    /**
+     * 构建座位锁唯一Field
+     */
+    private String buildSeatLockFieldKey(Long seatId, String lockId) {
+        return String.format("SeatId:%d:LockId:%s", seatId, lockId);
     }
 
 

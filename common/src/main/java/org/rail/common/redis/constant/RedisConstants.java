@@ -23,6 +23,10 @@ public final class RedisConstants {
     public static final String RAIL_HASH_SEAT_INFO_PREFIX = "rail:hash:seat:info:";
     public static final String RAIL_SEAT_OCCUPY_RECORD_PREFIX = "rail:seat:occupy:record:"; // 座位占用记录元数据（String类型）前缀
 
+    public static final int RAIL_SEAT_LOCK_DELAY_MINUTES = 15;
+    public static final long RAIL_SEAT_OCCUPY_LOCK_EXPIRE_MINUTES = RAIL_SEAT_LOCK_DELAY_MINUTES + 5L; // 临时锁座Hash过期时间
+    public static final long RAIL_SEAT_OCCUPY_FORMAL_EXPIRE_MINUTES = 5L; // 正式订单/已释放Hash过期时间
+
     // =================== 预订单表 ====================
     public static final String RAIL_PRE_ORDER_PREFIX = "rail:pre:order:";
     public static final String RAIL_PRE_ORDER_DETAILS_PREFIX = "rail:pre:order:details:";

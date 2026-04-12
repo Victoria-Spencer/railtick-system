@@ -37,7 +37,7 @@ public class SeatCacheInitRunner implements CommandLineRunner {
 
         RLock lock = redissonClient.getLock(SEAT_CACHE_INIT_LOCK);
         try {
-            boolean locked = lock.tryLock(3, 30, TimeUnit.SECONDS);
+            boolean locked = lock.tryLock(3, -1, TimeUnit.SECONDS);
             if (locked) {
                 // 初始化座位基础信息 (Hash)
                 seatService.initAllTrainSeatCache();

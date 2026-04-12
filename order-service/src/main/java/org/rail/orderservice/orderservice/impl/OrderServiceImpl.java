@@ -11,6 +11,7 @@ import org.rail.api.client.TicketFeignClient;
 import org.rail.api.client.UserFeignClient;
 import org.rail.api.constant.OrderTypeConstants;
 import org.rail.common.core.util.BeanConvertUtil;
+import org.rail.common.core.util.SnowflakeIdGenerator;
 import org.rail.common.redis.api.ICacheClient;
 import org.rail.common.redis.constant.RedisConstants;
 import org.rail.common.core.exception.BusinessException;
@@ -33,7 +34,6 @@ import org.rail.orderservice.pojo.vo.CreateOrderVO;
 import org.rail.orderservice.pojo.vo.OrderDetailsVO;
 import org.rail.orderservice.pojo.vo.OrderPageQueryVO;
 import org.rail.orderservice.pojo.vo.SelfTicketPageVO;
-import org.rail.orderservice.util.SnowflakeIdGenerator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -89,7 +89,6 @@ public class OrderServiceImpl implements OrderService {
         // 根据用户ID和列车ID，查询是否已存在预订单
         String preOrderKey = buildPreOrderKey(createPreOrderDTO.getUserId(), createPreOrderDTO.getTrainId());
         PreOrder preOrder = cacheClient.get(preOrderKey);
-//        PreOrder preOrder = orderMapper.getByPreOrderUserIdAndTrainId(createPreOrderDTO.getUserId(), createPreOrderDTO.getTrainId());
 
         if(ObjectUtil.isNotNull(preOrder)) {
             // 存在旧预订单：更新逻辑
@@ -116,12 +115,10 @@ public class OrderServiceImpl implements OrderService {
         String detailsKey = buildPreOrderDetailsKey(preOrder.getId());
         Set<PreOrderDetails> oldSet = cacheClient.getSetMembers(detailsKey);
         List<PreOrderDetails> oldDetails = oldSet.stream().toList();
-//        List<PreOrderDetails> oldDetails = orderMapper.getTempSeatInfoByPreOrderId(preOrder.getId());
         releaseOldPreOrderSeatLock(createPreOrderDTO, preOrder, oldDetails);
 
         // 删除旧明细（仅删明细，不删主记录）
         cacheClient.delete(detailsKey);
-//        orderMapper.deletePreOrderDetailsByPreOrderId(preOrder.getId());
 
         // 更新预订单主记录（重置过期时间、状态）
         updatePreOrderMainInfo(createPreOrderDTO, preOrder);
@@ -446,10 +443,6 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public PageResult<OrderPageQueryVO> orderPageQuery(OrderPageQueryDTO orderPageQueryDTO) {
         return queryOrderPageCache(orderPageQueryDTO);
-        // 分页查询
-        /*PageHelper.startPage(orderPageQueryDTO.getPageNumber(), orderPageQueryDTO.getPageSize());
-        List<OrderPageQueryVO> orderPageQueryVOList = orderMapper.getOrderPageByQueryDTO(orderPageQueryDTO);
-        return new PageResult<>(orderPageQueryVOList);*/
     }
 
     /**
@@ -573,7 +566,6 @@ public class OrderServiceImpl implements OrderService {
                 .toList();
         List<String> dependSingleKeys = new ArrayList<>(selfTicketKeys);
 
-//        return new PageResult<>(SelfTicketPageVOList);
         return AggCacheResult.of(new PageResult<>(selfTicketPageVOList), dependSingleKeys);
     }
 
@@ -685,7 +677,6 @@ public class OrderServiceImpl implements OrderService {
         // 批量插入
         String detailsKey = buildPreOrderDetailsKey(preOrderId);
         cacheClient.addSetMembersWithExpire(detailsKey, detailsList, RedisConstants.RAIL_DEFAULT_TTL, TimeUnit.MINUTES);
-//        orderMapper.batchInsertPreOrderDetails(detailsList);
 
         // 锁定新座位
         if(ObjectUtil.isNotEmpty(batchSeatDTO.getSeatList())) {
