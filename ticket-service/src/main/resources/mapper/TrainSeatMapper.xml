@@ -60,9 +60,12 @@
             s.seat_no,
             s.status,
             tsc.carriage_number AS carriageNumber,
-            tsc.train_id AS trainId
+            tsc.train_id AS trainId,
+            sc.type AS seatType
         FROM seat s
         INNER JOIN train_seat_class tsc
             ON s.train_seat_class_id = tsc.id
+        INNER JOIN seat_class sc
+            ON tsc.seat_class_id = sc.id
     </select>
 </mapper>

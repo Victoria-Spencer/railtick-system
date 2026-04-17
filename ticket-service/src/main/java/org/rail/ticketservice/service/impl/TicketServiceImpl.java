@@ -5,11 +5,14 @@ import cn.hutool.core.bean.copier.CopyOptions;
 import cn.hutool.core.lang.TypeReference;
 import cn.hutool.core.map.MapUtil;
 import cn.hutool.core.util.StrUtil;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang.StringUtils;
 import org.rail.api.constant.OrderTypeConstants;
 import org.rail.api.constant.SeatIntervalStatusConstants;
+import org.rail.common.core.exception.SeatLockFailedException;
 import org.rail.common.core.util.BeanConvertUtil;
 import org.rail.common.core.util.SnowflakeIdGenerator;
+import org.rail.common.core.util.ThreadLocalUtils;
 import org.rail.common.redis.api.ICacheClient;
 import org.rail.common.redis.constant.RedisConstants;
 import org.rail.common.core.exception.BusinessException;
@@ -24,6 +27,7 @@ import org.rail.ticketservice.pojo.entity.SeatIntervalOccupy;
 import org.rail.ticketservice.pojo.entity.Station;
 import org.rail.ticketservice.pojo.entity.Train;
 import org.rail.ticketservice.pojo.vo.*;
+import org.rail.ticketservice.service.SeatService;
 import org.rail.ticketservice.service.TicketService;
 import org.rail.ticketservice.task.StationLocalCacheTask;
 import org.rail.ticketservice.task.TrainStopStationLocalCacheTask;
@@ -44,6 +48,7 @@ import static org.rail.common.redis.constant.RedisConstants.RAIL_SEAT_OCCUPY_FOR
 import static org.rail.common.redis.constant.RedisConstants.RAIL_SEAT_OCCUPY_LOCK_EXPIRE_MINUTES;
 
 @Service
+@Slf4j
 public class TicketServiceImpl implements TicketService {
 
     @Autowired
@@ -62,6 +67,8 @@ public class TicketServiceImpl implements TicketService {
     private StationLocalCacheTask stationCacheTask;
     @Autowired
     private TrainStopStationLocalCacheTask trainStopCacheTask;
+    @Autowired
+    private SeatService seatService;
 
     // 从配置文件注入预订单有效期（分钟）
     @Value("${order.pre.expire-minutes : 15}") // 默认15分钟
@@ -93,8 +100,8 @@ public class TicketServiceImpl implements TicketService {
         // 1. 转换入参：TrainDetailVO -> SeatQueryDTO
         List<SeatQueryDTO> seatQueryDTOList = BeanUtil.copyToList(trainDetailVOList, SeatQueryDTO.class);
 
-        // 2. 核心：构建「trainId → SeatQueryDTO列表」的映射（仅一次遍历，预处理）
-        // 目的：后续通过VO的trainId快速拿到对应DTO
+        // 2. 构建「trainId → SeatQueryDTO列表」的映射（仅一次遍历，预处理）
+        // 后续通过VO的trainId快速拿到对应DTO
         Map<Long, List<SeatQueryDTO>> trainId2DtosMap = seatQueryDTOList.stream()
                 .collect(Collectors.groupingBy(SeatQueryDTO::getTrainId)); // 按trainId分组
 
@@ -319,7 +326,7 @@ public class TicketServiceImpl implements TicketService {
                 aggKey,
                 typeRef,
                 // 缓存未命中时，查库
-                dto -> queryTrainDetailDb(dto, departureDate, depCode, arrCode),
+                dto -> queryTrainDetailDb(departureDate, depCode, arrCode),
                 ticketQueryDTO,
                 RedisConstants.RAIL_TRAIN_BASE_CACHE_TTL_HOURS,
                 TimeUnit.HOURS
@@ -328,14 +335,12 @@ public class TicketServiceImpl implements TicketService {
 
     /**
      * 缓存未命中时：查询车次详情数据库 + 构建聚合缓存依赖Key
-     * @param dto 查询参数DTO
      * @param departureDate 出发日期
      * @param depCode 出发站编码
      * @param arrCode 到达站编码
      * @return 聚合缓存结果（数据+依赖单表Key）
      */
     private AggCacheResult<List<TrainDetailVO>> queryTrainDetailDb(
-            TicketQueryDTO dto,
             LocalDate departureDate,
             String depCode,
             String arrCode
@@ -454,38 +459,333 @@ public class TicketServiceImpl implements TicketService {
 
     /**
      * 查询可用座位
-     * @param randomSeatQueryDTO 随机选座查询参数DTO
+     * @param queryDTO 随机选座查询参数DTO
      * @return 可用座位列表DTO
      */
     @Override
-    public List<AvailableSeatDTO> getAvailableSeats(RandomSeatQueryDTO randomSeatQueryDTO) {
-        List<AvailableSeatDTO> availableSeatDTOList = new ArrayList<>();
+    public List<AvailableSeatDTO> getAvailableSeats(RandomSeatQueryDTO queryDTO) {
+        Long trainId = queryDTO.getTrainId();
+        Integer seatType = queryDTO.getSeatType();
+        Integer passengerCount = queryDTO.getPassengerCount();
+        String departureCode = queryDTO.getDepartureCode();
+        String arrivalCode = queryDTO.getArrivalCode();
+        List<String> preferredSeatSymbols = queryDTO.getPreferredSeatSymbols();
 
-        // 按seatType对seatTypes进行分类
-        List<Integer> seatTypes = randomSeatQueryDTO.getSeatTypes();
-        Map<Integer, Integer> countSeatTypes = countSeatTypes(seatTypes);
-
-        // 遍历查询可用的座位
-        for (Map.Entry<Integer, Integer> entry : countSeatTypes.entrySet()) {
-            Integer seatType = entry.getKey(); // 获取seatType（键）
-            Integer requiredCount = entry.getValue();  // 获取出现次数（值）
-
-            // 构建查询条件
-            SeatTypeQueryDTO seatTypeQueryDTO = BeanUtil.copyProperties(randomSeatQueryDTO, SeatTypeQueryDTO.class);
-            seatTypeQueryDTO.setSeatType(seatType);
-            seatTypeQueryDTO.setRequiredCount(requiredCount);
-            List<AvailableSeatDTO> availableSeatDTOs = seatClassMapper.getAvailableSeatsBySeatTypeQueryDTO(seatTypeQueryDTO);
-
-            // 判断取到的座位数量是否满足要求
-            if(availableSeatDTOs == null || availableSeatDTOs.size() < requiredCount) {
-                throw new BusinessException("空座位数量不足");
-            }
-
-            // 将availableSeatDTOs批量添加到availableSeatDTOList中
-            availableSeatDTOList.addAll(availableSeatDTOs);
+        if (trainId == null || seatType == null || passengerCount == null ||
+                StrUtil.isBlank(departureCode) || StrUtil.isBlank(arrivalCode)) {
+            throw new BusinessException("选座参数不能为空");
         }
 
-        return availableSeatDTOList;
+        int maxRetry = 3;
+        List<SeatBusinessVO> finalSelectedSeats = null;
+
+        for (int i = 0; i < maxRetry; i++) {
+            ThreadLocalUtils.removeKey("lockedSuccessSeats");
+
+            List<Long> freeSeatIds = getFreeSeatIds(trainId, departureCode, arrivalCode);
+            List<SeatBusinessVO> freeSeatInfoList = getFreeSeatInfoList(freeSeatIds, trainId);
+            List<SeatBusinessVO> filteredBySeatType = filterSeatsBySeatType(freeSeatInfoList, seatType);
+            List<SeatBusinessVO> selectedSeats = selectMatchedSeats(filteredBySeatType, passengerCount, preferredSeatSymbols);
+
+            if (CollectionUtils.isEmpty(selectedSeats)) {
+                throw new BusinessException("无符合条件的座位");
+            }
+
+            boolean lockSuccess = batchLockSelectedSeats(queryDTO, selectedSeats);
+
+            if (lockSuccess) {
+                finalSelectedSeats = selectedSeats;
+                break;
+            }
+
+        }
+
+        if (CollectionUtils.isEmpty(finalSelectedSeats)) {
+            throw new SeatLockFailedException("座位已被抢占，请重新选座");
+        }
+
+        return convertToAvailableSeatDTO(finalSelectedSeats, seatType);
+    }
+
+    /**
+     * 批量锁定座位：预订单标准锁定（生成占用记录 + Bitmap + 延迟消息）
+     * 锁定成功返回true，失败返回false
+     */
+    private boolean batchLockSelectedSeats(RandomSeatQueryDTO queryDTO, List<SeatBusinessVO> selectedSeats) {
+        if (CollectionUtils.isEmpty(selectedSeats)) {
+            return false;
+        }
+
+        try {
+            BatchSeatIntervalInsertDTO batchDTO = BeanUtil.copyProperties(queryDTO, BatchSeatIntervalInsertDTO.class);
+
+            List<SeatBaseDTO> seatList = BeanUtil.copyToList(selectedSeats, SeatBaseDTO.class);
+            batchDTO.setSeatList(seatList);
+
+            updateSeatStatus(batchDTO);
+
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
+     * 仅回滚Bitmap占用标记（锁座失败时，无占用记录，只清理脏Bitmap）
+     */
+    private void rollbackSeatLock(BatchSeatIntervalInsertDTO batchDTO) {
+        List<SeatBusinessVO> lockedSeats = ThreadLocalUtils.getList("lockedSuccessSeats");
+        Integer orderType = batchDTO.getOrderType();
+
+        // 1. 基础参数校验
+        if (CollectionUtils.isEmpty(lockedSeats)) return;
+
+        if (StrUtil.hasBlank(batchDTO.getDepartureCode(), batchDTO.getArrivalCode())
+                || Objects.isNull(orderType)) {
+            log.warn("座位回滚参数不合法，跳过回滚");
+            return;
+        }
+
+        Long trainId = lockedSeats.getFirst().getTrainId();
+
+        try {
+            SequenceDTO seqs = getStationSequence(trainId, batchDTO.getDepartureCode(), batchDTO.getArrivalCode());
+            int startSeq = seqs.getStartSequence();
+            int endSeq = seqs.getEndSequence();
+
+            for (SeatBusinessVO seat : lockedSeats) {
+                Long seatId = seat.getId();
+
+                String bitmapKey = buildSeatBitmapKey(orderType, trainId, seatId);
+                cacheClient.setRangeBits(bitmapKey, startSeq, endSeq, false);
+            }
+        } catch (Exception ex) {
+            log.error("回滚解锁座位失败，trainId：{}", trainId, ex);
+        }
+    }
+
+    /**
+     * 转换为 AvailableSeatDTO 返回列表
+     */
+    private List<AvailableSeatDTO> convertToAvailableSeatDTO(List<SeatBusinessVO> selectedSeats, Integer seatType) {
+        return selectedSeats.stream()
+                .map(seat -> AvailableSeatDTO.builder()
+                        .seatType(seatType)
+                        .carriageNumber(seat.getCarriageNumber())
+                        .seatNo(seat.getSeatNo())
+                        .build())
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 按座位类型过滤
+     */
+    private List<SeatBusinessVO> filterSeatsBySeatType(List<SeatBusinessVO> freeSeatInfoList, Integer seatType) {
+        if (CollectionUtils.isEmpty(freeSeatInfoList)) {
+            throw new BusinessException("当前席别无可用座位");
+        }
+
+        List<SeatBusinessVO> filteredBySeatType = freeSeatInfoList.stream()
+                .filter(seat -> Objects.equals(seatType, seat.getSeatType()))
+                .collect(Collectors.toList());
+
+        if (CollectionUtils.isEmpty(filteredBySeatType)) {
+            throw new BusinessException("当前席别无可用座位");
+        }
+        return filteredBySeatType;
+    }
+
+    /**
+     * 根据空闲座位ID列表查询座位基础信息列表
+     */
+    private List<SeatBusinessVO> getFreeSeatInfoList(List<Long> freeSeatIds, Long trainId) {
+        List<SeatBusinessVO> freeSeatInfoList = new ArrayList<>();
+        for (Long seatId : freeSeatIds) {
+            SeatBusinessVO seatInfo = seatService.getSeatBaseInfo(trainId, seatId);
+            if (seatInfo != null) {
+                freeSeatInfoList.add(seatInfo);
+            }
+        }
+        if (CollectionUtils.isEmpty(freeSeatInfoList)) {
+            throw new BusinessException("当前车次无空闲座位");
+        }
+
+        return freeSeatInfoList;
+    }
+
+    /**
+     * 获取空闲座位ID列表
+     */
+    private List<Long> getFreeSeatIds(Long trainId, String departureCode, String arrivalCode) {
+        List<Long> freeSeatIds = seatService.getFreeSeatIdsByBitmap(trainId, departureCode, arrivalCode);
+        if (CollectionUtils.isEmpty(freeSeatIds)) {
+            throw new BusinessException("当前车次无空闲座位");
+        }
+        return freeSeatIds;
+    }
+
+    /**
+     * 核心选座算法
+     * 1. 无偏好 → 全随机
+     * 2. 有偏好 → 先足额选满偏好座位(限前后两排) → 补齐剩余随机座位
+     * 3. 偏好无法满足 → 直接全随机兜底
+     */
+    private List<SeatBusinessVO> selectMatchedSeats(List<SeatBusinessVO> allSeats,
+                                                    Integer passengerCount,
+                                                    List<String> preferredSeatSymbols) {
+
+        // 全局排序（车厢→排号→座位）
+        List<SeatBusinessVO> sortedSeats = sortSeats(allSeats);
+
+        // 无偏好
+        if (CollectionUtils.isEmpty(preferredSeatSymbols)) {
+            return getRandomSeats(sortedSeats, passengerCount);
+        }
+
+        // 有偏好 → 执行偏好选座逻辑
+        return handlePreferredSeatSelection(passengerCount, preferredSeatSymbols, sortedSeats);
+    }
+
+    /**
+     * 处理 有偏好 的选座逻辑
+     */
+    private List<SeatBusinessVO> handlePreferredSeatSelection(Integer passengerCount, List<String> preferredSeatSymbols, List<SeatBusinessVO> sortedSeats) {
+        int requiredPrefCount = preferredSeatSymbols.size();
+        int needRandomCount = Math.max(passengerCount - requiredPrefCount, 0);
+
+        List<Integer> preferredSeqs = convertPreferredSymbolsToSeqs(preferredSeatSymbols);
+        List<SeatBusinessVO> allPreferredSeats = filterPreferredSeats(sortedSeats, preferredSeqs);
+
+        // 尝试获取 足额+符合两排规则 的偏好座位
+        List<SeatBusinessVO> selectedPrefSeats = getSeatsInTwoRows(allPreferredSeats, requiredPrefCount, preferredSeqs);
+        if (CollectionUtils.isEmpty(selectedPrefSeats)) {
+            return getRandomSeats(sortedSeats, passengerCount);
+        }
+
+        // 补齐随机座位
+        List<SeatBusinessVO> finalSeats = new ArrayList<>(selectedPrefSeats);
+        if (needRandomCount > 0) {
+            List<SeatBusinessVO> randomSeats = fillRandomSeats(sortedSeats, finalSeats, needRandomCount);
+
+            if (randomSeats == null || randomSeats.size() < needRandomCount) {
+                return null;
+            }
+            finalSeats.addAll(randomSeats);
+        }
+
+        return finalSeats;
+    }
+
+    /**
+     * 补齐随机座位
+     */
+    private List<SeatBusinessVO> fillRandomSeats(List<SeatBusinessVO> sortedSeats, List<SeatBusinessVO> finalSeats, int needRandomCount) {
+        List<SeatBusinessVO> allAvailableSeats = sortedSeats.stream()
+                .filter(seat -> !finalSeats.contains(seat))
+                .toList();
+
+        return getRandomSeats(allAvailableSeats, needRandomCount);
+    }
+
+    /**
+     * 筛选所有符合偏好的座位
+     */
+    private List<SeatBusinessVO> filterPreferredSeats(List<SeatBusinessVO> sortedSeats, List<Integer> preferredSeqs) {
+        return sortedSeats.stream()
+                .filter(s -> preferredSeqs.contains(s.getSeatSeq()))
+                .toList();
+    }
+
+    /**
+     * 转换偏好符号（A/B/C → 0/1/2）
+     */
+    private List<Integer> convertPreferredSymbolsToSeqs(List<String> preferredSeatSymbols) {
+        return preferredSeatSymbols.stream()
+                .map(this::convertSymbolToSeq)
+                .filter(seq -> seq != -1)
+                .toList();
+    }
+
+    /**
+     * 基础排序：车厢→排号→座位（保证选座有序）
+     */
+    private List<SeatBusinessVO> sortSeats(List<SeatBusinessVO> allSeats) {
+        return allSeats.stream()
+                .sorted(Comparator.comparing(SeatBusinessVO::getCarriageNumber)
+                        .thenComparing(SeatBusinessVO::getRowNum)
+                        .thenComparing(SeatBusinessVO::getSeatSeq))
+                .toList();
+    }
+
+    /**
+     * 纯随机选座（无任何限制，满足trainId+seatType即可）
+     */
+    private List<SeatBusinessVO> getRandomSeats(List<SeatBusinessVO> seats, int needCount) {
+        List<SeatBusinessVO> randomList = new ArrayList<>(seats);
+        Collections.shuffle(randomList);
+        return randomList.stream().limit(needCount).toList();
+    }
+
+    /**
+     * 筛选规则：
+     * 1. 同一车厢
+     * 2. 最多跨1排（前后两排）
+     * 3. 座位类型/数量 严格匹配用户指定的偏好
+     */
+    private List<SeatBusinessVO> getSeatsInTwoRows(List<SeatBusinessVO> seats, int needCount, List<Integer> preferredSeqs) {
+        List<SeatBusinessVO> result = new ArrayList<>();
+        // 临时统计当前选中的座位类型数量
+        Map<Integer, Integer> currentCount = new HashMap<>();
+        // 用户需要的座位类型数量
+        Map<Integer, Integer> targetCount = preferredSeqs.stream()
+                .collect(Collectors.toMap(k -> k, k -> 1, Integer::sum));
+
+        String targetCarriage = null;
+
+        for (SeatBusinessVO seat : seats) {
+            if (targetCarriage == null) {
+                targetCarriage = seat.getCarriageNumber();
+            } else if (!Objects.equals(seat.getCarriageNumber(), targetCarriage)) {
+                result.clear();
+                currentCount.clear();
+                targetCarriage = seat.getCarriageNumber();
+            }
+
+            Integer seq = seat.getSeatSeq();
+            if (!targetCount.containsKey(seq)) continue;
+            if (currentCount.getOrDefault(seq, 0) >= targetCount.get(seq)) continue;
+
+            result.add(seat);
+            currentCount.put(seq, currentCount.getOrDefault(seq, 0) + 1);
+
+            if (result.size() == needCount) {
+                int minRow = result.stream().mapToInt(SeatBusinessVO::getRowNum).min().getAsInt();
+                int maxRow = result.stream().mapToInt(SeatBusinessVO::getRowNum).max().getAsInt();
+
+                // 满足：同一车厢 + 排数合规 + 数量/类型完全匹配
+                if (maxRow - minRow <= 1) {
+                    return result;
+                } else {
+                    result.clear();
+                    currentCount.clear();
+                }
+            }
+        }
+        return Collections.emptyList();
+    }
+
+    /**
+     * 座位符号转换为序号
+     */
+    private Integer convertSymbolToSeq(String symbol) {
+        return switch (symbol.toUpperCase()) {
+            case "A" -> 0;
+            case "B" -> 1;
+            case "C" -> 2;
+            case "D" -> 3;
+            case "F" -> 4;
+            default -> -1;
+        };
     }
 
     /**
@@ -493,11 +793,16 @@ public class TicketServiceImpl implements TicketService {
      */
     @Override
     public void updateSeatStatus(BatchSeatIntervalInsertDTO batchDTO) {
-        // 1.变动座位区间占用记录
-        operateSeatIntervalOccupy(batchDTO);
+        try {
+            // 1.锁座
+            operateSeatIntervalOccupy(batchDTO);
 
-        // 2.批量更新座位状态
-        batchUpdateSeatStatus(batchDTO);
+            // 2.批量更新座位状态
+            batchUpdateSeatStatus(batchDTO);
+        } catch (Exception e) {
+            rollbackSeatLock(batchDTO);
+            throw new SeatLockFailedException("锁座失败", e);
+        }
     }
 
     /**
@@ -564,7 +869,7 @@ public class TicketServiceImpl implements TicketService {
     private Map<Long, Integer> calculateSeatStatusMap(Long trainId, List<Long> seatIdList) {
         Map<Long, Integer> statusMap = new HashMap<>(seatIdList.size());
         for (Long seatId : seatIdList) {
-            // 从Redis查询该座位的所有占用区间，计算状态（复用你原有的getSeatStatus逻辑）
+            // 从Redis查询该座位的所有占用区间，计算状态
             Integer status = calculateSeatStatusFromRedis(trainId, seatId);
             statusMap.put(seatId, status);
         }
@@ -667,8 +972,11 @@ public class TicketServiceImpl implements TicketService {
         List<SeatBaseDTO> seatList = batchDTO.getSeatList();
 
         // 获取站点序列 + 座位ID列表
-        SequenceDTO seqs = getStationSequence(batchDTO);
+        SequenceDTO seqs = getStationSequence(trainId, batchDTO.getDepartureCode(), batchDTO.getArrivalCode());
         List<Long> seatIdList = getSeatIdListBySeatNos(seatList, trainId);
+
+        LocalDateTime expireTime = generateExpireTime(batchDTO.getOrderType());
+        batchDTO.setExpireTime(expireTime);
 
         List<SeatIntervalOccupy> occupyList = BeanConvertUtil.copyWithCommonField(
                 batchDTO,
@@ -680,6 +988,17 @@ public class TicketServiceImpl implements TicketService {
     }
 
     /**
+     * 根据订单类型生成过期时间
+     */
+    private LocalDateTime generateExpireTime(Integer orderType) {
+        if (OrderTypeConstants.PREORDER.equals(orderType)) {
+            return LocalDateTime.now().plusMinutes(preOrderExpireMinutes);
+        } else {
+            return null;
+        }
+    }
+
+    /**
      * 批量缓存：Bitmap区间标记 + String占用记录
      */
     private void batchCacheSeatOccupy(List<SeatIntervalOccupy> occupyList, List<Long> seatIdList, SequenceDTO seqs, Long trainId) {
@@ -687,6 +1006,7 @@ public class TicketServiceImpl implements TicketService {
 
         String recordKey = buildSeatOccupyHashKey(trainId);
         Map<String, Object> batchHashMap = new HashMap<>();
+        List<DelayMsgDTO> delayMsgList = new ArrayList<>();
 
         boolean isLockedBatch = SeatIntervalStatusConstants.LOCKED.equals(occupyList.getFirst().getStatus());
 
@@ -699,21 +1019,39 @@ public class TicketServiceImpl implements TicketService {
             fillSeatOccupyCommonFields(seqs, occupy, seatId, lockId);
 
             // 1. 更新Bitmap占用标记
-            String bitmapKey = buildSeatBitmapKey(occupy);
-            cacheClient.setRangeBits(bitmapKey, occupy.getStartSequence(), occupy.getEndSequence(), true);
+            String tempBitmapKey = buildSeatBitmapKey(OrderTypeConstants.PREORDER, trainId, seatId);
+            String formalBitmapKey = buildSeatBitmapKey(OrderTypeConstants.ORDER, trainId, seatId);
+            Long result = cacheClient.executeLuaFile(
+                    "lua/seatLock.lua",
+                    Arrays.asList(tempBitmapKey, formalBitmapKey),
+                    seqs.getStartSequence(),
+                    seqs.getEndSequence(),
+                    occupy.getOrderType()
+            );
+
+            if (result == null || result == 0) {
+                throw new SeatLockFailedException(lockId);
+            }
+
+            SeatBusinessVO vo = SeatBusinessVO.builder()
+                    .trainId(trainId)
+                    .id(seatId)
+                    .build();
+            ThreadLocalUtils.addToList("lockedSuccessSeats", vo);
 
             // 2. 存储占用元数据
             String field = buildSeatLockFieldKey(seatId, lockId);
             batchHashMap.put(field, occupy);
 
-            // 3. 仅锁定中：单条发送延迟释放消息
+            // 3. 收集延迟消息参数
             if (isLockedBatch) {
-                sendDelayReleaseMsg(trainId, seatId, lockId);
+                delayMsgList.add(new DelayMsgDTO(trainId, seatId, lockId));
             }
         }
 
         if (isLockedBatch) {
             cacheClient.hPutAll(recordKey, batchHashMap, RAIL_SEAT_OCCUPY_LOCK_EXPIRE_MINUTES, TimeUnit.MINUTES);
+            sendDelayReleaseMsg(delayMsgList);
         } else {
             cacheClient.hPutAll(recordKey, batchHashMap, RAIL_SEAT_OCCUPY_FORMAL_EXPIRE_MINUTES, TimeUnit.MINUTES);
             // 非锁定状态：发送1次批量落库消息
@@ -725,6 +1063,7 @@ public class TicketServiceImpl implements TicketService {
      * 填充座位占用记录的公共属性
      */
     private void fillSeatOccupyCommonFields(SequenceDTO seqs, SeatIntervalOccupy occupy, Long seatId, String lockId) {
+        occupy.setId(SnowflakeIdGenerator.nextId());
         occupy.setSeatId(seatId);
         occupy.setStartSequence(seqs.getStartSequence());
         occupy.setEndSequence(seqs.getEndSequence());
@@ -746,7 +1085,7 @@ public class TicketServiceImpl implements TicketService {
      *    整的逻辑：发送 (key, lockId) 到队列 → 批量取出 → 进入普通队列 →
      *    消息处理器根据 key 从 Redis 获取占用记录 → 如果记录存在且 lockId 匹配，则说明锁过期，进行解锁处理（删除占用记录 + 更新Bitmap）
      */
-    private void sendDelayReleaseMsg(Long trainId, Long seatId, String lockId) {
+    private void sendDelayReleaseMsg(List<DelayMsgDTO> delayMsgList) {
         // TODO 实现：发送延迟MQ消息(trainId+seatId+lockId)
         //  消费者：校验lockId → 存在则释放座位 → 发送普通队列落库
     }
@@ -764,10 +1103,7 @@ public class TicketServiceImpl implements TicketService {
     /**
      * 获取站点序列信息
      */
-    private SequenceDTO getStationSequence(BatchSeatIntervalInsertDTO batchDTO) {
-        Long trainId = batchDTO.getTrainId();
-        String departureCode = batchDTO.getDepartureCode();
-        String arrivalCode = batchDTO.getArrivalCode();
+    private SequenceDTO getStationSequence(Long trainId, String departureCode, String arrivalCode) {
         List<Station> allStations = stationCacheTask.getAllStations();
 
         Long fromStationId = getStationIdByCode(allStations, departureCode, "出发站");
@@ -837,15 +1173,15 @@ public class TicketServiceImpl implements TicketService {
     /**
      * 构建Bitmap缓存Key
      */
-    private String buildSeatBitmapKey(SeatIntervalOccupy occupancy) {
-        String prefix = OrderTypeConstants.PREORDER.equals(occupancy.getOrderType())
+    private String buildSeatBitmapKey(Integer orderType, Long trainId, Long seatId) {
+        String prefix = OrderTypeConstants.PREORDER.equals(orderType)
                 ? RedisConstants.RAIL_BITMAP_SEAT_TEMP_LOCK_PREFIX
                 : RedisConstants.RAIL_BITMAP_SEAT_FORMAL_PREFIX;
 
         return String.format("%strainId:%d:seatId:%d",
                 prefix,
-                occupancy.getTrainId(),
-                occupancy.getSeatId());
+                trainId,
+                seatId);
     }
 
     /**
@@ -915,57 +1251,6 @@ public class TicketServiceImpl implements TicketService {
     }
 
     /**
-     * 判断座位状态
-     * @param intervalList 座位占用区间列表（包含startSequence、endSequence等属性）
-     * @param trainId 列车ID（用于查询终点站站序，判断是否完全占用）
-     * @return 座位状态（0-无占用，1-部分占用，2-完全占用）
-     */
-    private Integer getSeatStatus(List<SequenceDTO> intervalList, Long trainId) {
-        // 无占用
-        if(intervalList == null || intervalList.isEmpty()) {
-            // 无占用
-            return SeatStatusConstants.AVAILABLE;
-        }
-
-        // 获取终点站站序
-        Integer beginSeq = 1;
-        Integer terminalSeq = trainStopStationMapper.getTerminalSequence(trainId);
-        // 开始站序不是起点站序或最后站序不是终点站序，则部分占用
-        if(!beginSeq.equals(intervalList.getFirst().getStartSequence()) || !terminalSeq.equals(intervalList.getLast().getEndSequence())) {
-            return SeatStatusConstants.PARTIALLY_OCCUPIED;
-        }
-
-        // 其余为部分或全部占用
-        Integer preArrSeq = 1;
-        for (SequenceDTO interval : intervalList) {
-            Integer depSeq = interval.getStartSequence();
-            Integer arrSeq = interval.getEndSequence();
-
-            if(arrSeq > preArrSeq) {
-                return SeatStatusConstants.PARTIALLY_OCCUPIED;
-            }
-        }
-        return SeatStatusConstants.FULLY_OCCUPIED;
-    }
-
-    /**
-     * 按seatType对seatTypes进行分类
-     * @param seatTypes 席别类型列表（可能包含重复的seatType，表示需要的该类型座位数量）
-     * @return Map<seatType, count>，key为seatType，value为该类型出现的次数（即需要的座位数量）
-     */
-    private Map<Integer, Integer> countSeatTypes(List<Integer> seatTypes) {
-        // 处理null列表（返回空Map），非空则统计
-        return seatTypes == null ? new HashMap<>() :
-                seatTypes.stream()
-                        .filter(Objects::nonNull) // 过滤null（可选）
-                        .collect(Collectors.groupingBy(
-                                Function.identity(), // key：seatType本身
-                                Collectors.summingInt(e -> 1) // value：出现次数（每次+1）
-                        ));
-    }
-
-
-    /**
      * 判断站点是否为列车的始发站
      */
     private boolean checkDepartureStation(Long trainId, Integer stationId) {
@@ -986,16 +1271,12 @@ public class TicketServiceImpl implements TicketService {
         // 计算两个时间的差值（分钟）
         long minutesLong = Duration.between(departureTime, arrivalTime).toMinutes();
 
-        // 转为整形返回
         int minutesInteger;
         if (minutesLong > Integer.MAX_VALUE) {
-            // 超出最大值，按业务需求处理（如取最大值）
             minutesInteger = Integer.MAX_VALUE;
         } else if (minutesLong < Integer.MIN_VALUE) {
-            // 超出最小值（时间差为负时可能触发，需先确保 arrivalTime 晚于 departureTime）
             minutesInteger = Integer.MIN_VALUE;
         } else {
-            // 在范围内，安全转换
             minutesInteger = (int) minutesLong;
         }
         return minutesInteger;

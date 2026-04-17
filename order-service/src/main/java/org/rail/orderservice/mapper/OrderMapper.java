@@ -1,6 +1,5 @@
 package org.rail.orderservice.mapper;
 
-import lombok.Data;
 import org.apache.ibatis.annotations.*;
 import org.rail.orderservice.pojo.dto.OrderPageQueryDTO;
 import org.rail.orderservice.pojo.dto.SelfTicketPageDTO;

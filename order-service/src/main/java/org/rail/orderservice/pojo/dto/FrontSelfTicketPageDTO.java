@@ -1,6 +1,7 @@
 package org.rail.orderservice.pojo.dto;
 
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import org.rail.common.core.pageQuery.PageQuery;
 
 import java.time.LocalDate;
@@ -8,6 +9,7 @@ import java.time.LocalDate;
 /**
  * 前端传递过来的本人车票分页参数
  */
+@EqualsAndHashCode(callSuper = true)
 @Data
 public class FrontSelfTicketPageDTO extends PageQuery {
 

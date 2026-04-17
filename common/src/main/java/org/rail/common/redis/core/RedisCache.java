@@ -81,4 +81,8 @@ public interface RedisCache {
     void batchDelete(Collection<String> keys);
 
     boolean exists(String key);
+
+    <T> T executeLuaFile(String luaFilePath, List<Object> keys, Object... args);
+
+    <T> T executeLuaScript(String luaScript, List<Object> keys, Object... args);
 }

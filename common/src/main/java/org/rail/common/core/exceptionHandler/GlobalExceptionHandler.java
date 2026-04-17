@@ -4,6 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.rail.common.core.exception.BusinessException;
 import org.rail.common.core.exception.OpenFeignException;
 import org.rail.common.core.exception.OrderNotFoundException;
+import org.rail.common.core.exception.SeatLockFailedException;
 import org.rail.common.core.result.Result;
 import org.rail.common.redis.exception.CacheException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -15,6 +16,12 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 public class GlobalExceptionHandler{
 
     // ===================== 自定义异常处理 =====================
+    @ExceptionHandler(SeatLockFailedException.class)
+    public Result<Void> handleSeatLockFailedException(SeatLockFailedException e) {
+        log.warn("座位锁定失败：", e);
+        return Result.error(e.getMessage() == null ? "座位锁定失败" : e.getMessage());
+    }
+
     @ExceptionHandler(BusinessException.class)
     public Result<Void> handleBusinessException(BusinessException e) {
         log.error("业务异常：", e); // 打印完整堆栈

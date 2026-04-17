@@ -18,7 +18,7 @@ public class OrderDetails {
     private String departureCode;
     private String arrivalCode;
     private LocalDateTime ridingDate;
-    private String trainId;
+    private Long trainId;
     private LocalDateTime departureTime;
     private LocalDateTime arrivalTime;
     // 席别类型：0-商等座 1-一等座 2-二务座...

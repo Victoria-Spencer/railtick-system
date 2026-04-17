@@ -15,20 +15,16 @@
 	<name>user-service</name>
 	<description>用户服务子模块</description>
 
-	<!-- 依赖：直接引用父工程已管理的依赖，无需写version -->
 	<dependencies>
 		<dependency>
 			<groupId>mysql</groupId>
 			<artifactId>mysql-connector-java</artifactId>
 		</dependency>
-		<!-- 引入common模块 -->
 		<dependency>
 			<groupId>org.rail</groupId>
 			<artifactId>common</artifactId>
-			<version>0.0.1-SNAPSHOT</version>
 		</dependency>
 
-		<!-- 测试依赖 -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-test</artifactId>
@@ -61,18 +57,11 @@
 		<dependency>
 			<groupId>org.rail</groupId>
 			<artifactId>api</artifactId>
-			<version>0.0.1-SNAPSHOT</version>
 		</dependency>
 
 		<dependency>
 			<groupId>com.alibaba.cloud</groupId>
 			<artifactId>spring-cloud-starter-alibaba-seata</artifactId>
-		</dependency>
-
-		<dependency>
-			<groupId>org.rail</groupId>
-			<artifactId>common</artifactId>
-			<version>0.0.1-SNAPSHOT</version>
 		</dependency>
 	</dependencies>
 

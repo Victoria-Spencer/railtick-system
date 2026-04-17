@@ -3,7 +3,6 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <!-- 继承Spring Boot父依赖 -->
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
@@ -11,7 +10,6 @@
         <relativePath/>
     </parent>
 
-    <!-- 父工程基本信息 -->
     <groupId>org.rail</groupId>
     <artifactId>railtick-system</artifactId>
     <version>0.0.1-SNAPSHOT</version>
@@ -19,9 +17,9 @@
     <name>railtick-system</name>
     <description>父工程：管理所有子模块</description>
 
-    <!-- 声明子模块 -->
     <modules>
         <module>common</module>
+        <module>api</module>
         <module>gateway-service</module>
         <module>order-service</module>
         <module>pay-service</module>
@@ -29,7 +27,6 @@
         <module>user-service</module>
     </modules>
 
-    <!-- 统一管理版本（核心：子模块直接引用属性） -->
     <properties>
         <java.version>21</java.version>
         <spring-boot.version>3.5.7</spring-boot.version>
@@ -44,11 +41,23 @@
         <hutool.version>5.8.12</hutool.version>
         <pagehelper-spring-boot-starter.version>1.4.7</pagehelper-spring-boot-starter.version>
         <logstash-logback-encoder.version>7.2</logstash-logback-encoder.version>
+        <common.version>0.0.1-SNAPSHOT</common.version>
+        <api.version>0.0.1-SNAPSHOT</api.version>
     </properties>
 
     <!-- 依赖管理：子模块引用时无需写version -->
     <dependencyManagement>
         <dependencies>
+            <dependency>
+                <groupId>org.rail</groupId>
+                <artifactId>common</artifactId>
+                <version>${common.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.rail</groupId>
+                <artifactId>api</artifactId>
+                <version>0.0.1-SNAPSHOT</version>
+            </dependency>
             <!-- Spring Boot 核心依赖 -->
             <dependency>
                 <groupId>org.springframework.boot</groupId>
@@ -91,7 +100,6 @@
                 <scope>import</scope>
             </dependency>
 
-            <!-- 第三方依赖 -->
             <dependency>
                 <groupId>mysql</groupId>
                 <artifactId>mysql-connector-java</artifactId>
@@ -112,7 +120,6 @@
                 <artifactId>hutool-all</artifactId>
                 <version>${hutool.version}</version>
             </dependency>
-            <!-- PageHelper 核心依赖 -->
             <dependency>
                 <groupId>com.github.pagehelper</groupId>
                 <artifactId>pagehelper-spring-boot-starter</artifactId>

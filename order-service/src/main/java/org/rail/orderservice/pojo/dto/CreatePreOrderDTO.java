@@ -12,5 +12,6 @@ public class CreatePreOrderDTO {
     private String departureCode;
     private String arrivalCode;
     List<PassengerOrderDetailDTO> passengerOrderDetailDTOList;
-    List<ChooseSeatDTO> chooseSeats;
+    // 座位偏好（A/B/C/D/F）
+    List<String> preferredSeatSymbols;
 }

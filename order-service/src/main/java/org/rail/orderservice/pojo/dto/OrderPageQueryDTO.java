@@ -1,10 +1,12 @@
 package org.rail.orderservice.pojo.dto;
 
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import org.rail.common.core.pageQuery.PageQuery;
 
 import java.time.LocalDate;
 
+@EqualsAndHashCode(callSuper = true)
 @Data
 public class OrderPageQueryDTO extends PageQuery {
 

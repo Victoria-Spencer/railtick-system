@@ -8,11 +8,13 @@ import org.rail.api.dto.RandomSeatQueryDTO;
 import org.rail.common.core.result.Result;
 import org.rail.ticketservice.pojo.dto.PlannedTicketQueryDTO;
 import org.rail.ticketservice.pojo.dto.TicketQueryDTO;
+import org.rail.ticketservice.pojo.vo.SeatBusinessVO;
 import org.rail.ticketservice.pojo.vo.TicketQueryVO;
 import org.rail.ticketservice.service.TicketService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @RestController

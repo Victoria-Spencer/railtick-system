@@ -9,6 +9,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class PageQuery {
 
-    private Integer pageNumber = 1;
-    private Integer pageSize = 10;
+    protected Integer pageNumber = 1;
+    protected Integer pageSize = 10;
 }

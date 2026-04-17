@@ -67,7 +67,7 @@ public class AggCacheClearAspect {
             }
         } else if (anno.keySource() == AutoClearAggCache.KeySource.THREAD_LOCAL) {
             // 从 ThreadLocal 中取
-            keyValue = ThreadLocalUtils.get();
+            keyValue = ThreadLocalUtils.get("userId", String.class);
             if (keyValue == null) {
                 log.warn("自动清理聚合缓存失败：ThreadLocal 中无数据");
                 return;

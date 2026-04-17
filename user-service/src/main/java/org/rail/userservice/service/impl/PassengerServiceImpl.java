@@ -91,7 +91,7 @@ public class PassengerServiceImpl implements PassengerService {
     @Override
     public void save(Passenger passenger) {
         // 从线程中获取乘车人对应的用户标识
-        Long userId = Long.valueOf(ThreadLocalUtils.get());
+        Long userId = Long.valueOf(ThreadLocalUtils.get("userId", String.class));
         passenger.setUserId(userId);
 
         // 设置审核状态
@@ -118,7 +118,7 @@ public class PassengerServiceImpl implements PassengerService {
         passenger.setUpdateTime(LocalDateTime.now());
         passengerMapper.updateById(passenger);
 
-        String userId = ThreadLocalUtils.get();
+        String userId = ThreadLocalUtils.get("userId", String.class);
         cacheClient.autoClearAggCache(RedisConstants.RAIL_PASSENGER_LIST_USER_PREFIX + userId);
         /*// 删除缓存
         String userId = ThreadLocalUtils.get();
@@ -137,7 +137,7 @@ public class PassengerServiceImpl implements PassengerService {
     public void deleteByIds(List<Long> ids) {
         passengerMapper.batchDelete(ids);
 
-        String userId = ThreadLocalUtils.get();
+        String userId = ThreadLocalUtils.get("userId", String.class);
         cacheClient.autoClearAggCache(RedisConstants.RAIL_PASSENGER_LIST_USER_PREFIX + userId);
         // 删除缓存
         /*String userId = ThreadLocalUtils.get();

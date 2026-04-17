@@ -1,8 +1,10 @@
 package org.rail.ticketservice.pojo.dto;
 
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import org.rail.common.core.pageQuery.PageQuery;
 
+@EqualsAndHashCode(callSuper = true)
 @Data
 public class StationPageQueryDTO extends PageQuery {
 

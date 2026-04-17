@@ -1,14 +1,21 @@
 package org.rail.ticketservice.pojo.vo;
 
+import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.experimental.SuperBuilder;
 
 @Data
+@SuperBuilder
+@NoArgsConstructor
+@AllArgsConstructor
 public class SeatDetailVO {
 
-    private Long id;
-    private Long trainSeatClassId;
-    private String carriageNumber;
-    private String seatNo;
-    private Integer status;
-    private Long trainId;
+    protected Long id;
+    protected Long trainId;
+    protected Long trainSeatClassId;
+    protected Integer seatType;
+    protected String carriageNumber;
+    protected String seatNo;
+    protected Integer status;
 }

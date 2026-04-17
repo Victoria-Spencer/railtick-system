@@ -11,17 +11,14 @@
     </parent>
     <!-- 子模块自身信息（无需重复groupId和version，继承父工程） -->
     <artifactId>common</artifactId>
-    <name>common-service</name>
+    <name>common</name>
     <description>公共服务子模块</description>
 
-    <!-- 依赖：直接引用父工程已管理的依赖，无需写version -->
     <dependencies>
-        <!-- Web依赖（继承父工程版本） -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
-        <!-- 测试依赖，不传递 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
@@ -78,5 +75,15 @@
 
     </dependencies>
 
-    <!-- 无需重复配置插件，继承父工程的插件 -->
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <skip>true</skip>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 </project>

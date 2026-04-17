@@ -20,7 +20,7 @@ public class FeignConfig {
             public void apply(RequestTemplate requestTemplate) {
                 // 从当前上下文（如ThreadLocal）中获取用户ID
                 // 用户登录后，user-id存储在ThreadLocal中
-                String userId = ThreadLocalUtils.get();
+                String userId = ThreadLocalUtils.get("userId", String.class);
                 if (userId != null) {
                     // 向请求头添加user-id
                     requestTemplate.header("user-id", userId);

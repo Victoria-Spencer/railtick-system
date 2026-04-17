@@ -3,7 +3,12 @@ package org.rail.ticketservice.service.impl;
 import cn.hutool.core.util.StrUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.rail.api.constant.OrderTypeConstants;
+import org.rail.common.core.exception.BusinessException;
 import org.rail.common.core.exception.CacheInitException;
+import org.rail.common.redis.exception.CacheException;
+import org.rail.ticketservice.pojo.dto.SequenceDTO;
+import org.rail.ticketservice.pojo.entity.Station;
+import org.rail.ticketservice.pojo.vo.SeatBusinessVO;
 import org.rail.ticketservice.pojo.vo.SeatDetailVO;
 import org.rail.common.redis.constant.RedisConstants;
 import org.rail.common.redis.util.CacheClient;
@@ -11,13 +16,13 @@ import org.rail.ticketservice.mapper.SeatIntervalOccupyMapper;
 import org.rail.ticketservice.mapper.SeatMapper;
 import org.rail.ticketservice.pojo.entity.SeatIntervalOccupy;
 import org.rail.ticketservice.service.SeatService;
+import org.rail.ticketservice.task.StationLocalCacheTask;
+import org.rail.ticketservice.task.TrainStopStationLocalCacheTask;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -30,6 +35,10 @@ public class SeatServiceImpl implements SeatService {
     private SeatMapper seatMapper;
     @Autowired
     private CacheClient cacheClient;
+    @Autowired
+    private StationLocalCacheTask stationCacheTask;
+    @Autowired
+    private TrainStopStationLocalCacheTask trainStopCacheTask;
 
     /**
      * 最大允许初始化的座位区间长度，防止Redis内存溢出
@@ -85,27 +94,64 @@ public class SeatServiceImpl implements SeatService {
         Map<String, Object> fieldMap = new HashMap<>();
 
         // ============================= 正向映射 =============================
-        // 座位ID
         String fieldId = buildSeatFieldKey(seat.getId(), "id");
         fieldMap.put(fieldId, seat.getId());
-        // 车次ID
+
         String fieldTrainId = buildSeatFieldKey(seat.getId(), "trainId");
         fieldMap.put(fieldTrainId, seat.getTrainId());
-        // 席别关联ID
+
         String fieldClassId = buildSeatFieldKey(seat.getId(), "trainSeatClassId");
         fieldMap.put(fieldClassId, seat.getTrainSeatClassId());
-        // 座位号
+
+        String fieldSeatType = buildSeatFieldKey(seat.getId(), "seatType");
+        fieldMap.put(fieldSeatType, seat.getSeatType());
+
+        String fieldCarriage = buildSeatFieldKey(seat.getId(), "carriageNumber");
+        fieldMap.put(fieldCarriage, seat.getCarriageNumber());
+
         String fieldSeatNo = buildSeatFieldKey(seat.getId(), "seatNo");
         fieldMap.put(fieldSeatNo, seat.getSeatNo());
-        // 座位状态
+
         String fieldStatus = buildSeatFieldKey(seat.getId(), "status");
         fieldMap.put(fieldStatus, seat.getStatus());
+
+        Integer rowNum = extractRowNum(seat.getSeatNo());
+        Integer seatSeq = extractFieldSeatSeq(seat.getSeatNo());
+
+        String fieldRowNum = buildSeatFieldKey(seat.getId(), "rowNum");
+        fieldMap.put(fieldRowNum, rowNum);
+
+        String fieldSeatSeq = buildSeatFieldKey(seat.getId(), "seatSeq");
+        fieldMap.put(fieldSeatSeq, seatSeq);
+
 
         // ============================= 反向映射 =============================
         String reverseField = buildSeatReverseFieldKey(seat.getCarriageNumber(), seat.getSeatNo());
         fieldMap.put(reverseField, seat.getId());
 
         return fieldMap;
+    }
+
+    /**
+     * 从 seatNo 提取排号：1A → 1
+     */
+    private Integer extractRowNum(String seatNo) {
+        return Integer.parseInt(seatNo.replaceAll("[^0-9]", ""));
+    }
+
+    /**
+     * 从 seatNo 提取座位序号：A→0, B→1, C→2, D→3, F→4
+     */
+    private Integer extractFieldSeatSeq(String seatNo) {
+        char c = seatNo.replaceAll("[0-9]", "").toUpperCase().charAt(0);
+        return switch (c) {
+            case 'A' -> 0;
+            case 'B' -> 1;
+            case 'C' -> 2;
+            case 'D' -> 3;
+            case 'F' -> 4;
+            default -> -1; // 异常座位
+        };
     }
 
     /**
@@ -154,12 +200,180 @@ public class SeatServiceImpl implements SeatService {
     }
 
     /**
+     * 根据车次ID、出发站、到达站，获取Redis中空闲座位ID列表
+     */
+    @Override
+    public List<Long> getFreeSeatIdsByBitmap(Long trainId, String departureCode, String arrivalCode) {
+        if(trainId == null || departureCode == null || arrivalCode == null) {
+            throw new BusinessException("车次ID、出发站、到达站不能为空");
+        }
+
+        SequenceDTO seq = getStationSequence(trainId, departureCode, arrivalCode);
+        int startSeq = seq.getStartSequence();
+        int endSeq = seq.getEndSequence();
+
+        if (startSeq < 0 || endSeq < 0 || startSeq >= endSeq) {
+            throw new BusinessException("车次不存在或站点信息无效");
+        }
+
+        List<Long> allSeatIds = getAllSeatIdsByTrainId(trainId);
+        if (allSeatIds.isEmpty()) {
+            return null;
+        }
+
+        List<Long> freeSeatIdList = new ArrayList<>();
+        for (Long seatId : allSeatIds) {
+            boolean isFree = isSeatFreeInRange(trainId, seatId, startSeq, endSeq);
+            if (isFree) {
+                freeSeatIdList.add(seatId);
+            }
+        }
+
+        return freeSeatIdList;
+    }
+
+    /**
+     * 根据车次ID和座位ID获取座位基础信息（Hash结构字段查询）
+     */
+    @Override
+    public SeatBusinessVO getSeatBaseInfo(Long trainId, Long seatId) {
+        if (trainId == null || seatId == null) {
+            return null;
+        }
+
+        String hashKey = buildSeatHashKey(trainId);
+
+        try {
+            Object idObj = cacheClient.hGet(hashKey, buildSeatFieldKey(seatId, "id"));
+            Object trainIdObj = cacheClient.hGet(hashKey, buildSeatFieldKey(seatId, "trainId"));
+            Object classIdObj = cacheClient.hGet(hashKey, buildSeatFieldKey(seatId, "trainSeatClassId"));
+            Object seatTypeObj = cacheClient.hGet(hashKey, buildSeatFieldKey(seatId, "seatType"));
+            Object carriageObj = cacheClient.hGet(hashKey, buildSeatFieldKey(seatId, "carriageNumber"));
+            Object seatNoObj = cacheClient.hGet(hashKey, buildSeatFieldKey(seatId, "seatNo"));
+            Object statusObj = cacheClient.hGet(hashKey, buildSeatFieldKey(seatId, "status"));
+            Object rowNumObj = cacheClient.hGet(hashKey, buildSeatFieldKey(seatId, "rowNum"));
+            Object seatSeqObj = cacheClient.hGet(hashKey, buildSeatFieldKey(seatId, "seatSeq"));
+
+            return SeatBusinessVO.builder()
+                    .id(Long.parseLong(idObj.toString()))
+                    .trainId(Long.parseLong(trainIdObj.toString()))
+                    .trainSeatClassId(Long.parseLong(classIdObj.toString()))
+                    .seatType(Integer.parseInt(seatTypeObj.toString()))
+                    .carriageNumber(carriageObj != null ? carriageObj.toString() : "")
+                    .seatNo(seatNoObj != null ? seatNoObj.toString() : "")
+                    .status(statusObj != null ? Integer.parseInt(statusObj.toString()) : 0)
+                    .rowNum(rowNumObj != null ? Integer.parseInt(rowNumObj.toString()) : null)
+                    .seatSeq(seatSeqObj != null ? Integer.parseInt(seatSeqObj.toString()) : null)
+                    .build();
+
+        } catch (Exception e) {
+            String errorMsg = String.format("从Redis获取座位基础信息发生异常，trainId=%s, seatId=%s", trainId, seatId);
+            throw new BusinessException(errorMsg, e);
+        }
+    }
+
+    /**
+     * 判断座位在指定区间内是否空闲
+     */
+    private boolean isSeatFreeInRange(Long trainId, Long seatId, int startSeq, int endSeq) {
+        String tempBitmapKey = buildSeatBitmapKey(OrderTypeConstants.PREORDER, trainId, seatId);
+        String formalBitmapKey = buildSeatBitmapKey(OrderTypeConstants.ORDER, trainId, seatId);
+
+        return cacheClient.isRangeAllZero(tempBitmapKey, startSeq, endSeq)
+                && cacheClient.isRangeAllZero(formalBitmapKey, startSeq, endSeq);
+    }
+
+    /**
+     * 根据车次ID获取Redis中所有座位ID（通过Hash字段前缀过滤）
+     */
+    private List<Long> getAllSeatIdsByTrainId(Long trainId) {
+        if (trainId == null) {
+            throw new BusinessException("车次ID不能为空");
+        }
+
+        String redisHashKey = buildSeatHashKey(trainId);
+
+        Map<String, Object> seatFieldMap = cacheClient.hEntries(redisHashKey);
+        if (CollectionUtils.isEmpty(seatFieldMap)) {
+            return List.of();
+        }
+
+        return seatFieldMap.keySet().stream()
+                .filter(field -> field.startsWith("SeatId:") && field.split(":").length >= 3)
+                // 提取seatId（拆分字符串：SeatId:1001:id → [SeatId,1001,id] → 取1001）
+                .map(field -> {
+                    try {
+                        return Long.parseLong(field.split(":")[1]);
+                    } catch (NumberFormatException e) {
+                        log.error("解析座位ID失败，field:{}", field, e);
+                        return null;
+                    }
+                })
+                .filter(Objects::nonNull)
+                .distinct()
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 获取站点序列信息
+     */
+    private SequenceDTO getStationSequence(Long trainId, String departureCode, String arrivalCode) {
+        List<Station> allStations = stationCacheTask.getAllStations();
+
+        Long fromStationId = getStationIdByCode(allStations, departureCode, "出发站");
+        Long toStationId = getStationIdByCode(allStations, arrivalCode, "到达站");
+
+        Map<Long, Integer> stationId2SeqMap = trainStopCacheTask.getCacheByTrainId(trainId)
+                .getStationId2SeqMap();
+
+        validateStationSequence(stationId2SeqMap, fromStationId, toStationId, trainId, departureCode, arrivalCode);
+
+        SequenceDTO sequenceDTO = new SequenceDTO();
+        sequenceDTO.setStartSequence(stationId2SeqMap.get(fromStationId));
+        sequenceDTO.setEndSequence(stationId2SeqMap.get(toStationId));
+        return sequenceDTO;
+    }
+
+    /**
+     * 根据站点编码获取ID
+     */
+    private Long getStationIdByCode(List<Station> allStations, String stationCode, String stationType) {
+        return allStations.stream()
+                .filter(station -> stationCode.equals(station.getCode()))
+                .findFirst()
+                .orElseThrow(() -> new BusinessException(stationType + "编码不存在：" + stationCode))
+                .getId();
+    }
+
+    /**
+     * 业务校验
+     */
+    private void validateStationSequence(Map<Long, Integer> stationId2SeqMap,
+                                         Long fromStationId,
+                                         Long toStationId,
+                                         Long trainId,
+                                         String departureCode,
+                                         String arrivalCode) {
+        if (!stationId2SeqMap.containsKey(fromStationId)) {
+            throw new BusinessException(trainId + "车次不包含出发站：" + departureCode);
+        }
+        if (!stationId2SeqMap.containsKey(toStationId)) {
+            throw new BusinessException(trainId + "车次不包含到达站：" + arrivalCode);
+        }
+        Integer startSeq = stationId2SeqMap.get(fromStationId);
+        Integer endSeq = stationId2SeqMap.get(toStationId);
+        if (startSeq >= endSeq) {
+            throw new BusinessException("站点顺序异常：出发站序列不能大于等于到达站序列");
+        }
+    }
+
+    /**
      * 单条座位占用记录初始化Bitmap
      */
     private void initSeatOccupancyFromDb(SeatIntervalOccupy occupancy) {
         validateSeatOccupancy(occupancy);
 
-        String key = buildSeatBitmapKey(occupancy);
+        String key = buildSeatBitmapKey(occupancy.getOrderType(), occupancy.getTrainId(), occupancy.getSeatId());
         try {
             cacheClient.setRangeBits(key, occupancy.getStartSequence(), occupancy.getEndSequence(), true);
         } catch (Exception e) {
@@ -212,14 +426,14 @@ public class SeatServiceImpl implements SeatService {
     /**
      * 构建Bitmap缓存Key
      */
-    private String buildSeatBitmapKey(SeatIntervalOccupy occupancy) {
-        String prefix = OrderTypeConstants.PREORDER.equals(occupancy.getOrderType())
+    private String buildSeatBitmapKey(Integer orderType, Long trainId, Long seatId) {
+        String prefix = OrderTypeConstants.PREORDER.equals(orderType)
                 ? RedisConstants.RAIL_BITMAP_SEAT_TEMP_LOCK_PREFIX
                 : RedisConstants.RAIL_BITMAP_SEAT_FORMAL_PREFIX;
 
         return String.format("%strainId:%d:seatId:%d",
                 prefix,
-                occupancy.getTrainId(),
-                occupancy.getSeatId());
+                trainId,
+                seatId);
     }
 }

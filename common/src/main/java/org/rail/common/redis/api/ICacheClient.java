@@ -84,6 +84,10 @@ public interface ICacheClient {
 
     void batchDelete(Collection<String> keys);
 
+    <T> T executeLuaFile(String luaFilePath, List<Object> keys, Object... args);
+
+    <T> T executeLuaScript(String luaScript, List<Object> keys, Object... args);
+
     <D, ID> D queryWithPassThrough(
             String keyPrefix,
             ID id,

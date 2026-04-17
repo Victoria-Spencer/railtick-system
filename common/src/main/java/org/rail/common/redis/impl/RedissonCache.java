@@ -11,8 +11,13 @@ import org.redisson.client.codec.ByteArrayCodec;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.LongStream;
@@ -23,11 +28,13 @@ import java.util.stream.LongStream;
 @Component
 public class RedissonCache implements RedisCache {
 
+    private final Map<String, String> scriptContentCache = new ConcurrentHashMap<>();
+    private final Map<String, String> scriptShaCache = new ConcurrentHashMap<>();
+
     @Autowired
     private RedissonClient redissonClient;
 
     // =============================== String类型缓存操作封装 ===================================
-
     /**
      * 设置缓存
      */
@@ -721,5 +728,65 @@ public class RedissonCache implements RedisCache {
         return keys.stream()
                 .filter(StrUtil::isNotBlank)
                 .collect(Collectors.toList());
+    }
+
+    // ================================= Lua 脚本操作 ==================================
+    @Override
+    public <T> T executeLuaFile(String luaFilePath, List<Object> keys, Object... args) {
+        if (StrUtil.isBlank(luaFilePath) || CollectionUtil.isEmpty(keys)) {
+            throw new CacheException("Lua 脚本执行参数异常");
+        }
+        try {
+            String scriptContent = loadScriptFromClasspath(luaFilePath);
+            String sha1 = getScriptSha(scriptContent);
+            return redissonClient.getScript().evalSha(
+                    RScript.Mode.READ_WRITE,
+                    sha1,
+                    RScript.ReturnType.INTEGER,
+                    keys,
+                    args
+            );
+        } catch (Exception e) {
+            throw new CacheException("Lua 脚本文件执行失败", e);
+        }
+    }
+
+    @Override
+    public <T> T executeLuaScript(String luaScript, List<Object> keys, Object... args) {
+        if (StrUtil.isBlank(luaScript) || CollectionUtil.isEmpty(keys)) {
+            throw new CacheException("Lua 脚本执行参数异常");
+        }
+        try {
+            return redissonClient.getScript().eval(
+                    RScript.Mode.READ_WRITE,
+                    luaScript,
+                    RScript.ReturnType.INTEGER,
+                    keys,
+                    args
+            );
+        } catch (Exception e) {
+            throw new CacheException("Lua 脚本字符串执行失败", e);
+        }
+    }
+
+    /**
+     * 从 classpath 加载 Lua 脚本文件
+     */
+    private String loadScriptFromClasspath(String filePath) {
+        try (InputStream is = getClass().getClassLoader().getResourceAsStream(filePath);
+             BufferedReader br = new BufferedReader(new InputStreamReader(is))) {
+            return br.lines().collect(Collectors.joining("\n"));
+        } catch (IOException e) {
+            throw new CacheException("加载 Lua 脚本文件失败：" + filePath, e);
+        }
+    }
+
+    /**
+     * 缓存脚本 SHA1 摘要，避免重复上传
+     */
+    private String getScriptSha(String script) {
+        return scriptShaCache.computeIfAbsent(script,
+                s -> redissonClient.getScript().scriptLoad(s)
+        );
     }
 }

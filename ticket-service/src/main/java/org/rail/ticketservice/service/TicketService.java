@@ -5,8 +5,10 @@ import org.rail.api.dto.BatchSeatIntervalInsertDTO;
 import org.rail.api.dto.RandomSeatQueryDTO;
 import org.rail.ticketservice.pojo.dto.PlannedTicketQueryDTO;
 import org.rail.ticketservice.pojo.dto.TicketQueryDTO;
+import org.rail.ticketservice.pojo.vo.SeatBusinessVO;
 import org.rail.ticketservice.pojo.vo.TicketQueryVO;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public interface TicketService {

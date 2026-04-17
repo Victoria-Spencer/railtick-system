@@ -1,34 +1,78 @@
 package org.rail.common.core.util;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 public class ThreadLocalUtils {
 
-    private static final ThreadLocal<Object> THREAD_LOCAL = new ThreadLocal<>();
+    // 存储 Map<String, Object>
+    private static final ThreadLocal<Map<String, Object>> THREAD_LOCAL =
+            ThreadLocal.withInitial(HashMap::new);
 
     private ThreadLocalUtils() {
     }
 
     /**
-     * 从当前线程获取数据
-     * @param <T> 数据类型（由调用方指定）
-     * @return 线程中存储的值（未存储则返回null）
+     * 按key存储数据
      */
-    public static <T> T get() {
-        return (T) THREAD_LOCAL.get();
+    public static void set(String key, Object value) {
+        Map<String, Object> map = THREAD_LOCAL.get();
+        map.put(key, value);
     }
 
     /**
-     * 向当前线程存储数据（新值会覆盖旧值）
-     * @param t 要存储的值
-     * @param <T> 数据类型
+     * 按key获取数据
      */
-    public static <T> void set(T t) {
-        THREAD_LOCAL.set(t);
+    @Deprecated
+    public static <T> T get(String key) {
+        Map<String, Object> map = THREAD_LOCAL.get();
+        return (T) map.get(key);
     }
 
     /**
-     * 清空当前线程的所有数据（必须调用，避免内存泄漏）
+     * 按key获取数据
      */
-    public static void remove() {
+    public static <T> T get(String key, Class<T> clazz) {
+        Map<String, Object> map = THREAD_LOCAL.get();
+        Object value = map.get(key);
+        return clazz.cast(value);
+    }
+
+    /**
+     * 获取List类型数据，为空则返回空集合（防NPE）
+     */
+    public static <T> List<T> getList(String key) {
+        Map<String, Object> map = THREAD_LOCAL.get();
+        Object value = map.get(key);
+        if (value == null) {
+            return new ArrayList<>();
+        }
+        return (List<T>) value;
+    }
+
+    /**
+     * 往ThreadLocal的List中添加元素
+     */
+    public static <T> void addToList(String key, T element) {
+        List<T> list = getList(key);
+        list.add(element);
+        set(key, list);
+    }
+
+    /**
+     * 删除指定key的数据
+     */
+    public static void removeKey(String key) {
+        Map<String, Object> map = THREAD_LOCAL.get();
+        map.remove(key);
+    }
+
+    /**
+     * 清空当前线程的所有数据
+     */
+    public static void removeAll() {
         THREAD_LOCAL.remove();
     }
 }

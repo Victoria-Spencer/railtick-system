@@ -1,5 +1,6 @@
 package org.rail.common.redis.util;
 
+import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.lang.TypeReference;
 import cn.hutool.core.util.StrUtil;
 import lombok.extern.slf4j.Slf4j;
@@ -10,8 +11,7 @@ import org.rail.common.redis.core.RedisStrategyCache;
 import org.rail.common.redis.exception.CacheException;
 import org.rail.common.redis.result.AggBatchResult;
 import org.rail.common.redis.result.AggCacheResult;
-import org.redisson.api.RBucket;
-import org.redisson.client.codec.ByteArrayCodec;
+import org.redisson.api.RScript;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -335,6 +335,17 @@ public class CacheClient implements ICacheClient {
     @Override
     public void batchDelete(Collection<String> keys) {
         redisCache.batchDelete(keys);
+    }
+
+    // ================================= Lua 脚本操作 ==================================
+    @Override
+    public <T> T executeLuaFile(String luaFilePath, List<Object> keys, Object... args) {
+        return redisCache.executeLuaFile(luaFilePath, keys, args);
+    }
+
+    @Override
+    public <T> T executeLuaScript(String luaScript, List<Object> keys, Object... args) {
+        return redisCache.executeLuaScript(luaScript, keys, args);
     }
 
     // ========================== 缓存穿透 ================================

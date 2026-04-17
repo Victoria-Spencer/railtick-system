@@ -22,13 +22,13 @@ public class CommonRequestInterceptor implements HandlerInterceptor {
         }
 
         // 将user-id存入到线程中
-        ThreadLocalUtils.set(userId);
+        ThreadLocalUtils.set("userId", userId);
 
 //        System.out.println("threadLocal：" + userId);
         return true;
     }
 
     public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) throws Exception {
-        ThreadLocalUtils.remove();
+        ThreadLocalUtils.removeAll();
     }
 }
