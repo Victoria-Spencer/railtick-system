@@ -11,13 +11,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.rail.api.client.TicketFeignClient;
 import org.rail.api.client.UserFeignClient;
 import org.rail.api.constant.OrderTypeConstants;
+import org.rail.common.core.exception.*;
 import org.rail.common.core.util.BeanConvertUtil;
 import org.rail.common.core.util.SnowflakeIdGenerator;
+import org.rail.common.core.util.ThreadLocalUtils;
 import org.rail.common.redis.api.ICacheClient;
 import org.rail.common.redis.constant.RedisConstants;
-import org.rail.common.core.exception.BusinessException;
-import org.rail.common.core.exception.OpenFeignException;
-import org.rail.common.core.exception.OrderNotFoundException;
 import org.rail.common.redis.result.AggCacheResult;
 import org.rail.common.core.result.PageResult;
 import org.rail.common.core.result.Result;
@@ -35,6 +34,8 @@ import org.rail.orderservice.pojo.vo.CreateOrderVO;
 import org.rail.orderservice.pojo.vo.OrderDetailsVO;
 import org.rail.orderservice.pojo.vo.OrderPageQueryVO;
 import org.rail.orderservice.pojo.vo.SelfTicketPageVO;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -45,8 +46,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static org.rail.common.redis.constant.RedisConstants.RAIL_PRE_ORDER_DETAILS_PREFIX;
-import static org.rail.common.redis.constant.RedisConstants.RAIL_PRE_ORDER_PREFIX;
+import static org.rail.common.redis.constant.RedisConstants.*;
 
 @Slf4j
 @Service
@@ -63,6 +63,8 @@ public class OrderServiceImpl implements OrderService {
     private TicketFeignClient ticketFeignClient;
     @Autowired
     private ICacheClient cacheClient;
+    @Autowired
+    private RedissonClient redissonClient;
 
     /**
      * 1.创建预订单，临时锁定座位
@@ -71,7 +73,7 @@ public class OrderServiceImpl implements OrderService {
      *      *********************************************************************************
      *      引入Redisson分布式锁，锁粒度控制在「同一用户 + 同一车次」，确保同一用户对同一车次的预订单操作串行化，
      *      避免并发导致的数据不一致问题（如重复预订、座位锁定冲突等）
-     *      TODO 双层锁
+     *      双层锁
      *      第一层（业务锁）	用户ID + 车次ID	防止同一个用户重复创建预订单
      *      第二层（资源锁）	座位ID（车厢+座位号）	防止不同用户抢同一个座位（超卖）
      *      *********************************************************************************
@@ -87,16 +89,34 @@ public class OrderServiceImpl implements OrderService {
     @Override
 //    @GlobalTransactional
     public String createPreOrder(CreatePreOrderDTO createPreOrderDTO) {
-        // 根据用户ID和列车ID，查询是否已存在预订单
-        String preOrderKey = buildPreOrderKey(createPreOrderDTO.getUserId(), createPreOrderDTO.getTrainId());
-        PreOrder preOrder = cacheClient.get(preOrderKey);
+        String userId = ThreadLocalUtils.get("userId", String.class);
+        Long trainId = createPreOrderDTO.getTrainId();
+        String lockKey = RedisConstants.USER_TRAIN_PRE_ORDER_LOCK_PREFIX + userId + ":" + trainId;
+        RLock lock = redissonClient.getLock(lockKey);
 
-        if(ObjectUtil.isNotNull(preOrder)) {
-            // 存在旧预订单：更新逻辑
-            return updateExistPreOrder(createPreOrderDTO, preOrder);
-        } else {
-            // 无旧预订单：创建新预订单+新明细
-            return createNewPreOrder(createPreOrderDTO);
+        try {
+            boolean isLocked = lock.tryLock(3, -1, TimeUnit.SECONDS);
+
+            if (!isLocked) {
+                throw new UserConcurrentLockException("操作频繁，请稍后再试！");
+            }
+
+            // 根据用户ID和列车ID，查询是否已存在预订单
+            String preOrderKey = buildPreOrderKey(createPreOrderDTO.getUserId(), trainId);
+            PreOrder preOrder = cacheClient.get(preOrderKey);
+
+            if(ObjectUtil.isNotNull(preOrder)) {
+                return updateExistPreOrder(createPreOrderDTO, preOrder);
+            } else {
+                return createNewPreOrder(createPreOrderDTO);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new UserOperateInterruptedException("预订单创建被中断，请重试", e);
+        } finally {
+            if (lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
         }
     }
 

@@ -132,7 +132,7 @@ public class RedissonStrategyCache implements RedisStrategyCache {
 
         // 数据库无数据，缓存空值
         if (data == null) {
-            redisCache.set(key, (D) "", CACHE_NULL_TTL, TimeUnit.MINUTES);
+            redisCache.set(key, (D) "", REDIS_CACHE_NULL_TTL, TimeUnit.MINUTES);
             return null;
         }
 
@@ -208,7 +208,7 @@ public class RedissonStrategyCache implements RedisStrategyCache {
         });
 
         if (MapUtil.isNotEmpty(nullMap)) {
-            redisCache.batchSet(nullMap, CACHE_NULL_TTL, TimeUnit.MINUTES);
+            redisCache.batchSet(nullMap, REDIS_CACHE_NULL_TTL, TimeUnit.MINUTES);
         }
         if (MapUtil.isNotEmpty(normalMap)) {
             redisCache.batchSet(normalMap, time, timeUnit);
@@ -272,11 +272,11 @@ public class RedissonStrategyCache implements RedisStrategyCache {
         if (redisCache.exists(key)) return null;
 
         // 缓存未命中，加锁重建
-        String lockKey = LOCK_PREFIX + key;
+        String lockKey = REDIS_LOCK_PREFIX + key;
         RLock lock = redissonClient.getLock(lockKey);
 
         try {
-            boolean locked = lock.tryLock(0, LOCK_TTL, TimeUnit.SECONDS);
+            boolean locked = lock.tryLock(0, REDIS_LOCK_TTL, TimeUnit.SECONDS);
             if (!locked) {
                 Thread.sleep(RETRY_INTERVAL);
                 return queryWithMutex(keyGenerator, dto, typeRef, dbFallback, time, timeUnit, retryCount - 1);
@@ -289,7 +289,7 @@ public class RedissonStrategyCache implements RedisStrategyCache {
 
             D dbData = dbFallback.apply(dto);
             if (dbData == null) {
-                redisCache.set(key, (D) "", CACHE_NULL_TTL, TimeUnit.MINUTES);
+                redisCache.set(key, (D) "", REDIS_CACHE_NULL_TTL, TimeUnit.MINUTES);
                 return null;
             }
             redisCache.set(key, dbData, time, timeUnit);
@@ -355,10 +355,10 @@ public class RedissonStrategyCache implements RedisStrategyCache {
                 lockMap.clear();
                 // 遍历加锁
                 for (DTO dto : missDtos) {
-                    RLock lock = redissonClient.getLock(LOCK_PREFIX + dtoKeyMap.get(dto));
+                    RLock lock = redissonClient.getLock(REDIS_LOCK_PREFIX + dtoKeyMap.get(dto));
                     try {
                         // Redisson 原生 tryLock：等待时间、锁过期时间、单位
-                        if (!lock.tryLock(LOCK_WAIT_TIME, LOCK_TTL, TimeUnit.SECONDS)) {
+                        if (!lock.tryLock(LOCK_WAIT_TIME, REDIS_LOCK_TTL, TimeUnit.SECONDS)) {
                             allLocked = false;
                             break;
                         }
@@ -470,7 +470,7 @@ public class RedissonStrategyCache implements RedisStrategyCache {
         // 缓存未过期，直接返回
         if (redisData.getExpireTime().isAfter(LocalDateTime.now())) return data;
 
-        String lockKey = LOCK_PREFIX + key;
+        String lockKey = REDIS_LOCK_PREFIX + key;
         RLock lock = redissonClient.getLock(lockKey);
 
         // 缓存过期，加锁，异步重建

@@ -70,8 +70,7 @@ public class TicketServiceImpl implements TicketService {
     @Autowired
     private SeatService seatService;
 
-    // 从配置文件注入预订单有效期（分钟）
-    @Value("${order.pre.expire-minutes : 15}") // 默认15分钟
+    @Value("${order.pre.expire-minutes : 15}")
     private Integer preOrderExpireMinutes;
 
     /**

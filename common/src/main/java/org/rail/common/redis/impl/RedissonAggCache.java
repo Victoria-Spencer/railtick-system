@@ -19,8 +19,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import static org.rail.common.redis.constant.RedisConstants.CACHE_NULL_TTL;
-import static org.rail.common.redis.constant.RedisConstants.DEP_PREFIX;
+import static org.rail.common.redis.constant.RedisConstants.REDIS_CACHE_NULL_TTL;
+import static org.rail.common.redis.constant.RedisConstants.REDIS_DEP_PREFIX;
 
 /**
  * 聚合缓存
@@ -230,8 +230,8 @@ public class RedissonAggCache implements RedisAggCache {
 
         // 数据库无数据 → 缓存空值（短TTL）+ 返回null
         if (data == null || (data instanceof PageResult && ((PageResult<?>) data).getTotal() == 0)) {
-            redisCache.set(aggKey, (D) "", CACHE_NULL_TTL, TimeUnit.MINUTES);
-            log.debug("聚合缓存策略-数据库无数据，缓存空值（TTL:{}分钟） | AggKey:{}", CACHE_NULL_TTL, aggKey);
+            redisCache.set(aggKey, (D) "", REDIS_CACHE_NULL_TTL, TimeUnit.MINUTES);
+            log.debug("聚合缓存策略-数据库无数据，缓存空值（TTL:{}分钟） | AggKey:{}", REDIS_CACHE_NULL_TTL, aggKey);
             return null;
         }
 
@@ -282,8 +282,8 @@ public class RedissonAggCache implements RedisAggCache {
 
         // 4. 数据库无数据 → 缓存空值（短TTL）+ 返回null
         if (data == null || (data instanceof PageResult && ((PageResult<?>) data).getTotal() == 0)) {
-            redisCache.set(aggKey, (D) "", CACHE_NULL_TTL, TimeUnit.MINUTES);
-            log.debug("聚合缓存策略-数据库无数据，缓存空值（TTL:{}分钟） | AggKey:{}", CACHE_NULL_TTL, aggKey);
+            redisCache.set(aggKey, (D) "", REDIS_CACHE_NULL_TTL, TimeUnit.MINUTES);
+            log.debug("聚合缓存策略-数据库无数据，缓存空值（TTL:{}分钟） | AggKey:{}", REDIS_CACHE_NULL_TTL, aggKey);
             return null;
         }
 
@@ -386,8 +386,8 @@ public class RedissonAggCache implements RedisAggCache {
         if (CollectionUtil.isNotEmpty(nullAggKeys)) {
             Map<String, String> nullValueMap = nullAggKeys.stream()
                     .collect(Collectors.toMap(key -> key, key -> ""));
-            redisCache.batchSet(nullValueMap, CACHE_NULL_TTL, TimeUnit.MINUTES);
-            log.debug("批量聚合缓存策略-批量缓存空值，共{}个Key，TTL:{}分钟", nullAggKeys.size(), CACHE_NULL_TTL);
+            redisCache.batchSet(nullValueMap, REDIS_CACHE_NULL_TTL, TimeUnit.MINUTES);
+            log.debug("批量聚合缓存策略-批量缓存空值，共{}个Key，TTL:{}分钟", nullAggKeys.size(), REDIS_CACHE_NULL_TTL);
         }
 
         // 批量缓存正常数据 + 记录依赖关系
@@ -459,6 +459,6 @@ public class RedissonAggCache implements RedisAggCache {
      * @return 如 rail:dep:rail:order:123
      */
     private String buildDepSetKey(String singleKey) {
-        return DEP_PREFIX + singleKey;
+        return REDIS_DEP_PREFIX + singleKey;
     }
 }
