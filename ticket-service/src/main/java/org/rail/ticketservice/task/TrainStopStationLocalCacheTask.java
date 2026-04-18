@@ -4,7 +4,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.rail.common.core.exception.BusinessException;
-import org.rail.common.core.exception.CacheInitException;
+import org.rail.common.redis.exception.CacheInitException;
 import org.rail.ticketservice.mapper.TrainStopStationMapper;
 import org.rail.ticketservice.pojo.dto.TrainStopStationCacheDTO;
 import org.rail.ticketservice.pojo.entity.TrainStopStation;

@@ -1,4 +1,4 @@
-package org.rail.common.core.exception;
+package org.rail.common.redis.exception;
 
 import java.io.Serial;
 

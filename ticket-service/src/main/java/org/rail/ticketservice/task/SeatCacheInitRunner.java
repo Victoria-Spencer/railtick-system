@@ -1,7 +1,7 @@
 package org.rail.ticketservice.task;
 
 import lombok.extern.slf4j.Slf4j;
-import org.rail.common.core.exception.CacheInitException;
+import org.rail.common.redis.exception.CacheInitException;
 import org.rail.common.redis.constant.RedisConstants;
 import org.rail.ticketservice.service.SeatService;
 import org.redisson.api.RLock;

@@ -1,11 +1,14 @@
 package org.rail.common.core.exception;
 
+import java.io.Serial;
+
 /**
  * 用户操作中断异常
  * 分布式锁等待、业务执行被线程中断时抛出
  */
 public class UserOperateInterruptedException extends RuntimeException {
 
+    @Serial
     private static final long serialVersionUID = 1L;
 
     public UserOperateInterruptedException() {
