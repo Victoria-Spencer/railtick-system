@@ -61,17 +61,15 @@ public class PassengerServiceImpl implements PassengerService {
             log.warn("查询乘客列表失败：userId 不能为空");
             return Collections.emptyList();
         }
-        // 缓存乘客信息
-        TypeReference<List<Passenger>> typeRef = new TypeReference<List<Passenger>>() {};
+        TypeReference<List<Passenger>> typeRef = new TypeReference<>() {};
         return cacheClient.queryWithMutex(
                 RedisConstants.RAIL_PASSENGER_LIST_USER_PREFIX,
                 userId,
-                typeRef, // 直接传泛型类型
-                id -> passengerMapper.getByUserId(id), // 缓存未命中时，查库
+                typeRef,
+                id -> passengerMapper.getByUserId(id),
                 RedisConstants.RAIL_DEFAULT_TTL,
                 TimeUnit.MINUTES
         );
-//        return passengerMapper.getByUserId(userId);
     }
 
     /**
