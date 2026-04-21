@@ -43,6 +43,8 @@
         <logstash-logback-encoder.version>7.2</logstash-logback-encoder.version>
         <common.version>0.0.1-SNAPSHOT</common.version>
         <api.version>0.0.1-SNAPSHOT</api.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     </properties>
 
     <!-- 依赖管理：子模块引用时无需写version -->
@@ -146,6 +148,7 @@
                     <configuration>
                         <source>${java.version}</source>
                         <target>${java.version}</target>
+                        <encoding>${project.build.sourceEncoding}</encoding>
                         <annotationProcessorPaths>
                             <path>
                                 <groupId>org.projectlombok</groupId>
@@ -199,7 +202,7 @@
                     <artifactId>maven-surefire-plugin</artifactId>
                     <configuration>
                         <testSourceDirectory>src/test/java</testSourceDirectory>
-                        <argLine>-Dfile.encoding=UTF-8</argLine>
+                        <argLine>-Dfile.encoding=${project.build.sourceEncoding}</argLine>
                     </configuration>
                 </plugin>
 
@@ -216,7 +219,7 @@
                             </goals>
                             <configuration>
                                 <testSourceDirectory>src/it/java</testSourceDirectory>
-                                <argLine>-Dfile.encoding=UTF-8</argLine>
+                                <argLine>-Dfile.encoding=${project.build.sourceEncoding}</argLine>
                             </configuration>
                         </execution>
                     </executions>
