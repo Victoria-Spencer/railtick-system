@@ -1,0 +1,14 @@
+spring:
+  data:
+    redis:
+      host: 192.168.43.143
+      port: 6379
+      database: 15
+      timeout: PT5S
+      client-name: redis-single-client
+      lettuce:
+        pool:
+          max-active: 16
+          max-idle: 8
+          min-idle: 4
+          max-wait: PT2S

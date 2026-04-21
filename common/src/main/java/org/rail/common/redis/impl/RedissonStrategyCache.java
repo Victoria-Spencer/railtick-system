@@ -78,7 +78,6 @@ public class RedissonStrategyCache implements RedisStrategyCache {
         validateRequired(cacheRebuildExecutor, "cacheRebuildExecutor");
     }
 
-    // ========================== 缓存穿透 ================================
     /**
      * 缓存穿透（keyPrefix + id 生成Key）
      */
@@ -220,7 +219,6 @@ public class RedissonStrategyCache implements RedisStrategyCache {
         return buildResultMap(dtos, dtoKeyMap, cacheMap);
     }
 
-    // ========================== 互斥锁（Mutex）=========================
 
     /**
      * 互斥锁（简化版：keyPrefix + id，默认重试次数，仅 TypeReference）
@@ -276,7 +274,7 @@ public class RedissonStrategyCache implements RedisStrategyCache {
         RLock lock = redissonClient.getLock(lockKey);
 
         try {
-            boolean locked = lock.tryLock(0, REDIS_LOCK_TTL, TimeUnit.SECONDS);
+            boolean locked = lock.tryLock(0, -1, TimeUnit.SECONDS);
             if (!locked) {
                 Thread.sleep(RETRY_INTERVAL);
                 return queryWithMutex(keyGenerator, dto, typeRef, dbFallback, time, timeUnit, retryCount - 1);
@@ -358,7 +356,7 @@ public class RedissonStrategyCache implements RedisStrategyCache {
                     RLock lock = redissonClient.getLock(REDIS_LOCK_PREFIX + dtoKeyMap.get(dto));
                     try {
                         // Redisson 原生 tryLock：等待时间、锁过期时间、单位
-                        if (!lock.tryLock(LOCK_WAIT_TIME, REDIS_LOCK_TTL, TimeUnit.SECONDS)) {
+                        if (!lock.tryLock(LOCK_WAIT_TIME, -1, TimeUnit.SECONDS)) {
                             allLocked = false;
                             break;
                         }
@@ -415,8 +413,6 @@ public class RedissonStrategyCache implements RedisStrategyCache {
     }
 
 
-    // =========================== 逻辑过期（LogicalExpire）=============================
-
     /**
      * 逻辑过期（简化版：keyPrefix + id）
      */
@@ -461,9 +457,7 @@ public class RedissonStrategyCache implements RedisStrategyCache {
         RedisData<D> redisData = redisCache.get(key);
 
         if (redisData == null || redisData.getData() == null) {
-            D dbData = dbFallback.apply(dto);
-            if (dbData != null) redisCache.setWithLogicalExpire(key, dbData, time, timeUnit);
-            return dbData;
+            return rebuildMissCacheWithLock(key, dto, dbFallback, time, timeUnit);
         }
 
         D data = redisData.getData();
@@ -499,6 +493,54 @@ public class RedissonStrategyCache implements RedisStrategyCache {
     }
 
     /**
+     * 单体缓存未命中 → 加锁重建
+     */
+    private <D, DTO> D rebuildMissCacheWithLock(
+            String key,
+            DTO dto,
+            Function<DTO, D> dbFallback,
+            Long time,
+            TimeUnit timeUnit
+    ) {
+        String lockKey = REDIS_LOCK_PREFIX + key;
+        RLock lock = redissonClient.getLock(lockKey);
+        D dbData = null;
+        try {
+            // 重试获取锁
+            boolean locked = lock.tryLock(0, -1, TimeUnit.SECONDS);
+            int retry = DEFAULT_RETRY_COUNT;
+            while (!locked && retry-- > 0) {
+                Thread.sleep(RETRY_INTERVAL);
+                locked = lock.tryLock(0, -1, TimeUnit.SECONDS);
+            }
+
+            if (!locked) {
+                throw new CacheException("缓存重建锁获取失败");
+            }
+
+            // 二次检查，防止并发重复重建
+            RedisData<D> doubleCheck = redisCache.get(key);
+            if (doubleCheck != null && doubleCheck.getData() != null) {
+                return doubleCheck.getData();
+            }
+
+            dbData = dbFallback.apply(dto);
+            // 写入逻辑过期缓存
+            if (dbData != null) {
+                redisCache.setWithLogicalExpire(key, dbData, time, timeUnit);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("线程中断，缓存重建失败", e);
+        } finally {
+            if (lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
+        }
+        return dbData;
+    }
+
+    /**
      * 批量逻辑过期
      */
     @Override
@@ -524,7 +566,6 @@ public class RedissonStrategyCache implements RedisStrategyCache {
             keys.add(key);
         }
 
-        // 结果集合
         Map<DTO, D> resultMap = new LinkedHashMap<>();
         List<DTO> missDtos = new ArrayList<>();
         List<DTO> expiredDtos = new ArrayList<>();
@@ -551,14 +592,12 @@ public class RedissonStrategyCache implements RedisStrategyCache {
 
         // 处理未命中的DTO（同步查库）
         if (!CollectionUtil.isEmpty(missDtos)) {
-            log.debug("批量逻辑过期策略-未命中数:{}，同步查询数据库", missDtos.size());
-            Map<DTO, D> missDbMap = batchDbFallback.apply(missDtos);
+            log.debug("批量逻辑过期策略-未命中数:{}，加锁重建缓存", missDtos.size());
+            Map<DTO, D> missDbMap = rebuildBatchMissCacheWithLock(missDtos, dtoKeyMap, batchDbFallback, time, timeUnit);
+
+            // 合并未命中数据结果
             for (DTO dto : missDtos) {
-                D data = missDbMap.getOrDefault(dto, null);
-                resultMap.put(dto, data);
-                if (data != null) {
-                    redisCache.setWithLogicalExpire(dtoKeyMap.get(dto), data, time, timeUnit);
-                }
+                resultMap.put(dto, missDbMap.getOrDefault(dto, null));
             }
         }
 
@@ -568,6 +607,95 @@ public class RedissonStrategyCache implements RedisStrategyCache {
         }
 
         return resultMap;
+    }
+
+    /**
+     * 批量缓存未命中 → 加锁重建
+     */
+    private <D, DTO> Map<DTO, D> rebuildBatchMissCacheWithLock(
+            List<DTO> missDtos,
+            Map<DTO, String> dtoKeyMap,
+            Function<List<DTO>, Map<DTO, D>> batchDbFallback,
+            Long time,
+            TimeUnit timeUnit
+    ) {
+        Map<DTO, D> missDbMap = new HashMap<>();
+        Map<DTO, RLock> lockMap = new HashMap<>();
+
+        try {
+            // 重试获取批量锁
+            boolean allLocked = false;
+            int retry = DEFAULT_RETRY_COUNT;
+            while (!allLocked && retry-- > 0) {
+                allLocked = true;
+                lockMap.clear();
+
+                // 逐个加锁
+                for (DTO dto : missDtos) {
+                    String lockKey = REDIS_LOCK_PREFIX + dtoKeyMap.get(dto);
+                    RLock lock = redissonClient.getLock(lockKey);
+                    try {
+                        boolean locked = lock.tryLock(0, -1, TimeUnit.SECONDS);
+                        if (!locked) {
+                            allLocked = false;
+                            break;
+                        }
+                        lockMap.put(dto, lock);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        throw new RuntimeException("批量加锁被中断", e);
+                    }
+                }
+
+                // 加锁失败 → 释放已持有的锁 → 重试
+                if (!allLocked) {
+                    lockMap.values().forEach(lock -> {
+                        if (lock.isHeldByCurrentThread()) lock.unlock();
+                    });
+                    Thread.sleep(RETRY_INTERVAL);
+                }
+            }
+
+            // 重试耗尽仍未拿到全部锁 → 直接抛异常
+            if (!allLocked) {
+                throw new CacheException("批量缓存重建锁获取失败，重试次数已耗尽");
+            }
+
+            // 二次检查缓存（防止并发重复重建）
+            List<String> checkKeys = missDtos.stream().map(dtoKeyMap::get).toList();
+            Map<String, RedisData<D>> doubleCheckMap = redisCache.batchGet(checkKeys);
+
+            // 筛选最终需要查库的未命中数据
+            List<DTO> finalMissDtos = missDtos.stream()
+                    .filter(dto -> {
+                        RedisData<D> data = doubleCheckMap.get(dtoKeyMap.get(dto));
+                        return data == null || data.getData() == null;
+                    })
+                    .toList();
+
+            // 真正执行批量查库
+            if (CollectionUtil.isNotEmpty(finalMissDtos)) {
+                missDbMap = batchDbFallback.apply(finalMissDtos);
+                // 写入逻辑过期缓存
+                for (DTO dto : finalMissDtos) {
+                    D data = missDbMap.get(dto);
+                    if (data != null) {
+                        redisCache.setWithLogicalExpire(dtoKeyMap.get(dto), data, time, timeUnit);
+                    }
+                }
+            }
+
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("批量缓存重建异常", e);
+        } finally {
+            lockMap.values().forEach(lock -> {
+                if (lock.isHeldByCurrentThread()) {
+                    lock.unlock();
+                }
+            });
+        }
+        return missDbMap;
     }
 
     /**

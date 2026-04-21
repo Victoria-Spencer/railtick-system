@@ -171,25 +171,6 @@ public interface ICacheClient {
             TimeUnit timeUnit
     );
 
-    <D, DTO> D queryAggCacheWithBloom(
-            String aggKey,
-            List<String> dependSingleKeys,
-            TypeReference<D> typeRef,
-            Function<DTO, D> dbFallback,
-            DTO dto,
-            Long time,
-            TimeUnit timeUnit
-    );
-
-    <D, DTO> D queryAggCacheWithBloom(
-            String aggKey,
-            TypeReference<D> typeRef,
-            Function<DTO, AggCacheResult<D>> dbFallback,
-            DTO dto,
-            Long time,
-            TimeUnit timeUnit
-    );
-
     <D, DTO> D queryAggCacheWithNullCache(
             String aggKey,
             List<String> dependSingleKeys,

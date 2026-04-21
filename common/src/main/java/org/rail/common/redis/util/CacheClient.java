@@ -1,17 +1,13 @@
 package org.rail.common.redis.util;
 
-import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.lang.TypeReference;
-import cn.hutool.core.util.StrUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.rail.common.redis.api.ICacheClient;
 import org.rail.common.redis.core.RedisAggCache;
 import org.rail.common.redis.core.RedisCache;
 import org.rail.common.redis.core.RedisStrategyCache;
-import org.rail.common.redis.exception.CacheException;
 import org.rail.common.redis.result.AggBatchResult;
 import org.rail.common.redis.result.AggCacheResult;
-import org.redisson.api.RScript;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -495,54 +491,7 @@ public class CacheClient implements ICacheClient {
 
 // ========================== 聚合缓存（单Key关联多表Key） =========================
     /**
-     * 1.布隆过滤器：分页不适用，组合太多，容易引发维度爆炸
-     * 聚合缓存查询（存储聚合结果 + 自动记录单表依赖关系）
-     * @param aggKey 聚合缓存Key（如 rail:agg:order_full:123）
-     * @param dependSingleKeys 该聚合依赖的所有单表Key（如 [rail:order:123, rail:order_details:456]）
-     * @param typeRef 聚合数据类型（TypeReference，兼容泛型）
-     * @param dbFallback DB查询回调（缓存未命中时执行）
-     * @param dto 入参DTO（传递给dbFallback）
-     * @param time 缓存过期时间
-     * @param timeUnit 时间单位
-     * @return 聚合数据
-     */
-    @Override
-    public <D, DTO> D queryAggCacheWithBloom(
-            String aggKey,
-            List<String> dependSingleKeys,
-            TypeReference<D> typeRef,
-            Function<DTO, D> dbFallback,
-            DTO dto,
-            Long time,
-            TimeUnit timeUnit
-    ) {
-        return redisAggCache.queryAggCacheWithBloom(aggKey, dependSingleKeys, typeRef, dbFallback, dto, time, timeUnit);
-    }
-
-    /**
-     * 聚合缓存查询（布隆过滤优化版：从AggCacheResult提取依赖单表Key）
-     * @param aggKey 聚合缓存Key
-     * @param typeRef 聚合数据类型
-     * @param dbFallback DB查询回调（返回AggCacheResult，包含数据+依赖单表Key）
-     * @param dto 入参DTO
-     * @param time 缓存过期时间
-     * @param timeUnit 时间单位
-     * @return 聚合数据
-     */
-    @Override
-    public <D, DTO> D queryAggCacheWithBloom(
-            String aggKey,
-            TypeReference<D> typeRef,
-            Function<DTO, AggCacheResult<D>> dbFallback,
-            DTO dto,
-            Long time,
-            TimeUnit timeUnit
-    ) {
-        return redisAggCache.queryAggCacheWithBloom(aggKey, typeRef, dbFallback, dto, time, timeUnit);
-    }
-
-    /**
-     * 2，缓存空值
+     * 缓存空值
      * 聚合缓存查询（存储聚合结果 + 自动记录单表依赖关系）
      * @param aggKey 聚合缓存Key（如 rail:agg:order_full:123）
      * @param dependSingleKeys 该聚合依赖的所有单表Key（如 [rail:order:123, rail:order_details:456]）

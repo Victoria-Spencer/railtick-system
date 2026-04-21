@@ -10,7 +10,6 @@ import org.rail.common.redis.core.RedisAggCache;
 import org.rail.common.redis.core.RedisCache;
 import org.rail.common.redis.result.AggBatchResult;
 import org.rail.common.redis.result.AggCacheResult;
-import org.redisson.api.RBloomFilter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -31,9 +30,6 @@ public class RedissonAggCache implements RedisAggCache {
 
     @Autowired
     private RedisCache redisCache;
-    @Autowired
-    private RBloomFilter<String> aggCacheBloomFilter;
-
     // ========================== 通用极简校验方法 ================================
     private static void validateRequired(Object param, String paramName) {
         if (param == null) {
@@ -62,10 +58,6 @@ public class RedissonAggCache implements RedisAggCache {
         }
     }
 
-    private void validateBloomFilter() {
-        validateRequired(aggCacheBloomFilter, "aggCacheBloomFilter");
-    }
-
     // ============================== 组合封装校验 =======================================
     /**
      * 单条聚合缓存 统一校验
@@ -91,111 +83,7 @@ public class RedissonAggCache implements RedisAggCache {
 
     // ========================== 聚合缓存（单Key关联多表Key） =========================
     /**
-     * 1.布隆过滤器：分页不适用，组合太多，容易引发维度爆炸
-     * 聚合缓存查询（存储聚合结果 + 自动记录单表依赖关系）
-     * @param aggKey 聚合缓存Key（如 rail:agg:order_full:123）
-     * @param dependSingleKeys 该聚合依赖的所有单表Key（如 [rail:order:123, rail:order_details:456]）
-     * @param typeRef 聚合数据类型（TypeReference，兼容泛型）
-     * @param dbFallback DB查询回调（缓存未命中时执行）
-     * @param dto 入参DTO（传递给dbFallback）
-     * @param time 缓存过期时间
-     * @param timeUnit 时间单位
-     * @return 聚合数据
-     */
-    @Override
-    public <D, DTO> D queryAggCacheWithBloom(
-            String aggKey,
-            List<String> dependSingleKeys,
-            TypeReference<D> typeRef,
-            Function<DTO, D> dbFallback,
-            DTO dto,
-            Long time,
-            TimeUnit timeUnit
-    ) {
-        validateAggCacheSingle(aggKey, typeRef, dbFallback, dto, time, timeUnit);
-        validateBloomFilter();
-
-        // 布隆过滤器前置拦截
-        boolean mightExist = aggCacheBloomFilter.contains(aggKey);
-        if (!mightExist) {
-            return null;
-        }
-
-        D data = redisCache.get(aggKey);
-
-        // 缓存未命中，查询数据库
-        if (data != null) return data;
-        data = dbFallback.apply(dto);
-
-        if (data == null || (data instanceof PageResult<?> pr && pr.getTotal() == 0)) return null;
-
-        // 6. 数据库有数据 → ①写入聚合缓存 ②记录依赖 ③将aggKey加入布隆
-        redisCache.set(aggKey, data, time, timeUnit);
-        if (CollectionUtil.isNotEmpty(dependSingleKeys)) {
-            for (String singleKey : dependSingleKeys) {
-                String depSetKey = buildDepSetKey(singleKey);
-                redisCache.addSetMember(depSetKey, aggKey);
-            }
-        }
-        aggCacheBloomFilter.add(aggKey);
-
-        return data;
-    }
-
-    /**
-     * 聚合缓存查询（布隆过滤优化版：从AggCacheResult提取依赖单表Key）
-     * @param aggKey 聚合缓存Key
-     * @param typeRef 聚合数据类型
-     * @param dbFallback DB查询回调（返回AggCacheResult，包含数据+依赖单表Key）
-     * @param dto 入参DTO
-     * @param time 缓存过期时间
-     * @param timeUnit 时间单位
-     * @return 聚合数据
-     */
-    @Override
-    public <D, DTO> D queryAggCacheWithBloom(
-            String aggKey,
-            TypeReference<D> typeRef,
-            Function<DTO, AggCacheResult<D>> dbFallback,
-            DTO dto,
-            Long time,
-            TimeUnit timeUnit
-    ) {
-        validateAggCacheSingle(aggKey, typeRef, dbFallback, dto, time, timeUnit);
-        validateBloomFilter();
-
-        // 布隆过滤器前置拦截
-        boolean mightExist = aggCacheBloomFilter.contains(aggKey);
-        if (!mightExist) {
-            return null;
-        }
-
-        D data = redisCache.get(aggKey);
-
-        if (data != null) return data;
-
-        // 缓存未命中，查询数据库
-        AggCacheResult<D> aggResult = dbFallback.apply(dto);
-        data = aggResult.getData();
-        List<String> dependSingleKeys = aggResult.getDependSingleKeys();
-
-        if (data == null || (data instanceof PageResult<?> pr && pr.getTotal() == 0)) return null;
-
-        // 6. 数据库有数据 → 写入缓存 + 记录依赖 + 加入布隆
-        redisCache.set(aggKey, data, time, timeUnit);
-        if (CollectionUtil.isNotEmpty(dependSingleKeys)) {
-            for (String singleKey : dependSingleKeys) {
-                String depSetKey = buildDepSetKey(singleKey);
-                redisCache.addSetMember(depSetKey, aggKey);
-            }
-        }
-        aggCacheBloomFilter.add(aggKey);
-
-        return data;
-    }
-
-    /**
-     * 2，缓存空值
+     * 缓存空值
      * 聚合缓存查询（存储聚合结果 + 自动记录单表依赖关系）
      * @param aggKey 聚合缓存Key（如 rail:agg:order_full:123）
      * @param dependSingleKeys 该聚合依赖的所有单表Key（如 [rail:order:123, rail:order_details:456]）
@@ -280,14 +168,14 @@ public class RedissonAggCache implements RedisAggCache {
         data = aggResult.getData();
         List<String> dependSingleKeys = aggResult.getDependSingleKeys();
 
-        // 4. 数据库无数据 → 缓存空值（短TTL）+ 返回null
+        // 数据库无数据 → 缓存空值（短TTL）+ 返回null
         if (data == null || (data instanceof PageResult && ((PageResult<?>) data).getTotal() == 0)) {
             redisCache.set(aggKey, (D) "", REDIS_CACHE_NULL_TTL, TimeUnit.MINUTES);
             log.debug("聚合缓存策略-数据库无数据，缓存空值（TTL:{}分钟） | AggKey:{}", REDIS_CACHE_NULL_TTL, aggKey);
             return null;
         }
 
-        // 5. 数据库有数据 → 写入缓存 + 记录依赖
+        // 数据库有数据 → 写入缓存 + 记录依赖
         redisCache.set(aggKey, data, time, timeUnit);
         if (CollectionUtil.isNotEmpty(dependSingleKeys)) {
             for (String singleKey : dependSingleKeys) {
@@ -430,15 +318,15 @@ public class RedissonAggCache implements RedisAggCache {
         }
 
         try {
-            // 步骤1：删除单表自身缓存
+            // 删除单表自身缓存
             redisCache.delete(singleKey);
             log.debug("清理聚合缓存-删除单表缓存，SingleKey:{}", singleKey);
 
-            // 步骤2：读取依赖Set，获取关联的聚合Key
+            // 读取依赖Set，获取关联的聚合Key
             String depSetKey = buildDepSetKey(singleKey);
             Set<String> aggKeys = redisCache.getSetMembers(depSetKey);
 
-            // 步骤3：批量删除聚合缓存 + 清空依赖Set
+            // 批量删除聚合缓存 + 清空依赖Set
             if (aggKeys != null && CollectionUtil.isNotEmpty(aggKeys)) {
                 redisCache.batchDelete(aggKeys);
                 log.debug("清理聚合缓存-批量删除聚合Key，数量:{}, SingleKey:{}", aggKeys.size(), singleKey);

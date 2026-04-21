@@ -11,7 +11,6 @@ public final class RedisConstants {
 
     // =================== Redis 通用工具常量 ===================
     public static final String REDIS_LOCK_PREFIX = "lock:";
-    public static final Long REDIS_LOCK_TTL = 10L;  // （秒）分布式锁默认过期时间，防止死锁
     public static final Long REDIS_CACHE_NULL_TTL = 2L;
     public static final String REDIS_DEP_PREFIX = "dep:";
 

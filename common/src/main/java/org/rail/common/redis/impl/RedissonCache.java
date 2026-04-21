@@ -102,29 +102,24 @@ public class RedissonCache implements RedisCache {
      */
     @Override
     public <T> void batchSet(Map<String, T> keyValueMap, Long expireTime, TimeUnit timeUnit) {
-        // 防御性校验：空Map、无效过期时间直接返回
         if (MapUtil.isEmpty(keyValueMap) || expireTime == null || expireTime <= 0 || timeUnit == null) {
             return;
         }
         try {
-            // 1. 预处理：空值转""、过滤空key，和单条set逻辑100%一致
             Map<String, T> finalMap = handleNullValue(keyValueMap);
             if (MapUtil.isEmpty(finalMap)) {
                 return;
             }
 
-            // 2. 创建RBatch批量操作对象（一次性打包所有命令，仅1次网络IO）
             RBatch batch = redissonClient.createBatch();
 
-            // 3. 遍历Map，批量添加set命令（每个key独立设置过期时间，原子性保证）
+            // 遍历Map，批量添加set命令
             for (Map.Entry<String, T> entry : finalMap.entrySet()) {
                 String key = entry.getKey();
                 T value = entry.getValue();
-                // 直接调用RBucket的setAsync，和单条set的逻辑完全一致
                 batch.getBucket(key).setAsync(value, expireTime, timeUnit);
             }
 
-            // 4. 执行批量命令（一次性发送所有请求到Redis，同步阻塞直到完成）
             batch.execute();
         } catch (Exception e) {
             throw new CacheException("批量缓存设置失败", e);
