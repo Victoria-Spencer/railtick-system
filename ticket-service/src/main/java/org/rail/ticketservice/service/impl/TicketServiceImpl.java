@@ -80,8 +80,22 @@ public class TicketServiceImpl implements TicketService {
      */
     @Override
     public List<TicketQueryVO> queryTicket(TicketQueryDTO ticketQueryDTO) {
+        if (ticketQueryDTO == null) {
+            return Collections.emptyList();
+        }
+        List<String> departureCodes = Optional.ofNullable(ticketQueryDTO.getDepartureCodes()).orElse(Collections.emptyList());
+        List<String> arrivalCodes = Optional.ofNullable(ticketQueryDTO.getArrivalCodes()).orElse(Collections.emptyList());
+        LocalDate departureDate = ticketQueryDTO.getDepartureDate();
+        if (CollectionUtils.isEmpty(departureCodes) || CollectionUtils.isEmpty(arrivalCodes) || departureDate == null) {
+            return Collections.emptyList();
+        }
+
         // 查询车次基础信息
         List<TrainDetailVO> trainDetailVOList = getTrainDetailVOS(ticketQueryDTO);
+
+        if (CollectionUtils.isEmpty(trainDetailVOList)) {
+            return Collections.emptyList();
+        }
 
         // 查询余票数量
         List<SeatClassVO> seatClassVOList = querySeatClassData(trainDetailVOList);
@@ -96,15 +110,14 @@ public class TicketServiceImpl implements TicketService {
      * @return 席别信息列表
      */
     private List<SeatClassVO> querySeatClassData(List<TrainDetailVO> trainDetailVOList) {
-        // 1. 转换入参：TrainDetailVO -> SeatQueryDTO
+        // 转换入参：TrainDetailVO -> SeatQueryDTO
         List<SeatQueryDTO> seatQueryDTOList = BeanUtil.copyToList(trainDetailVOList, SeatQueryDTO.class);
 
-        // 2. 构建「trainId → SeatQueryDTO列表」的映射（仅一次遍历，预处理）
+        // 构建「trainId → SeatQueryDTO列表」的映射（仅一次遍历，预处理）
         // 后续通过VO的trainId快速拿到对应DTO
         Map<Long, List<SeatQueryDTO>> trainId2DtosMap = seatQueryDTOList.stream()
                 .collect(Collectors.groupingBy(SeatQueryDTO::getTrainId)); // 按trainId分组
 
-        // 3. 查缓存
         return batchQuerySeatClassCache(seatQueryDTOList, trainId2DtosMap);
     }
 
@@ -410,8 +423,16 @@ public class TicketServiceImpl implements TicketService {
      */
     @Override
     public TicketQueryVO queryPlannedTicket(PlannedTicketQueryDTO plannedTicketQueryDTO) {
-        TicketQueryVO ticketQueryVO = new TicketQueryVO();
+        if(plannedTicketQueryDTO == null) {
+            return null;
+        }
         Long trainId = plannedTicketQueryDTO.getTrainId();
+        String depCode = plannedTicketQueryDTO.getDepartureCode();
+        String arrCode = plannedTicketQueryDTO.getArrivalCode();
+        if(trainId == null || depCode == null || arrCode == null) {
+            return null;
+        }
+        TicketQueryVO ticketQueryVO = new TicketQueryVO();
 
         // 查询列车表属性
         ticketQueryVO.setTrain(trainMapper.getById(trainId));
@@ -473,10 +494,13 @@ public class TicketServiceImpl implements TicketService {
         String departureCode = queryDTO.getDepartureCode();
         String arrivalCode = queryDTO.getArrivalCode();
         List<String> preferredSeatSymbols = queryDTO.getPreferredSeatSymbols();
+        Integer orderType = queryDTO.getOrderType();
+        Integer status = queryDTO.getStatus();
 
         if (trainId == null || seatType == null || passengerCount == null ||
-                StrUtil.isBlank(departureCode) || StrUtil.isBlank(arrivalCode)) {
-            throw new BusinessException("选座参数不能为空");
+                StrUtil.isBlank(departureCode) || StrUtil.isBlank(arrivalCode) ||
+                orderType == null || status == null) {
+            return null;
         }
 
         int maxRetry = 3;
@@ -796,11 +820,15 @@ public class TicketServiceImpl implements TicketService {
      */
     @Override
     public void updateSeatStatus(BatchSeatIntervalInsertDTO batchDTO) {
+        if (batchDTO == null || CollectionUtils.isEmpty(batchDTO.getSeatList()) ||
+                batchDTO.getOrderType() == null || batchDTO.getStatus() == null) {
+            return;
+        }
         try {
-            // 1.锁座
+            // 锁座
             operateSeatIntervalOccupy(batchDTO);
 
-            // 2.批量更新座位状态
+            // 批量更新座位状态
             batchUpdateSeatStatus(batchDTO);
         } catch (Exception e) {
             rollbackSeatLock(batchDTO);
@@ -968,7 +996,7 @@ public class TicketServiceImpl implements TicketService {
      * 操作座位区间占用记录（新增/更新），并同步到Redis Bitmap和占用记录缓存
      */
     private void operateSeatIntervalOccupy(BatchSeatIntervalInsertDTO batchDTO) {
-        if (batchDTO == null) {
+        if (batchDTO == null || CollectionUtils.isEmpty(batchDTO.getSeatList())) {
             return;
         }
         Long trainId = batchDTO.getTrainId();
