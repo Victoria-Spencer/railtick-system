@@ -1,5 +1,6 @@
 package org.rail.userservice.pojo.dto;
 
+import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -10,7 +11,9 @@ import org.rail.common.core.pageQuery.PageQuery;
 @AllArgsConstructor
 public class PsgrPageQueryDTO extends PageQuery {
 
+    @NotNull(message = "用户ID不能为空")
     private Long userId;
+
     private String realName;
     // 审核状态
     private Integer verifyStatus;

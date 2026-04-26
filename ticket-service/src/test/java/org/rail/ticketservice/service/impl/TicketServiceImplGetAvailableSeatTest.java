@@ -218,8 +218,10 @@ class TicketServiceImplGetAvailableSeatTest {
         // 置空任意一个必填字段
         queryDTO.setTrainId(null);
 
-        List<AvailableSeatDTO> result = ticketService.getAvailableSeats(queryDTO);
-        assertNull(result);
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> ticketService.getAvailableSeats(queryDTO)
+        );
     }
 
 

@@ -1,6 +1,7 @@
 package org.rail.userservice.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.util.ObjectUtil;
 import org.rail.api.dto.UserIdCardDTO;
 import org.rail.common.core.exception.BusinessException;
 import org.rail.common.core.util.BeanUtils;
@@ -125,6 +126,9 @@ public class UserServiceImpl implements UserService {
      */
     @Override
     public UserIdCardDTO getIdCardInfoById(Long id) {
+        if (ObjectUtil.isEmpty(id)) {
+            throw new IllegalArgumentException("用户ID不能为空");
+        }
         User user = userMapper.getById(id);
         return BeanUtil.copyProperties(user, UserIdCardDTO.class);
     }

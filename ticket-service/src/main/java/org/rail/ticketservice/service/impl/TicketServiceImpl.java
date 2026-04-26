@@ -4,6 +4,7 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.bean.copier.CopyOptions;
 import cn.hutool.core.lang.TypeReference;
 import cn.hutool.core.map.MapUtil;
+import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang.StringUtils;
@@ -80,16 +81,6 @@ public class TicketServiceImpl implements TicketService {
      */
     @Override
     public List<TicketQueryVO> queryTicket(TicketQueryDTO ticketQueryDTO) {
-        if (ticketQueryDTO == null) {
-            return Collections.emptyList();
-        }
-        List<String> departureCodes = Optional.ofNullable(ticketQueryDTO.getDepartureCodes()).orElse(Collections.emptyList());
-        List<String> arrivalCodes = Optional.ofNullable(ticketQueryDTO.getArrivalCodes()).orElse(Collections.emptyList());
-        LocalDate departureDate = ticketQueryDTO.getDepartureDate();
-        if (CollectionUtils.isEmpty(departureCodes) || CollectionUtils.isEmpty(arrivalCodes) || departureDate == null) {
-            return Collections.emptyList();
-        }
-
         // 查询车次基础信息
         List<TrainDetailVO> trainDetailVOList = getTrainDetailVOS(ticketQueryDTO);
 
@@ -423,15 +414,7 @@ public class TicketServiceImpl implements TicketService {
      */
     @Override
     public TicketQueryVO queryPlannedTicket(PlannedTicketQueryDTO plannedTicketQueryDTO) {
-        if(plannedTicketQueryDTO == null) {
-            return null;
-        }
         Long trainId = plannedTicketQueryDTO.getTrainId();
-        String depCode = plannedTicketQueryDTO.getDepartureCode();
-        String arrCode = plannedTicketQueryDTO.getArrivalCode();
-        if(trainId == null || depCode == null || arrCode == null) {
-            return null;
-        }
         TicketQueryVO ticketQueryVO = new TicketQueryVO();
 
         // 查询列车表属性
@@ -488,20 +471,23 @@ public class TicketServiceImpl implements TicketService {
      */
     @Override
     public List<AvailableSeatDTO> getAvailableSeats(RandomSeatQueryDTO queryDTO) {
+        if (ObjectUtil.isEmpty(queryDTO)
+                || ObjectUtil.isEmpty(queryDTO.getTrainId())
+                || ObjectUtil.isEmpty(queryDTO.getSeatType())
+                || ObjectUtil.isEmpty(queryDTO.getPassengerCount()) || queryDTO.getPassengerCount() <= 0
+                || StrUtil.isBlank(queryDTO.getDepartureCode())
+                || StrUtil.isBlank(queryDTO.getArrivalCode())
+                || ObjectUtil.isEmpty(queryDTO.getOrderType())
+                || ObjectUtil.isEmpty(queryDTO.getStatus())) {
+            throw new IllegalArgumentException("随机选座参数校验失败：车次ID、席别类型、乘客数量、出发站编码、到达站编码、订单类型、状态为必填项且乘客数量必须大于0");
+        }
+
         Long trainId = queryDTO.getTrainId();
         Integer seatType = queryDTO.getSeatType();
         Integer passengerCount = queryDTO.getPassengerCount();
         String departureCode = queryDTO.getDepartureCode();
         String arrivalCode = queryDTO.getArrivalCode();
         List<String> preferredSeatSymbols = queryDTO.getPreferredSeatSymbols();
-        Integer orderType = queryDTO.getOrderType();
-        Integer status = queryDTO.getStatus();
-
-        if (trainId == null || seatType == null || passengerCount == null ||
-                StrUtil.isBlank(departureCode) || StrUtil.isBlank(arrivalCode) ||
-                orderType == null || status == null) {
-            return null;
-        }
 
         int maxRetry = 3;
         List<SeatBusinessVO> finalSelectedSeats = null;
@@ -820,10 +806,16 @@ public class TicketServiceImpl implements TicketService {
      */
     @Override
     public void updateSeatStatus(BatchSeatIntervalInsertDTO batchDTO) {
-        if (batchDTO == null || CollectionUtils.isEmpty(batchDTO.getSeatList()) ||
-                batchDTO.getOrderType() == null || batchDTO.getStatus() == null) {
-            return;
+        if (ObjectUtil.isEmpty(batchDTO)
+                || ObjectUtil.isEmpty(batchDTO.getTrainId())
+                || ObjectUtil.isEmpty(batchDTO.getOrderType())
+                || ObjectUtil.isEmpty(batchDTO.getStatus())
+                || StrUtil.isBlank(batchDTO.getDepartureCode())
+                || StrUtil.isBlank(batchDTO.getArrivalCode())
+                || CollectionUtils.isEmpty(batchDTO.getSeatList())) {
+            throw new IllegalArgumentException("更新座位状态参数校验失败：车次ID、订单类型、状态、出发站编码、到达站编码、座位列表为必填项");
         }
+
         try {
             // 锁座
             operateSeatIntervalOccupy(batchDTO);
@@ -832,7 +824,7 @@ public class TicketServiceImpl implements TicketService {
             batchUpdateSeatStatus(batchDTO);
         } catch (Exception e) {
             rollbackSeatLock(batchDTO);
-            throw new SeatLockFailedException("锁座失败", e);
+            throw new SeatLockFailedException(e);
         }
     }
 
@@ -996,9 +988,6 @@ public class TicketServiceImpl implements TicketService {
      * 操作座位区间占用记录（新增/更新），并同步到Redis Bitmap和占用记录缓存
      */
     private void operateSeatIntervalOccupy(BatchSeatIntervalInsertDTO batchDTO) {
-        if (batchDTO == null || CollectionUtils.isEmpty(batchDTO.getSeatList())) {
-            return;
-        }
         Long trainId = batchDTO.getTrainId();
         List<SeatBaseDTO> seatList = batchDTO.getSeatList();
 
@@ -1061,7 +1050,7 @@ public class TicketServiceImpl implements TicketService {
             );
 
             if (result == null || result == 0) {
-                throw new SeatLockFailedException(lockId);
+                throw new SeatLockFailedException("锁冲突，lockId:" + lockId);
             }
 
             SeatBusinessVO vo = SeatBusinessVO.builder()
@@ -1158,7 +1147,7 @@ public class TicketServiceImpl implements TicketService {
         return allStations.stream()
                 .filter(station -> stationCode.equals(station.getCode()))
                 .findFirst()
-                .orElseThrow(() -> new BusinessException(stationType + "编码不存在：" + stationCode))
+                .orElseThrow(() -> new IllegalArgumentException(stationType + "编码不存在：" + stationCode))
                 .getId();
     }
 

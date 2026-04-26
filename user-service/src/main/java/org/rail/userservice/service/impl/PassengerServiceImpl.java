@@ -57,10 +57,6 @@ public class PassengerServiceImpl implements PassengerService {
      */
     @Override
     public List<Passenger> getByUserId(Long userId) {
-        if (userId == null) {
-            log.warn("查询乘客列表失败：userId 不能为空");
-            return Collections.emptyList();
-        }
         TypeReference<List<Passenger>> typeRef = new TypeReference<>() {};
         return cacheClient.queryWithMutex(
                 RedisConstants.RAIL_PASSENGER_LIST_USER_PREFIX,

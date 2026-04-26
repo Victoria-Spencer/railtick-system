@@ -113,7 +113,6 @@ class TicketServiceImplUpdateSeatStatusTest {
 
         SeatLockFailedException ex = assertThrows(SeatLockFailedException.class,
                 () -> ticketService.updateSeatStatus(batchDTO));
-        assertEquals("锁座失败", ex.getMessage());
         // 无锁定座位不回滚
         verify(cacheClient, never()).setRangeBits(anyString(), anyInt(), anyInt(), anyBoolean());
     }
@@ -138,7 +137,6 @@ class TicketServiceImplUpdateSeatStatusTest {
 
         SeatLockFailedException ex = assertThrows(SeatLockFailedException.class,
                 () -> ticketService.updateSeatStatus(batchDTO));
-        assertEquals("锁座失败", ex.getMessage());
         // 有锁定座位，回滚
         verify(cacheClient).setRangeBits(anyString(), eq(2L), eq(5L), eq(false));
     }
@@ -151,8 +149,7 @@ class TicketServiceImplUpdateSeatStatusTest {
         BatchSeatIntervalInsertDTO batchDTO = buildBaseBatchSeatDTO();
         batchDTO.setSeatList(null);
 
-        // 执行+验证（无任何Mock，直接验证无调用）
-        assertDoesNotThrow(() -> ticketService.updateSeatStatus(batchDTO));
+        assertThrows(IllegalArgumentException.class, () -> ticketService.updateSeatStatus(batchDTO));
         verify(cacheClient, never()).executeLuaFile(anyString(), anyList(), anyInt(), anyInt(), anyInt());
         verify(cacheClient, never()).hPutAll(anyString(), anyMap(), anyLong(), any());
     }

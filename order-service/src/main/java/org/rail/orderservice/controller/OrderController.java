@@ -1,6 +1,6 @@
 package org.rail.orderservice.controller;
 
-import org.apache.ibatis.jdbc.Null;
+import jakarta.validation.constraints.NotBlank;
 import org.rail.common.core.result.PageResult;
 import org.rail.common.core.result.Result;
 import org.rail.orderservice.orderservice.OrderService;
@@ -12,41 +12,43 @@ import org.rail.orderservice.pojo.vo.CreateOrderVO;
 import org.rail.orderservice.pojo.vo.OrderPageQueryVO;
 import org.rail.orderservice.pojo.vo.SelfTicketPageVO;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/order-service")
+@Validated
 public class OrderController {
 
     @Autowired
     private OrderService orderService;
 
     @PostMapping("/pre-order/create")
-    public Result<String> createPreOrder(@RequestBody CreatePreOrderDTO createPreOrderDTO) {
+    public Result<String> createPreOrder(@RequestBody  @Validated CreatePreOrderDTO createPreOrderDTO) {
         String preOrderSn = orderService.createPreOrder(createPreOrderDTO);
         return Result.success(preOrderSn);
     }
 
     @PostMapping("/order/create")
-    public Result<CreateOrderVO> createOrder(@RequestBody CreateOrderDTO createOrderDTO) {
+    public Result<CreateOrderVO> createOrder(@RequestBody  @Validated CreateOrderDTO createOrderDTO) {
         CreateOrderVO createOrderVO = orderService.createOrder(createOrderDTO);
         return Result.success(createOrderVO);
     }
 
     @GetMapping("/order/page")
-    public Result<PageResult<OrderPageQueryVO>> orderPageQuery(@RequestBody OrderPageQueryDTO orderPageQueryDTO) {
+    public Result<PageResult<OrderPageQueryVO>> orderPageQuery(@RequestBody  @Validated OrderPageQueryDTO orderPageQueryDTO) {
         PageResult<OrderPageQueryVO> pageResult = orderService.orderPageQuery(orderPageQueryDTO);
         return Result.success(pageResult);
     }
 
     @GetMapping("/order/ticket/self/page")
-    public Result<PageResult<SelfTicketPageVO>> selfTicketPageQuery(@RequestBody FrontSelfTicketPageDTO frontSelfTicketPageDTO) {
+    public Result<PageResult<SelfTicketPageVO>> selfTicketPageQuery(@RequestBody  @Validated FrontSelfTicketPageDTO frontSelfTicketPageDTO) {
         PageResult<SelfTicketPageVO> pageResult = orderService.selfTicketPageQuery(frontSelfTicketPageDTO);
         return Result.success(pageResult);
     }
 
     @DeleteMapping("/order/cancel")
-    public Result<Null> cancel(@RequestParam String orderSn) {
+    public Result<Void> cancel(@RequestParam @NotBlank(message = "订单编号不能为空") String orderSn) {
         orderService.cancelOrder(orderSn);
         return Result.success();
     }

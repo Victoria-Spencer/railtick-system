@@ -1,5 +1,6 @@
 package org.rail.orderservice.pojo.dto;
 
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.rail.common.core.pageQuery.PageQuery;
@@ -13,6 +14,7 @@ import java.time.LocalDate;
 @Data
 public class FrontSelfTicketPageDTO extends PageQuery {
 
+    @NotNull(message = "用户ID不能为空")
     private Long userId;
     // 车票类型（0：成人，1：儿童，2：学生，3：残疾军人）
     private Integer ticketType;

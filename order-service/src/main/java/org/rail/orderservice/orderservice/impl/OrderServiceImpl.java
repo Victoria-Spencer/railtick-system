@@ -379,7 +379,7 @@ public class OrderServiceImpl implements OrderService {
      */
     private List<AvailableSeatDTO> getAvailableSeatList(List<OrderDetails> detailsList) {
         if (CollectionUtil.isEmpty(detailsList)) {
-            throw new BusinessException("订单详情不能为空");
+            throw new IllegalArgumentException("订单详情不能为空");
         }
         OrderDetails detailsListFirst = detailsList.getFirst();
 
@@ -672,7 +672,7 @@ public class OrderServiceImpl implements OrderService {
     private List<AvailableSeatDTO> getAvailableSeatList(CreatePreOrderDTO createPreOrderDTO, Integer seatType, Integer need, Long preOrderId) {
         if (ObjectUtil.isEmpty(createPreOrderDTO) || ObjectUtil.isEmpty(seatType)
                 || ObjectUtil.isEmpty(need) || ObjectUtil.isEmpty(preOrderId)) {
-            throw new BusinessException("参数不完整：缺少列车ID、席别类型、需分配人数或预订单ID");
+            throw new IllegalArgumentException("参数不完整：缺少列车ID、席别类型、需分配人数或预订单ID");
         }
 
         RandomSeatQueryDTO queryDTO = RandomSeatQueryDTO.builder()
