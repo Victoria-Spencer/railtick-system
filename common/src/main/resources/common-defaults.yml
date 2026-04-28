@@ -49,3 +49,14 @@ spring:
         # password: 你的ES密码（安装时生成的）
         connection-timeout: 10s # 连接超时
         read-timeout: 30s # 读取超时
+
+# 网关认证相关配置
+request:
+  interceptor:
+    # 免拦截路径列表，根据实际业务调整
+    exclude-paths:
+      - /api/user-service/v1/login
+      - /api/user-service/register
+      - /api/ticket-service/ticket/query
+      - /api/ticket-service/stations/page
+      - /error

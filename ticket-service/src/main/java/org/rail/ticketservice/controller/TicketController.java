@@ -22,13 +22,13 @@ public class TicketController {
     @Autowired
     private TicketService ticketService;
 
-    @GetMapping("/query")
+    @PostMapping("/query")
     public Result<List<TicketQueryVO>> queryTicket(@RequestBody @Validated TicketQueryDTO ticketQueryDTO) {
         List<TicketQueryVO> ticketQueryVOList = ticketService.queryTicket(ticketQueryDTO);
         return Result.success(ticketQueryVOList);
     }
 
-    @GetMapping("/planned-tickets/query")
+    @PostMapping("/planned-tickets/query")
     public Result<TicketQueryVO>  queryPlannedTicket(@RequestBody @Validated PlannedTicketQueryDTO plannedTicketQueryDTO) {
         TicketQueryVO ticketQueryVO = ticketService.queryPlannedTicket(plannedTicketQueryDTO);
         return Result.success(ticketQueryVO);

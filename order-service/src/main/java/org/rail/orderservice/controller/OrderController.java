@@ -35,13 +35,13 @@ public class OrderController {
         return Result.success(createOrderVO);
     }
 
-    @GetMapping("/order/page")
+    @PostMapping("/order/page")
     public Result<PageResult<OrderPageQueryVO>> orderPageQuery(@RequestBody  @Validated OrderPageQueryDTO orderPageQueryDTO) {
         PageResult<OrderPageQueryVO> pageResult = orderService.orderPageQuery(orderPageQueryDTO);
         return Result.success(pageResult);
     }
 
-    @GetMapping("/order/ticket/self/page")
+    @PostMapping("/order/ticket/self/page")
     public Result<PageResult<SelfTicketPageVO>> selfTicketPageQuery(@RequestBody  @Validated FrontSelfTicketPageDTO frontSelfTicketPageDTO) {
         PageResult<SelfTicketPageVO> pageResult = orderService.selfTicketPageQuery(frontSelfTicketPageDTO);
         return Result.success(pageResult);

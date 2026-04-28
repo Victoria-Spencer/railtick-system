@@ -2,12 +2,14 @@ package org.rail.common.core.config;
 
 import org.rail.common.core.interceptor.CommonRequestInterceptor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 // 标记为 Spring MVC 配置类
 @Configuration
+@EnableConfigurationProperties(RequestInterceptorProperties.class)
 public class WebMvcConfig implements WebMvcConfigurer {
 
     @Autowired
@@ -16,12 +18,6 @@ public class WebMvcConfig implements WebMvcConfigurer {
     // ========== 拦截器配置 ==========
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(commonRequestInterceptor)
-                .addPathPatterns("/**")
-                .excludePathPatterns(
-                        "/api/user-service/v1/login",
-                        "/api/user-service/register",
-                        "/error" // 排除错误页面请求
-                );
+                .addPathPatterns("/**");  // 拦截所有路径，由拦截器内部的excludePaths控制免拦截
     }
-
 }

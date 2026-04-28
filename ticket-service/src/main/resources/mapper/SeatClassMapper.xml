@@ -41,7 +41,7 @@
                 tsc.train_id AS trainId,
                 tsc.seat_class_id AS seatClassId,
                 -- 统计去重后的已占用座位数（同一座位被多次占用仅算1次）
-                COUNT(DISTINCT ts.id) AS occupiedSeats
+                COUNT(DISTINCT s.id) AS occupiedSeats
             FROM train_seat_class tsc
             -- 子查询关联临时表：获取当前train_id的区间参数
             INNER JOIN query_params qp ON tsc.train_id = qp.train_id

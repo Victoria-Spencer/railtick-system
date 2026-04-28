@@ -3,6 +3,9 @@ server:
 spring:
   application:
     name: user-service
+  config:
+    import:
+      - classpath:common-defaults.yml
   cloud:
     # nacos注册中心配置
     nacos:

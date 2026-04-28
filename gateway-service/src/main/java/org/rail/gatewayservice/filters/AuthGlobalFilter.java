@@ -18,21 +18,24 @@ import java.util.List;
 @Component
 public class AuthGlobalFilter implements GlobalFilter, Ordered {
 
-    // 注入路径排除属性类
+    private static final String USER_ID_HEADER = "user-id";
+    private static final String TOKEN_HEADER = "token";
+
     @Autowired
     private GatewayAuthProperties gatewayAuthProperties;
 
     private final AntPathMatcher pathMatcher = new AntPathMatcher();
 
+    @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         // 1.判断是否需要拦截
         String path = exchange.getRequest().getPath().toString();
-        if(isExclude(path)) {
+        if(isExcludePath(path)) {
             return chain.filter(exchange);
         }
 
         // 2.从请求头中获取token
-        String token = exchange.getRequest().getHeaders().getFirst("token");
+        String token = exchange.getRequest().getHeaders().getFirst(TOKEN_HEADER);
 
         // 3.需要先去掉 Bearer 前缀才能进行解析
         if (token != null && token.startsWith("Bearer ")) {
@@ -49,7 +52,7 @@ public class AuthGlobalFilter implements GlobalFilter, Ordered {
 
         // 5.将userId存入请求头中
         ServerWebExchange newExchange = exchange.mutate()
-                .request(builder -> builder.header("user-id", userId))
+                .request(builder -> builder.header(USER_ID_HEADER, userId))
                 .build();
 
         // 6.放行
@@ -59,7 +62,7 @@ public class AuthGlobalFilter implements GlobalFilter, Ordered {
     /**
      * 判断当前路径是否在排除列表中（支持模糊匹配）
      */
-    private boolean isExclude(String path) {
+    private boolean isExcludePath(String path) {
         List<String> excludePaths = gatewayAuthProperties.getExcludePaths();
 
         // 排除列表为空
@@ -77,6 +80,7 @@ public class AuthGlobalFilter implements GlobalFilter, Ordered {
         return false;
     }
 
+    @Override
     public int getOrder() {
         return 0;
     }

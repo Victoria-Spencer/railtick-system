@@ -4,6 +4,7 @@ import com.github.pagehelper.Page;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.io.Serial;
 import java.io.Serializable;
 import java.util.Collections;
 import java.util.List;
@@ -16,6 +17,7 @@ import java.util.List;
 @NoArgsConstructor
 public class PageResult<T> implements Serializable {
 
+    @Serial
     private static final long serialVersionUID = 1L;
 
     /** 总条数 **/
@@ -31,8 +33,7 @@ public class PageResult<T> implements Serializable {
      * 构造方法：自动计算总页数（适配PageHelper的Page类型）
      */
     public PageResult(List<T> list) {
-        if(list instanceof Page) {
-            Page<T> page = (Page<T>) list;
+        if(list instanceof Page<T> page) {
             this.total = page.getTotal(); // 总条数
             this.records = page; // 当前页数据
             this.pages = page.getPages(); // 总页数

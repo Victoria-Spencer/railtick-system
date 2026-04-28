@@ -22,7 +22,7 @@ public class StationController {
     @Autowired
     private StationService stationService;
 
-    @GetMapping("/stations/page")
+    @PostMapping("/stations/page")
     public Result<PageResult<StationPageQueryVO>> pageQuery(@RequestBody StationPageQueryDTO stationPageQueryDTO) {
         PageResult<StationPageQueryVO> page = stationService.pageQueryStations(stationPageQueryDTO);
         return Result.success(page);

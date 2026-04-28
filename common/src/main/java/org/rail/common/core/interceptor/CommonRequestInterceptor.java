@@ -2,9 +2,14 @@ package org.rail.common.core.interceptor;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.rail.common.core.config.RequestInterceptorProperties;
 import org.rail.common.core.util.ThreadLocalUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import org.springframework.util.AntPathMatcher;
 import org.springframework.web.servlet.HandlerInterceptor;
+
+import java.util.List;
 
 /**
  * 通用请求拦截器
@@ -12,8 +17,25 @@ import org.springframework.web.servlet.HandlerInterceptor;
 @Component
 public class CommonRequestInterceptor implements HandlerInterceptor {
 
+    private static final String USER_ID_HEADER = "user-id";
+
+    @Autowired
+    private RequestInterceptorProperties interceptorProperties;
+
+    private final AntPathMatcher pathMatcher = new AntPathMatcher();
+
+    @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
-        String userId = request.getHeader("user-id");
+        String requestURI = request.getRequestURI();
+
+        System.out.println("✅ 配置的excludePaths: " + interceptorProperties.getExcludePaths());
+        System.out.println("当前请求URI: " + requestURI);
+
+        if (isExcludePath(requestURI)) {
+            return true;
+        }
+
+        String userId = request.getHeader(USER_ID_HEADER);
         if (userId == null || userId.trim().isEmpty()) {
             // 返回 401 状态码
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
@@ -28,6 +50,23 @@ public class CommonRequestInterceptor implements HandlerInterceptor {
         return true;
     }
 
+    /**
+     * 支持Ant风格模糊匹配
+     */
+    private boolean isExcludePath(String path) {
+        List<String> excludePaths = interceptorProperties.getExcludePaths();
+        if (excludePaths == null || excludePaths.isEmpty()) {
+            return false;
+        }
+        for (String excludePath : excludePaths) {
+            if (pathMatcher.match(excludePath, path)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
     public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) throws Exception {
         ThreadLocalUtils.removeAll();
     }

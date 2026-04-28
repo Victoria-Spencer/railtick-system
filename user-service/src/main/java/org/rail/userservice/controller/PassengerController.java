@@ -22,7 +22,7 @@ public class PassengerController {
     @Autowired
     private PassengerService passengerService;
 
-    @GetMapping("/pageQuery")
+    @PostMapping("/pageQuery")
     public Result<PageResult<Passenger>> pageQuery(@RequestBody @Validated PsgrPageQueryDTO psgrPageQueryDTO) {
         PageResult<Passenger> pageResult = passengerService.pageQuery(psgrPageQueryDTO);
         return Result.success(pageResult);
