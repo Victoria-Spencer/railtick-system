@@ -28,9 +28,6 @@ public class CommonRequestInterceptor implements HandlerInterceptor {
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
         String requestURI = request.getRequestURI();
 
-        System.out.println("✅ 配置的excludePaths: " + interceptorProperties.getExcludePaths());
-        System.out.println("当前请求URI: " + requestURI);
-
         if (isExcludePath(requestURI)) {
             return true;
         }
