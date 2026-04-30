@@ -18,6 +18,7 @@ import org.rail.common.core.util.SnowflakeIdGenerator;
 import org.rail.common.core.util.ThreadLocalUtils;
 import org.rail.common.redis.api.ICacheClient;
 import org.rail.ticketservice.pojo.dto.TrainStopStationCacheDTO;
+import org.rail.ticketservice.pojo.entity.Seat;
 import org.rail.ticketservice.pojo.entity.Station;
 import org.rail.ticketservice.task.StationLocalCacheTask;
 import org.rail.ticketservice.task.TrainStopStationLocalCacheTask;
@@ -85,13 +86,14 @@ class TicketServiceImplUpdateSeatStatusTest {
                 anyList(),
                 eq(DEP_SEQUENCE),
                 eq(ARR_SEQUENCE),
-                eq(OrderTypeConstants.PREORDER)
+                eq(OrderTypeConstants.PREORDER),
+                eq(SeatIntervalStatusConstants.LOCKED)
         )).thenReturn(1L);
         doNothing().when(cacheClient).hPutAll(anyString(), anyMap(), anyLong(), any());
 
         // 执行+验证
         assertDoesNotThrow(() -> ticketService.updateSeatStatus(batchDTO));
-        verify(cacheClient).executeLuaFile(anyString(), anyList(), anyInt(), anyInt(), anyInt());
+        verify(cacheClient).executeLuaFile(anyString(), anyList(), anyInt(), anyInt(), anyInt(), anyInt());
         verify(cacheClient).hPutAll(anyString(), anyMap(), anyLong(), any());
     }
 
@@ -108,7 +110,8 @@ class TicketServiceImplUpdateSeatStatusTest {
                 anyList(),
                 eq(DEP_SEQUENCE),
                 eq(ARR_SEQUENCE),
-                eq(OrderTypeConstants.PREORDER)
+                eq(OrderTypeConstants.PREORDER),
+                eq(SeatIntervalStatusConstants.LOCKED)
         )).thenReturn(0L);
 
         SeatLockFailedException ex = assertThrows(SeatLockFailedException.class,
@@ -130,7 +133,8 @@ class TicketServiceImplUpdateSeatStatusTest {
                 anyList(),
                 eq(DEP_SEQUENCE),
                 eq(ARR_SEQUENCE),
-                eq(OrderTypeConstants.PREORDER)
+                eq(OrderTypeConstants.PREORDER),
+                eq(SeatIntervalStatusConstants.LOCKED)
         )).thenReturn(1L);
         doThrow(new RuntimeException("Redis写入失败"))
                 .when(cacheClient).hPutAll(anyString(), anyMap(), anyLong(), any());
@@ -150,7 +154,7 @@ class TicketServiceImplUpdateSeatStatusTest {
         batchDTO.setSeatList(null);
 
         assertThrows(IllegalArgumentException.class, () -> ticketService.updateSeatStatus(batchDTO));
-        verify(cacheClient, never()).executeLuaFile(anyString(), anyList(), anyInt(), anyInt(), anyInt());
+        verify(cacheClient, never()).executeLuaFile(anyString(), anyList(), anyInt(), anyInt(), anyInt(), anyInt());
         verify(cacheClient, never()).hPutAll(anyString(), anyMap(), anyLong(), any());
     }
 

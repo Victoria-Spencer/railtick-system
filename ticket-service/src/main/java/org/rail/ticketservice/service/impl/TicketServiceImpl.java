@@ -10,8 +10,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang.StringUtils;
 import org.rail.api.constant.OrderTypeConstants;
 import org.rail.api.constant.SeatIntervalStatusConstants;
-import org.rail.common.core.context.RequestContext;
-import org.rail.common.core.context.RequestContextHolder;
 import org.rail.common.core.exception.SeatLockFailedException;
 import org.rail.common.core.util.*;
 import org.rail.common.redis.api.ICacheClient;
@@ -44,8 +42,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import static org.rail.common.core.util.LogUtils.FAIL;
-import static org.rail.common.core.util.LogUtils.SUCCESS;
 import static org.rail.common.redis.constant.RedisConstants.RAIL_SEAT_OCCUPY_FORMAL_EXPIRE_MINUTES;
 import static org.rail.common.redis.constant.RedisConstants.RAIL_SEAT_OCCUPY_LOCK_EXPIRE_MINUTES;
 
@@ -1047,7 +1043,8 @@ public class TicketServiceImpl implements TicketService {
                     Arrays.asList(tempBitmapKey, formalBitmapKey),
                     seqs.getStartSequence(),
                     seqs.getEndSequence(),
-                    occupy.getOrderType()
+                    occupy.getOrderType(),
+                    occupy.getStatus()
             );
 
             if (result == null || result == 0) {

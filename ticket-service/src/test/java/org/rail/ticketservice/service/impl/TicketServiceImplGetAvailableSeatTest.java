@@ -97,6 +97,7 @@ class TicketServiceImplGetAvailableSeatTest {
                 anyList(),
                 anyInt(),
                 anyInt(),
+                anyInt(),
                 anyInt()
         )).thenReturn(1L);
         doNothing().when(cacheClient).hPutAll(anyString(), anyMap(), anyLong(), any());
@@ -110,10 +111,11 @@ class TicketServiceImplGetAvailableSeatTest {
         verify(seatService, times(1)).getFreeSeatIdsByBitmap(anyLong(), anyString(), anyString());
         verify(cacheClient, times(2)).executeLuaFile(
                 eq("lua/seatLock.lua"),
-                anyList(),                           // 断言传入了bitmap key列表
-                eq(DEP_SEQ),                         // 断言开始站点序列=2（和mock一致）
-                eq(ARR_SEQ),                         // 断言结束站点序列=5（和mock一致）
-                eq(OrderTypeConstants.PREORDER)     // 断言订单类型=预订单
+                anyList(),                              // 断言传入了bitmap key列表
+                eq(DEP_SEQ),                            // 断言开始站点序列=2（和mock一致）
+                eq(ARR_SEQ),                            // 断言结束站点序列=5（和mock一致）
+                eq(OrderTypeConstants.PREORDER),        // 断言订单类型=预订单
+                eq(SeatIntervalStatusConstants.LOCKED)  // 断言锁座状态=锁定
         );
         verify(cacheClient, times(1)).hPutAll(anyString(), anyMap(), anyLong(), any());
     }
@@ -150,6 +152,7 @@ class TicketServiceImplGetAvailableSeatTest {
                 anyList(),
                 anyInt(),
                 anyInt(),
+                anyInt(),
                 anyInt()
         )).thenReturn(1L);
         doNothing().when(cacheClient).hPutAll(anyString(), anyMap(), anyLong(), any());
@@ -166,7 +169,8 @@ class TicketServiceImplGetAvailableSeatTest {
                 anyList(),
                 eq(DEP_SEQ),
                 eq(ARR_SEQ),
-                eq(OrderTypeConstants.PREORDER)
+                eq(OrderTypeConstants.PREORDER),
+                eq(SeatIntervalStatusConstants.LOCKED)
         );
         verify(cacheClient, times(1)).hPutAll(anyString(), anyMap(), anyLong(), any());
     }
@@ -191,6 +195,7 @@ class TicketServiceImplGetAvailableSeatTest {
                 anyList(),
                 anyInt(),
                 anyInt(),
+                anyInt(),
                 anyInt()
         )).thenReturn(0L);
 
@@ -203,7 +208,8 @@ class TicketServiceImplGetAvailableSeatTest {
                 anyList(),
                 eq(DEP_SEQ),
                 eq(ARR_SEQ),
-                eq(OrderTypeConstants.PREORDER)
+                eq(OrderTypeConstants.PREORDER),
+                eq(SeatIntervalStatusConstants.LOCKED)
         );
         // 验证重试机制：getFreeSeatIdsByBitmap被调用了3次（对应循环3次）
         verify(seatService, times(3)).getFreeSeatIdsByBitmap(anyLong(), anyString(), anyString());

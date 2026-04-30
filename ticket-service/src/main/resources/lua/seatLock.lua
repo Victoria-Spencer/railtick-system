@@ -9,30 +9,41 @@
 -- ARGV[1] = 开始站序 startSeq
 -- ARGV[2] = 结束站序 endSeq
 -- ARGV[3] = 订单类型 orderType (0=预订单/临时, 1=正式订单)
+-- ARGV[4] = 座位状态 status (0=锁定, 1=已售, 2=释放)
 
 local start = tonumber(ARGV[1])
 local endSeq = tonumber(ARGV[2])
 local orderType = tonumber(ARGV[3])
+local status = tonumber(ARGV[4])
 
 -- 基础参数校验
-if start == nil or endSeq == nil or orderType == nil then
+if start == nil or endSeq == nil or orderType == nil or status == nil then
     return 0
 end
--- 站序不能为负数
-if start < 0 or endSeq < 0 then
+if start < 0 or endSeq < 0 or start >= endSeq then
     return 0
 end
--- 开始站序必须 < 结束站序
-if start >= endSeq then
-    return 0
-end
--- 订单类型只能是0或1
 if orderType ~= 0 and orderType ~= 1 then
     return 0
 end
+if status ~= 0 and status ~= 1 and status ~= 2 then
+    return 0
+end
 
+-- 释放座位逻辑
+if status == 2 then
+    for i = start, endSeq - 1 do
+        if orderType == 0 then
+            redis.call('SETBIT', KEYS[1], i, 0) -- 预订单释放：只清临时锁
+        else
+            redis.call('SETBIT', KEYS[1], i, 0) -- 正式订单释放：清两个锁
+            redis.call('SETBIT', KEYS[2], i, 0)
+        end
+    end
+    return 1
+end
 
--- 1. 【原子检查】左闭右开 [start, endSeq)
+-- 检查占用 [start, endSeq)
 for i = start, endSeq - 1 do
     local tempBit = redis.call('GETBIT', KEYS[1], i)
     local formalBit = redis.call('GETBIT', KEYS[2], i)
@@ -41,7 +52,7 @@ for i = start, endSeq - 1 do
     end
 end
 
--- 2. 【动态锁定】根据orderType选择锁定哪个Bitmap
+-- 动态锁定，根据orderType选择锁定哪个Bitmap
 local targetKey = ""
 if orderType == 0 then
     -- 预订单 → 锁定临时Bitmap
@@ -51,7 +62,7 @@ else
     targetKey = KEYS[2]
 end
 
--- 3. 原子标记占用
+-- 标记占用
 for i = start, endSeq - 1 do
     redis.call('SETBIT', targetKey, i, 1)
 end

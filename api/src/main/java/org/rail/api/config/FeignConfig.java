@@ -5,7 +5,6 @@ import feign.RequestTemplate;
 import org.rail.common.core.context.RequestContext;
 import org.rail.common.core.context.RequestContextHolder;
 import org.rail.common.core.exception.OpenFeignException;
-import org.rail.common.core.util.ThreadLocalUtils;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
