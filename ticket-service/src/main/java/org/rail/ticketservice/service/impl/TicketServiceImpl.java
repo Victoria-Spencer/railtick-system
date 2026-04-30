@@ -10,16 +10,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang.StringUtils;
 import org.rail.api.constant.OrderTypeConstants;
 import org.rail.api.constant.SeatIntervalStatusConstants;
+import org.rail.common.core.context.RequestContext;
+import org.rail.common.core.context.RequestContextHolder;
 import org.rail.common.core.exception.SeatLockFailedException;
-import org.rail.common.core.util.BeanConvertUtil;
-import org.rail.common.core.util.SnowflakeIdGenerator;
-import org.rail.common.core.util.ThreadLocalUtils;
+import org.rail.common.core.util.*;
 import org.rail.common.redis.api.ICacheClient;
 import org.rail.common.redis.constant.RedisConstants;
 import org.rail.common.core.exception.BusinessException;
 import org.rail.common.redis.result.AggBatchResult;
 import org.rail.common.redis.result.AggCacheResult;
-import org.rail.common.core.util.BeanUtils;
 import org.rail.api.dto.*;
 import org.rail.ticketservice.constant.SeatStatusConstants;
 import org.rail.ticketservice.mapper.*;
@@ -45,6 +44,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import static org.rail.common.core.util.LogUtils.FAIL;
+import static org.rail.common.core.util.LogUtils.SUCCESS;
 import static org.rail.common.redis.constant.RedisConstants.RAIL_SEAT_OCCUPY_FORMAL_EXPIRE_MINUTES;
 import static org.rail.common.redis.constant.RedisConstants.RAIL_SEAT_OCCUPY_LOCK_EXPIRE_MINUTES;
 

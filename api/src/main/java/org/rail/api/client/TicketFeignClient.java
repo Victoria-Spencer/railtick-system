@@ -1,6 +1,5 @@
 package org.rail.api.client;
 
-import org.apache.ibatis.jdbc.Null;
 import org.rail.api.dto.AvailableSeatDTO;
 import org.rail.api.dto.BatchSeatIntervalInsertDTO;
 import org.rail.api.dto.RandomSeatQueryDTO;
@@ -20,5 +19,5 @@ public interface TicketFeignClient {
     Result<List<AvailableSeatDTO>> getAvailableSeats(@RequestBody RandomSeatQueryDTO randomSeatQueryDTO);
 
     @PutMapping("/api/ticket-service/ticket/seat-status/update")
-    Result<Null> updateSeatStatus(@RequestBody BatchSeatIntervalInsertDTO batchDTO);
+    Result<Void> updateSeatStatus(@RequestBody BatchSeatIntervalInsertDTO batchDTO);
 }

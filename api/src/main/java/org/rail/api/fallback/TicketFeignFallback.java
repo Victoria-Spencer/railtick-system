@@ -1,7 +1,5 @@
 package org.rail.api.fallback;
 
-import lombok.extern.slf4j.Slf4j;
-import org.apache.ibatis.jdbc.Null;
 import org.rail.api.client.TicketFeignClient;
 import org.rail.api.dto.AvailableSeatDTO;
 import org.rail.api.dto.BatchSeatIntervalInsertDTO;
@@ -16,7 +14,6 @@ import java.util.List;
  * // 降级类，实现 Feign 接口
  */
 @Component
-@Slf4j
 public class TicketFeignFallback implements TicketFeignClient {
 
     /**
@@ -25,8 +22,7 @@ public class TicketFeignFallback implements TicketFeignClient {
      * @return 错误提示
      */
     public Result<List<AvailableSeatDTO>> getAvailableSeats(@RequestBody RandomSeatQueryDTO randomSeatQueryDTO) {
-        log.error("服务临时不可用，请稍后重试");
-        return Result.error("服务临时不可用，请稍后重试");
+        return Result.error("远程调用失败/触发降级");
     }
 
     /**
@@ -35,8 +31,7 @@ public class TicketFeignFallback implements TicketFeignClient {
      * @return 错误提示
      */
     @Override
-    public Result<Null> updateSeatStatus(@RequestBody BatchSeatIntervalInsertDTO batchDTO) {
-        log.error("服务临时不可用，请稍后重试");
-        return Result.error("服务临时不可用，请稍后重试");
+    public Result<Void> updateSeatStatus(@RequestBody BatchSeatIntervalInsertDTO batchDTO) {
+        return Result.error("远程调用失败/触发降级");
     }
 }

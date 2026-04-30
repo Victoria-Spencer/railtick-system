@@ -4,10 +4,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.annotation.AfterReturning;
 import org.aspectj.lang.reflect.MethodSignature;
+import org.rail.common.core.context.RequestContext;
+import org.rail.common.core.context.RequestContextHolder;
 import org.rail.common.redis.annotation.AutoClearAggCache;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Pointcut;
-import org.rail.common.core.util.ThreadLocalUtils;
 import org.rail.common.redis.api.ICacheClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -55,7 +56,7 @@ public class AggCacheClearAspect {
             }
             Object entity = args[0];
             String idField = anno.idField();
-            Field field = null;
+            Field field;
             try {
                 field = entity.getClass().getDeclaredField(idField);
                 field.setAccessible(true);
@@ -66,8 +67,8 @@ public class AggCacheClearAspect {
                 throw new RuntimeException(errorMsg, e);
             }
         } else if (anno.keySource() == AutoClearAggCache.KeySource.THREAD_LOCAL) {
-            // 从 ThreadLocal 中取
-            keyValue = ThreadLocalUtils.get("userId", String.class);
+            RequestContext requestContext = RequestContextHolder.getRequestContext();
+            keyValue = requestContext.getAccountId();
             if (keyValue == null) {
                 log.warn("自动清理聚合缓存失败：ThreadLocal 中无数据");
                 return;

@@ -7,14 +7,15 @@ import cn.hutool.core.lang.TypeReference;
 import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
 import com.github.pagehelper.PageHelper;
-import lombok.extern.slf4j.Slf4j;
 import org.rail.api.client.TicketFeignClient;
 import org.rail.api.client.UserFeignClient;
 import org.rail.api.constant.OrderTypeConstants;
+import org.rail.common.core.context.RequestContext;
+import org.rail.common.core.context.RequestContextHolder;
 import org.rail.common.core.exception.*;
 import org.rail.common.core.util.BeanConvertUtil;
+import org.rail.common.core.util.LogUtils;
 import org.rail.common.core.util.SnowflakeIdGenerator;
-import org.rail.common.core.util.ThreadLocalUtils;
 import org.rail.common.redis.api.ICacheClient;
 import org.rail.common.redis.constant.RedisConstants;
 import org.rail.common.redis.result.AggCacheResult;
@@ -48,7 +49,6 @@ import java.util.stream.Stream;
 
 import static org.rail.common.redis.constant.RedisConstants.*;
 
-@Slf4j
 @Service
 public class OrderServiceImpl implements OrderService {
 
@@ -89,7 +89,8 @@ public class OrderServiceImpl implements OrderService {
     @Override
 //    @GlobalTransactional
     public String createPreOrder(CreatePreOrderDTO createPreOrderDTO) {
-        String userId = ThreadLocalUtils.get("userId", String.class);
+        RequestContext context = RequestContextHolder.getRequestContext();
+        String userId = context.getAccountId();
         Long trainId = createPreOrderDTO.getTrainId();
         String lockKey = RedisConstants.USER_TRAIN_PRE_ORDER_LOCK_PREFIX + userId + ":" + trainId;
         RLock lock = redissonClient.getLock(lockKey);
@@ -187,15 +188,22 @@ public class OrderServiceImpl implements OrderService {
         }
 
         BatchSeatIntervalInsertDTO batchSeatDTO = buildSeatReleaseDto(createPreOrderDTO, oldPreOrder, oldDetails);
-        try {
-            if (ObjectUtil.isNotNull(batchSeatDTO) && ObjectUtil.isNotNull(batchSeatDTO.getSeatList())) {
-                ticketFeignClient.updateSeatStatus(batchSeatDTO);
-            }
-        } catch (Exception e) {
-            log.error("释放预订单座位锁失败，预订单ID：{}", oldPreOrder.getId(), e);
-            // 抛出业务异常，触发Seata全局事务回滚（避免「预订单已删但座位未释放」的脏数据）
-            throw new OpenFeignException("释放旧预订单座位锁失败：" + e.getMessage());
+        if (ObjectUtil.isNull(batchSeatDTO) || ObjectUtil.isNull(batchSeatDTO.getSeatList())) {
+            return;
         }
+
+        String params = batchSeatDTO.toString();
+
+        Result<Void> feignResult = ticketFeignClient.updateSeatStatus(batchSeatDTO);
+
+        if (!feignResult.isSuccess()) {
+            LogUtils.error("OrderService", "releaseOldPreOrderSeatLock", "/api/ticket-service/ticket/seat-status/update",
+                    params, feignResult.getMessage());
+            throw new OpenFeignException("释放旧预订单座位锁失败：" + feignResult.getMessage());
+        }
+
+        LogUtils.info("OrderService", "releaseOldPreOrderSeatLock", "/api/ticket-service/ticket/seat-status/update",
+                params, feignResult);
     }
 
     /**
@@ -303,10 +311,24 @@ public class OrderServiceImpl implements OrderService {
         BatchSeatIntervalInsertDTO batchSeatDTO = handleOrderSeat(detailsList);
 
         orderMapper.batchInsertOrderDetails(detailsList);
-        // 修改区间和更新座位的状态
-        if (ObjectUtil.isNotEmpty(batchSeatDTO) && ObjectUtil.isNotEmpty(batchSeatDTO.getSeatList())) {
-            ticketFeignClient.updateSeatStatus(batchSeatDTO);
+
+        if (ObjectUtil.isEmpty(batchSeatDTO) || ObjectUtil.isEmpty(batchSeatDTO.getSeatList())) {
+            return detailsList;
         }
+
+        String params = batchSeatDTO.toString();
+
+        Result<Void> feignResult = ticketFeignClient.updateSeatStatus(batchSeatDTO);
+
+        if (!feignResult.isSuccess()) {
+            LogUtils.error("OrderService", "handleOrderDetails", "/api/ticket-service/ticket/seat-status/update",
+                    params, feignResult.getMessage());
+            throw new OpenFeignException("订单创建-更新座位状态失败：" + feignResult.getMessage());
+        }
+
+        LogUtils.info("OrderService", "handleOrderDetails", "/api/ticket-service/ticket/seat-status/update",
+                params, feignResult);
+
         return detailsList;
     }
 
@@ -410,10 +432,16 @@ public class OrderServiceImpl implements OrderService {
      * 远程调用座位服务 + 统一校验
      */
     private List<AvailableSeatDTO> doGetAvailableSeat(RandomSeatQueryDTO randomSeatQueryDTO, Integer need) {
+        String params = randomSeatQueryDTO.toString();
+
         Result<List<AvailableSeatDTO>> feignResult = ticketFeignClient.getAvailableSeats(randomSeatQueryDTO);
         if (!feignResult.isSuccess()) {
+            LogUtils.error("OrderService", "doGetAvailableSeat", "/api/ticket-service/ticket/seats/available", params,
+                    feignResult.getMessage());
             throw new OpenFeignException(feignResult.getMessage());
         }
+
+        LogUtils.info("OrderService", "doGetAvailableSeat", "/api/ticket-service/ticket/seats/available", params, feignResult);
 
         List<AvailableSeatDTO> availableSeatList = feignResult.getData();
         if (availableSeatList == null || availableSeatList.size() < need) {
@@ -534,14 +562,19 @@ public class OrderServiceImpl implements OrderService {
      * 本人车票分页查询：数据库查询 + 构建聚合缓存依赖Key
      */
     private AggCacheResult<PageResult<SelfTicketPageVO>> loadSelfTicketFromDb(FrontSelfTicketPageDTO frontSelfTicketPageDTO) {
-        // 远程调用user-service，根据userId查询idType和idCard，UserIdCardDTO
+        String params = String.valueOf(frontSelfTicketPageDTO.getUserId());
+
+        // 远程调用user-service，根据userId查询idType和idCard
         Result<UserIdCardDTO> userIdCardDTOResult = userFeignClient.getIdCardInfo(frontSelfTicketPageDTO.getUserId());
-        if(!userIdCardDTOResult.isSuccess()) {
+
+        if (!userIdCardDTOResult.isSuccess()) {
+            LogUtils.error("OrderService", "loadSelfTicketFromDb", "/api/user-service/user/{id}", params, userIdCardDTOResult.getMessage());
             throw new OpenFeignException(userIdCardDTOResult.getMessage());
         }
-        UserIdCardDTO userIdCardDTO = userIdCardDTOResult.getData();
 
-        // 拷贝
+        LogUtils.info("OrderService", "loadSelfTicketFromDb", "/api/user-service/user/{id}", params, userIdCardDTOResult);
+
+        UserIdCardDTO userIdCardDTO = userIdCardDTOResult.getData();
         SelfTicketPageDTO selfTicketPageDTO = BeanUtil.copyProperties(frontSelfTicketPageDTO, SelfTicketPageDTO.class);
         selfTicketPageDTO.setIdType(userIdCardDTO.getIdType());
         selfTicketPageDTO.setIdCard(userIdCardDTO.getIdCard());
@@ -564,13 +597,21 @@ public class OrderServiceImpl implements OrderService {
      * 包含：身份证信息 + 车票状态 + 日期范围 + 车次 + 分页参数
      */
     private String buildSelfTicketCacheKey(FrontSelfTicketPageDTO dto) {
+        String params = String.valueOf(dto.getUserId());
+
         // 先远程获取idType和idCard，用于拼接Key（保证Key唯一性）
         String idType = "";
         String idCard = "";
         Result<UserIdCardDTO> userIdCardDTOResult = userFeignClient.getIdCardInfo(dto.getUserId());
         if (userIdCardDTOResult.isSuccess() && userIdCardDTOResult.getData() != null) {
-            idType = Objects.toString(userIdCardDTOResult.getData().getIdType(), "");
-            idCard = Objects.toString(userIdCardDTOResult.getData().getIdCard(), "");
+            UserIdCardDTO userIdCardDTO = userIdCardDTOResult.getData();
+            idType = Objects.toString(userIdCardDTO.getIdType(), "");
+            idCard = Objects.toString(userIdCardDTO.getIdCard(), "");
+            LogUtils.info("OrderService", "buildSelfTicketCacheKey", "/api/user-service/user/{id}", params,
+                    userIdCardDTOResult);
+        } else {
+            LogUtils.error("OrderService", "buildSelfTicketCacheKey", "/api/user-service/user/{id}", params,
+                    userIdCardDTOResult.getMessage());
         }
 
         // 拼接所有非空查询条件和分页参数

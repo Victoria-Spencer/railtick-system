@@ -1,8 +1,11 @@
 package org.rail.orderservice.controller;
 
 import jakarta.validation.constraints.NotBlank;
+import org.rail.common.core.context.RequestContext;
+import org.rail.common.core.context.RequestContextHolder;
 import org.rail.common.core.result.PageResult;
 import org.rail.common.core.result.Result;
+import org.rail.common.core.util.LogUtils;
 import org.rail.orderservice.orderservice.OrderService;
 import org.rail.orderservice.pojo.dto.CreateOrderDTO;
 import org.rail.orderservice.pojo.dto.CreatePreOrderDTO;
@@ -15,6 +18,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import static org.rail.common.core.util.LogUtils.FAIL;
+import static org.rail.common.core.util.LogUtils.SUCCESS;
+
 @RestController
 @RequestMapping("/api/order-service")
 @Validated
@@ -25,14 +31,40 @@ public class OrderController {
 
     @PostMapping("/pre-order/create")
     public Result<String> createPreOrder(@RequestBody  @Validated CreatePreOrderDTO createPreOrderDTO) {
-        String preOrderSn = orderService.createPreOrder(createPreOrderDTO);
-        return Result.success(preOrderSn);
+        RequestContext context = RequestContextHolder.getRequestContext();
+
+        try {
+            String preOrderSn = orderService.createPreOrder(createPreOrderDTO);
+            Result<String> result = Result.success(preOrderSn);
+
+            LogUtils.monitor(context, "TicketController", "createPreOrder",context.getStartTime(),
+                    SUCCESS, createPreOrderDTO, result);
+
+            return result;
+        } catch (Exception e) {
+            LogUtils.monitor(context, "TicketController", "createPreOrder",context.getStartTime(),
+                    FAIL, createPreOrderDTO, e.getMessage(), e);
+            throw e;
+        }
     }
 
     @PostMapping("/order/create")
     public Result<CreateOrderVO> createOrder(@RequestBody  @Validated CreateOrderDTO createOrderDTO) {
-        CreateOrderVO createOrderVO = orderService.createOrder(createOrderDTO);
-        return Result.success(createOrderVO);
+        RequestContext context = RequestContextHolder.getRequestContext();
+
+        try {
+            CreateOrderVO createOrderVO = orderService.createOrder(createOrderDTO);
+            Result<CreateOrderVO> result = Result.success(createOrderVO);
+
+            LogUtils.monitor(context, "TicketController", "createOrder",context.getStartTime(),
+                    SUCCESS, createOrderDTO, result);
+
+            return result;
+        } catch (Exception e) {
+            LogUtils.monitor(context, "TicketController", "createOrder",context.getStartTime(),
+                    FAIL, createOrderDTO, e.getMessage(), e);
+            throw e;
+        }
     }
 
     @PostMapping("/order/page")

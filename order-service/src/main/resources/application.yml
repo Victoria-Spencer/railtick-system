@@ -5,6 +5,7 @@ spring:
     name: order-service
   config:
     import:
+      # common-defaults.yml 来自 common 模块 jar 包，IDE 误报忽略即可
       - classpath:common-defaults.yml
   cloud:
     # nacos注册中心配置

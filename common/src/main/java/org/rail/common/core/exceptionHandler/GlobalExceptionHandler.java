@@ -2,9 +2,9 @@ package org.rail.common.core.exceptionHandler;
 
 import cn.hutool.core.util.StrUtil;
 import jakarta.validation.ConstraintViolationException;
-import lombok.extern.slf4j.Slf4j;
 import org.rail.common.core.exception.*;
 import org.rail.common.core.result.Result;
+import org.rail.common.core.util.LogUtils;
 import org.rail.common.redis.exception.CacheException;
 import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
@@ -13,7 +13,6 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice
-@Slf4j
 public class GlobalExceptionHandler{
 
     /**
@@ -21,15 +20,9 @@ public class GlobalExceptionHandler{
      */
     @ExceptionHandler(SeatLockFailedException.class)
     public Result<Void> handleSeatLockFailedException(SeatLockFailedException e) {
-        String errorMessage;
-        Throwable cause = e.getCause();
-        // 优先级：根因消息 > 当前异常消息 > 默认提示
-        if (cause != null && StrUtil.isNotBlank(cause.getMessage())) {
-            errorMessage = cause.getMessage();
-        } else {
-            errorMessage = e.getMessage() == null ? "座位锁定失败" : e.getMessage();
-        }
-        log.warn(errorMessage);
+        String[] location = getErrorLocation(e);
+        String errorMsg = getErrorMessage(e, "座位锁定失败");
+        LogUtils.warn(location[0], location[1], errorMsg, e);
         return Result.error("座位锁定失败，请重新选座");
     }
 
@@ -38,14 +31,9 @@ public class GlobalExceptionHandler{
      */
     @ExceptionHandler(BusinessException.class)
     public Result<Void> handleBusinessException(BusinessException e) {
-        String errorMessage;
-        Throwable cause = e.getCause();
-        if (cause != null && StrUtil.isNotBlank(cause.getMessage())) {
-            errorMessage = cause.getMessage();
-        } else {
-            errorMessage = e.getMessage() == null ? "业务处理失败" : e.getMessage();
-        }
-        log.error(errorMessage);
+        String[] location = getErrorLocation(e);
+        String errorMsg = getErrorMessage(e, "业务处理失败");
+        LogUtils.error(location[0], location[1], errorMsg, e);
         return Result.error("操作失败，请稍后重试");
     }
 
@@ -54,14 +42,9 @@ public class GlobalExceptionHandler{
      */
     @ExceptionHandler(OrderNotFoundException.class)
     public Result<Void> handleOrderNotFoundException(OrderNotFoundException e) {
-        String errorMessage;
-        Throwable cause = e.getCause();
-        if (cause != null && StrUtil.isNotBlank(cause.getMessage())) {
-            errorMessage = cause.getMessage();
-        } else {
-            errorMessage = e.getMessage() == null ? "订单不存在" : e.getMessage();
-        }
-        log.error(errorMessage);
+        String[] location = getErrorLocation(e);
+        String errorMsg = getErrorMessage(e, "订单不存在");
+        LogUtils.error(location[0], location[1], errorMsg, e);
         return Result.error("订单不存在，请检查订单号");
     }
 
@@ -70,14 +53,9 @@ public class GlobalExceptionHandler{
      */
     @ExceptionHandler(OpenFeignException.class)
     public Result<Void> handleOpenFeignException(OpenFeignException e) {
-        String errorMessage;
-        Throwable cause = e.getCause();
-        if (cause != null && StrUtil.isNotBlank(cause.getMessage())) {
-            errorMessage = cause.getMessage();
-        } else {
-            errorMessage = e.getMessage() == null ? "远程服务调用失败" : e.getMessage();
-        }
-        log.error(errorMessage);
+        String[] location = getErrorLocation(e);
+        String errorMsg = getErrorMessage(e, "远程服务调用失败");
+        LogUtils.error(location[0], location[1], errorMsg, e);
         return Result.error("服务繁忙，请稍后重试");
     }
 
@@ -86,14 +64,9 @@ public class GlobalExceptionHandler{
      */
     @ExceptionHandler(CacheException.class)
     public Result<Void> handleCacheException(CacheException e) {
-        String errorMessage;
-        Throwable cause = e.getCause();
-        if (cause != null && StrUtil.isNotBlank(cause.getMessage())) {
-            errorMessage = cause.getMessage();
-        } else {
-            errorMessage = e.getMessage() == null ? "缓存服务异常" : e.getMessage();
-        }
-        log.error(errorMessage);
+        String[] location = getErrorLocation(e);
+        String errorMsg = getErrorMessage(e, "缓存服务异常");
+        LogUtils.error(location[0], location[1], errorMsg, e);
         return Result.error("服务繁忙，请稍后重试");
     }
 
@@ -102,14 +75,9 @@ public class GlobalExceptionHandler{
      */
     @ExceptionHandler(UserConcurrentLockException.class)
     public Result<?> handleUserConcurrentLockException(UserConcurrentLockException e) {
-        String errorMessage;
-        Throwable cause = e.getCause();
-        if (cause != null && StrUtil.isNotBlank(cause.getMessage())) {
-            errorMessage = cause.getMessage();
-        } else {
-            errorMessage = e.getMessage() == null ? "用户并发操作冲突" : e.getMessage();
-        }
-        log.warn(errorMessage);
+        String[] location = getErrorLocation(e);
+        String errorMsg = getErrorMessage(e, "用户并发操作冲突");
+        LogUtils.warn(location[0], location[1], errorMsg, e);
         return Result.error("操作过于频繁，请稍后重试");
     }
 
@@ -118,14 +86,9 @@ public class GlobalExceptionHandler{
      */
     @ExceptionHandler(UserOperateInterruptedException.class)
     public Result<?> handleUserOperateInterruptedException(UserOperateInterruptedException e) {
-        String errorMessage;
-        Throwable cause = e.getCause();
-        if (cause != null && StrUtil.isNotBlank(cause.getMessage())) {
-            errorMessage = cause.getMessage();
-        } else {
-            errorMessage = e.getMessage() == null ? "操作已被中断，请重试" : e.getMessage();
-        }
-        log.warn(errorMessage);
+        String[] location = getErrorLocation(e);
+        String errorMsg = getErrorMessage(e, "操作已被中断，请重试");
+        LogUtils.warn(location[0], location[1], errorMsg, e);
         return Result.error("操作已中断，请重新尝试");
     }
 
@@ -134,10 +97,11 @@ public class GlobalExceptionHandler{
      */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public Result<Void> handleMethodArgumentNotValidException(MethodArgumentNotValidException e) {
+        String[] location = getErrorLocation(e);
         FieldError fieldError = e.getBindingResult().getFieldError();
-        String errorMessage = fieldError != null ? fieldError.getDefaultMessage() : "参数校验失败";
-        log.warn("参数校验失败：{}", errorMessage);
-        return Result.error(errorMessage);
+        String errorMsg = fieldError != null ? fieldError.getDefaultMessage() : "参数校验失败";
+        LogUtils.warn(location[0], location[1], errorMsg, e);
+        return Result.error(errorMsg);
     }
 
     /**
@@ -145,9 +109,10 @@ public class GlobalExceptionHandler{
      */
     @ExceptionHandler(ConstraintViolationException.class)
     public Result<Void> handleConstraintViolationException(ConstraintViolationException e) {
-        String errorMessage = e.getConstraintViolations().iterator().next().getMessage();
-        log.warn("参数校验失败：{}", errorMessage);
-        return Result.error(errorMessage);
+        String[] location = getErrorLocation(e);
+        String errorMsg = e.getConstraintViolations().iterator().next().getMessage();
+        LogUtils.warn(location[0], location[1], errorMsg, e);
+        return Result.error(errorMsg);
     }
 
     /**
@@ -156,10 +121,11 @@ public class GlobalExceptionHandler{
      */
     @ExceptionHandler(BindException.class)
     public Result<Void> handleBindException(BindException e) {
+        String[] location = getErrorLocation(e);
         FieldError fieldError = e.getBindingResult().getFieldError();
-        String errorMessage = fieldError != null ? fieldError.getDefaultMessage() : "参数校验失败";
-        log.warn("参数校验失败：{}", errorMessage);
-        return Result.error(errorMessage);
+        String errorMsg = fieldError != null ? fieldError.getDefaultMessage() : "参数校验失败";
+        LogUtils.warn(location[0], location[1], errorMsg, e);
+        return Result.error(errorMsg);
     }
 
     /**
@@ -167,9 +133,10 @@ public class GlobalExceptionHandler{
      */
     @ExceptionHandler(IllegalArgumentException.class)
     public Result<Void> handleValidException(IllegalArgumentException e) {
-        String errorMessage = e.getMessage() == null ? "参数校验异常" : e.getMessage();
-        log.error(errorMessage);
-        return Result.error(errorMessage);
+        String[] location = getErrorLocation(e);
+        String errorMsg = getErrorMessage(e, "参数校验异常");
+        LogUtils.error(location[0], location[1], errorMsg, e);
+        return Result.error(errorMsg);
     }
 
     /**
@@ -177,7 +144,32 @@ public class GlobalExceptionHandler{
      */
     @ExceptionHandler(Exception.class)
     public Result<Void> handleGlobalException(Exception e) {
-        log.error("服务器繁忙，请稍后再试", e);
+        String[] location = getErrorLocation(e);
+        LogUtils.error(location[0], location[1], "服务器未知异常", e);
         return Result.error("服务器繁忙，请稍后再试");
+    }
+
+    /**
+     * 自动获取 类名 + 方法名
+     */
+    private String[] getErrorLocation(Throwable e) {
+        StackTraceElement[] stackTrace = e.getStackTrace();
+        if (stackTrace == null || stackTrace.length == 0) {
+            return new String[]{"UnknownClass", "UnknownMethod"};
+        }
+        StackTraceElement element = stackTrace[0];
+        String className = element.getClassName().substring(element.getClassName().lastIndexOf(".") + 1);
+        String methodName = element.getMethodName();
+        return new String[]{className, methodName};
+    }
+
+    /**
+     * 获取异常错误信息
+     */
+    private String getErrorMessage(Throwable e, String defaultMessage) {
+        if (e.getCause() != null && StrUtil.isNotBlank(e.getCause().getMessage())) {
+            return e.getCause().getMessage();
+        }
+        return StrUtil.blankToDefault(e.getMessage(), defaultMessage);
     }
 }

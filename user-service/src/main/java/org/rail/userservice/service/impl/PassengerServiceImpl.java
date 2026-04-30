@@ -3,11 +3,11 @@ package org.rail.userservice.service.impl;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.lang.TypeReference;
 import com.github.pagehelper.PageHelper;
-import lombok.extern.slf4j.Slf4j;
+import org.rail.common.core.context.RequestContext;
+import org.rail.common.core.context.RequestContextHolder;
 import org.rail.common.redis.api.ICacheClient;
 import org.rail.common.redis.constant.RedisConstants;
 import org.rail.common.core.result.PageResult;
-import org.rail.common.core.util.ThreadLocalUtils;
 import org.rail.userservice.constant.VerifyStatusConstants;
 import org.rail.userservice.mapper.PassengerMapper;
 import org.rail.userservice.pojo.dto.PsgrPageQueryDTO;
@@ -18,11 +18,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-@Slf4j
 @Service
 public class PassengerServiceImpl implements PassengerService {
 
@@ -85,7 +83,8 @@ public class PassengerServiceImpl implements PassengerService {
     @Override
     public void save(Passenger passenger) {
         // 从线程中获取乘车人对应的用户标识
-        Long userId = Long.valueOf(ThreadLocalUtils.get("userId", String.class));
+        RequestContext requestContext = RequestContextHolder.getRequestContext();
+        Long userId = Long.valueOf(requestContext.getAccountId());
         passenger.setUserId(userId);
 
         // 设置审核状态
@@ -112,11 +111,9 @@ public class PassengerServiceImpl implements PassengerService {
         passenger.setUpdateTime(LocalDateTime.now());
         passengerMapper.updateById(passenger);
 
-        String userId = ThreadLocalUtils.get("userId", String.class);
+        RequestContext requestContext = RequestContextHolder.getRequestContext();
+        String userId = requestContext.getAccountId();
         cacheClient.autoClearAggCache(RedisConstants.RAIL_PASSENGER_LIST_USER_PREFIX + userId);
-        /*// 删除缓存
-        String userId = ThreadLocalUtils.get();
-        stringRedisTemplate.delete(RedisConstants.RAIL_PASSENGER_LIST_USER_PREFIX + userId);*/
     }
 
     /**
@@ -131,10 +128,8 @@ public class PassengerServiceImpl implements PassengerService {
     public void deleteByIds(List<Long> ids) {
         passengerMapper.batchDelete(ids);
 
-        String userId = ThreadLocalUtils.get("userId", String.class);
+        RequestContext requestContext = RequestContextHolder.getRequestContext();
+        String userId = requestContext.getAccountId();
         cacheClient.autoClearAggCache(RedisConstants.RAIL_PASSENGER_LIST_USER_PREFIX + userId);
-        // 删除缓存
-        /*String userId = ThreadLocalUtils.get();
-        stringRedisTemplate.delete(RedisConstants.RAIL_PASSENGER_LIST_USER_PREFIX + userId);*/
     }
 }

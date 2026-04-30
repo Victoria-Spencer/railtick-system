@@ -1,7 +1,6 @@
 package org.rail.common.redis.util;
 
 import cn.hutool.core.lang.TypeReference;
-import lombok.extern.slf4j.Slf4j;
 import org.rail.common.redis.api.ICacheClient;
 import org.rail.common.redis.core.RedisAggCache;
 import org.rail.common.redis.core.RedisCache;
@@ -25,7 +24,6 @@ import java.util.function.Function;
  * 5. 性能优化（批量操作、锁粒度控制）
  * 6. 简化接口（仅保留 TypeReference 版本，避免重载歧义）
  */
-@Slf4j
 @Component
 public class CacheClient implements ICacheClient {
 

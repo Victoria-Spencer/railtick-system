@@ -2,6 +2,8 @@ package org.rail.api.config;
 
 import feign.RequestInterceptor;
 import feign.RequestTemplate;
+import org.rail.common.core.context.RequestContext;
+import org.rail.common.core.context.RequestContextHolder;
 import org.rail.common.core.exception.OpenFeignException;
 import org.rail.common.core.util.ThreadLocalUtils;
 import org.springframework.context.annotation.Bean;
@@ -18,16 +20,19 @@ public class FeignConfig {
         return new RequestInterceptor() {
 
             public void apply(RequestTemplate requestTemplate) {
-                // 从当前上下文（如ThreadLocal）中获取用户ID
-                // 用户登录后，user-id存储在ThreadLocal中
-                String userId = ThreadLocalUtils.get("userId", String.class);
-                if (userId != null) {
-                    // 向请求头添加user-id
-                    requestTemplate.header("user-id", userId);
-                } else {
-                    // 若未获取到用户ID，可抛出异常或处理未登录场景
+                //  统一从上下文获取 RequestContext
+                RequestContext context = RequestContextHolder.getRequestContext();
+                if (context == null) {
+                    throw new OpenFeignException("当前请求无上下文，无法发起远程调用");
+                }
+
+                String userId = context.getAccountId();
+                if (userId == null || userId.isBlank()) {
                     throw new OpenFeignException("当前用户未登录，无法发起远程调用");
                 }
+
+                requestTemplate.header("user-id", userId);
+                requestTemplate.header("request-id", context.getRequestId());
             }
         };
     }

@@ -3,6 +3,9 @@ package org.rail.common.core.interceptor;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.rail.common.core.config.RequestInterceptorProperties;
+import org.rail.common.core.context.RequestContext;
+import org.rail.common.core.context.RequestContextHolder;
+import org.rail.common.core.util.LogUtils;
 import org.rail.common.core.util.ThreadLocalUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -10,6 +13,7 @@ import org.springframework.util.AntPathMatcher;
 import org.springframework.web.servlet.HandlerInterceptor;
 
 import java.util.List;
+import java.util.UUID;
 
 /**
  * 通用请求拦截器
@@ -18,6 +22,7 @@ import java.util.List;
 public class CommonRequestInterceptor implements HandlerInterceptor {
 
     private static final String USER_ID_HEADER = "user-id";
+    private static final String REQUEST_ID_HEADER = "request-id";
 
     @Autowired
     private RequestInterceptorProperties interceptorProperties;
@@ -37,13 +42,23 @@ public class CommonRequestInterceptor implements HandlerInterceptor {
             // 返回 401 状态码
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.getWriter().write("未获取到用户信息（user-id为空）");
-            return false; // 返回false，终止请求继续处理
+            return false;
         }
 
-        // 将user-id存入到线程中
-        ThreadLocalUtils.set("userId", userId);
+        RequestContext context = new RequestContext();
+        String requestId = request.getHeader(REQUEST_ID_HEADER);
+        // 上游未传递 → 自己生成
+        if (requestId == null || requestId.isBlank()) {
+            requestId = getTraceId();
+        }
+        context.setRequestId(requestId);
 
-//        System.out.println("threadLocal：" + userId);
+        context.setStartTime(System.currentTimeMillis());
+        context.setAccountId(userId);
+        context.setCallerIp(getClientIp(request));
+
+        RequestContextHolder.setRequestContext(context);
+
         return true;
     }
 
@@ -63,8 +78,36 @@ public class CommonRequestInterceptor implements HandlerInterceptor {
         return false;
     }
 
+    /**
+     * 生成traceId
+     */
+    private static String getTraceId() {
+        return UUID.randomUUID().toString().replace("-", "");
+    }
+
+    /**
+     * 获取客户端真实IP（兼容代理/负载均衡场景）
+     */
+    private String getClientIp(HttpServletRequest request) {
+        // 优先从代理请求头获取真实IP
+        String xForwardedFor = request.getHeader("X-Forwarded-For");
+        if (xForwardedFor != null && !xForwardedFor.isEmpty() && !"unknown".equalsIgnoreCase(xForwardedFor)) {
+            return xForwardedFor.split(",")[0].trim();
+        }
+
+        String xRealIp = request.getHeader("X-Real-IP");
+        if (xRealIp != null && !xRealIp.isEmpty() && !"unknown".equalsIgnoreCase(xRealIp)) {
+            return xRealIp.trim();
+        }
+
+        // 无代理时直接获取本地IP
+        return request.getRemoteAddr();
+    }
+
+
     @Override
     public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) throws Exception {
         ThreadLocalUtils.removeAll();
+        RequestContextHolder.clearRequestContext();
     }
 }
