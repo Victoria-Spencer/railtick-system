@@ -41,6 +41,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -163,7 +164,7 @@ public class OrderServiceImpl implements OrderService {
      * 更新预订单主表信息
      */
     private void updatePreOrderMainInfo(CreatePreOrderDTO createPreOrderDTO, PreOrder preOrder) {
-        Double newTotalAmount = calculateTotalAmount(createPreOrderDTO.getPassengerOrderDetailDTOList());
+        BigDecimal newTotalAmount = calculateTotalAmount(createPreOrderDTO.getPassengerOrderDetailDTOList());
         preOrder.setTotalAmount(newTotalAmount);
         preOrder.setExpireTime(calculateExpireTime());
         preOrder.setStatus(PreOrderStatusConstants.VALID);
@@ -658,7 +659,7 @@ public class OrderServiceImpl implements OrderService {
         //  构建预订单主表
         Long preOrderId = SnowflakeIdGenerator.nextId();
         String preOrderSn = SnowflakeIdGenerator.generatePreOrderSn();
-        Double totalAmount = calculateTotalAmount(createPreOrderDTO.getPassengerOrderDetailDTOList());
+        BigDecimal totalAmount = calculateTotalAmount(createPreOrderDTO.getPassengerOrderDetailDTOList());
 
         PreOrder preOrder = BeanUtil.copyProperties(createPreOrderDTO, PreOrder.class);
         preOrder.setId(preOrderId);
@@ -754,10 +755,10 @@ public class OrderServiceImpl implements OrderService {
         batchSeatDTO.setSeatList(new ArrayList<>());
     }
 
-    private Double calculateTotalAmount(List<PassengerOrderDetailDTO> passengerList) {
-        Double totalAmount = 0.0;
+    private BigDecimal calculateTotalAmount(List<PassengerOrderDetailDTO> passengerList) {
+        BigDecimal totalAmount = BigDecimal.ZERO;
         for (PassengerOrderDetailDTO dto : passengerList) {
-            totalAmount += dto.getAmount();
+            totalAmount = totalAmount.add(dto.getAmount());
         }
         return totalAmount;
     }

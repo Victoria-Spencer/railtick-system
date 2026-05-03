@@ -2,6 +2,8 @@ package org.rail.orderservice.pojo.vo;
 
 import lombok.Data;
 
+import java.math.BigDecimal;
+
 @Data
 public class OrderDetailsVO {
 
@@ -15,7 +17,7 @@ public class OrderDetailsVO {
     private String idCard;
     // 车票类型：0-成人票 1-儿童票 2-学生票 3-残疾军人
     private Integer ticketType;
-    private Double amount;
+    private BigDecimal amount;
     // 退票状态：0-未退票 1已退票
     private Boolean refundStatus;
 }

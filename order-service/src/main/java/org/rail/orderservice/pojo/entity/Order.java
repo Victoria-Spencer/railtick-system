@@ -2,6 +2,7 @@ package org.rail.orderservice.pojo.entity;
 
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
@@ -19,7 +20,7 @@ public class Order {
     // 订单状态：0-待支付 1-已支付 2-已取消 3-部分退票 4-全部退票
     private Integer status;
 
-    private Double totalAmount;
+    private BigDecimal totalAmount;
     private LocalDateTime payTime;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;

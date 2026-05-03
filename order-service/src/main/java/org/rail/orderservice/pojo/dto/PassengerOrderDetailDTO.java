@@ -2,6 +2,8 @@ package org.rail.orderservice.pojo.dto;
 
 import lombok.Data;
 
+import java.math.BigDecimal;
+
 @Data
 public class PassengerOrderDetailDTO {
 
@@ -13,5 +15,5 @@ public class PassengerOrderDetailDTO {
     private Integer ticketType;
     // 席别类型：0-商等座 1-一等座 2-二务座...
     private Integer seatType;
-    private Double amount;
+    private BigDecimal amount;
 }

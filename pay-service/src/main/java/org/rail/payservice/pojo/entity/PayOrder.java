@@ -2,6 +2,8 @@ package org.rail.payservice.pojo.entity;
 
 import org.rail.payservice.enums.PaymentStatus;
 
+import java.math.BigDecimal;
+
 public class PayOrder {
 
     // 支付单id
@@ -19,7 +21,7 @@ public class PayOrder {
 //    // 主体
 //    private String subject;
     // 总金额
-    private Double totalAmount;
+    private BigDecimal totalAmount;
     // 支付状态
     private PaymentStatus payStatus;
 }

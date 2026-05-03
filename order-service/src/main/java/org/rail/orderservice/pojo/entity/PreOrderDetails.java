@@ -2,6 +2,8 @@ package org.rail.orderservice.pojo.entity;
 
 import lombok.Data;
 
+import java.math.BigDecimal;
+
 /**
  * 预订单明细
  */
@@ -20,5 +22,5 @@ public class PreOrderDetails {
     private Integer seatType;
     private String carriageNumber;
     private String tempSeatNo;
-    private Double amount;
+    private BigDecimal amount;
 }
