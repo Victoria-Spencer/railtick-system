@@ -1,6 +1,9 @@
 package org.rail.common.redis.impl;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.rail.common.redis.impl.config.CommonTestConfig;
+import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
@@ -12,12 +15,20 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.*;
 
-@SpringBootTest
+@SpringBootTest(classes = CommonTestConfig.class)
 @ActiveProfiles("test")
 public class RedissonCacheTest {
 
     @Autowired
     private RedisCache redisCache;
+
+    @Autowired
+    private RedissonClient redissonClient;
+
+    @BeforeEach
+    void cleanRedisTestDb() {
+        redissonClient.getKeys().flushdb();
+    }
 
     // ======================== String 类型 ========================
     @Test
@@ -44,6 +55,47 @@ public class RedissonCacheTest {
         String key = "test:string:logical";
         redisCache.setWithLogicalExpire(key, "test-data", 10L, TimeUnit.SECONDS);
         assertTrue(redisCache.exists(key));
+    }
+
+    @Test
+    void testSetIfAbsent() {
+        String key = "test:setIfAbsent:normal";
+        String value = "absent-value";
+
+        // 第一次设置：key不存在，应该成功
+        Boolean firstSet = redisCache.setIfAbsent(key, value);
+        assertTrue(firstSet);
+        assertEquals(value, redisCache.get(key, String.class));
+
+        // 第二次设置：key已存在，应该失败
+        Boolean secondSet = redisCache.setIfAbsent(key, "new-value");
+        assertFalse(secondSet);
+        // 值不会被覆盖
+        assertEquals(value, redisCache.get(key, String.class));
+
+        // 测试空值/空key：直接返回false
+        assertFalse(redisCache.setIfAbsent("", value));
+        assertFalse(redisCache.setIfAbsent(key, null));
+    }
+
+    @Test
+    void testSetIfAbsentWithExpire() {
+        String key = "test:setIfAbsent:expire";
+        String value = "expire-value";
+
+        // 第一次带过期时间设置：成功
+        Boolean firstSet = redisCache.setIfAbsent(key, value, 30L, TimeUnit.SECONDS);
+        assertTrue(firstSet);
+        assertEquals(value, redisCache.get(key, String.class));
+
+        // 重复设置：失败
+        Boolean secondSet = redisCache.setIfAbsent(key, "new-value", 30L, TimeUnit.SECONDS);
+        assertFalse(secondSet);
+
+        // 非法参数校验：过期时间<=0 / 时间单位为null
+        assertFalse(redisCache.setIfAbsent("test:invalid", "v", 0L, TimeUnit.SECONDS));
+        assertFalse(redisCache.setIfAbsent("test:invalid", "v", -10L, TimeUnit.SECONDS));
+        assertFalse(redisCache.setIfAbsent("test:invalid", "v", 10L, null));
     }
 
     @Test
@@ -102,7 +154,7 @@ public class RedissonCacheTest {
     void testHashOperate() {
         String key = "test:hash:main";
         // 单个字段
-        redisCache.hPut(key, "name", "zhangsan", 1L, TimeUnit.MINUTES);
+        redisCache.hPut(key, "name", "zhangsan", 10L, TimeUnit.MINUTES);
         assertEquals("zhangsan", redisCache.hGet(key, "name"));
 
         // 批量字段
@@ -120,7 +172,7 @@ public class RedissonCacheTest {
 
         // 自增
         redisCache.hIncr(key, "count", 5);
-        assertEquals("5", redisCache.hGet(key, "count"));
+        assertEquals(Integer.valueOf(5), redisCache.hGet(key, "count"));
 
         // 存在&删除
         assertTrue(redisCache.hExists(key, "name"));

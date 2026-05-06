@@ -19,7 +19,7 @@ import java.time.format.DateTimeFormatter;
 public class RedissonJsonCodecConfig {
 
     /**
-     * 注入 Redisson 全局 JSON 序列化器
+     * 创建配置好时间格式的JSON序列化器
      * 单例、线程安全，全项目共用
      */
     @Bean

@@ -14,7 +14,7 @@ public interface OrderService {
     /**
      * 创建预订单，临时锁定座位
      * @param createPreOrderDTO 预订单信息
-     * @return 预订单号
+     * @return 预订号
      */
     String createPreOrder(CreatePreOrderDTO createPreOrderDTO);
 

@@ -18,7 +18,7 @@ public class RedissonConfig {
     @Autowired
     private RedisProperties redisProperties;
     @Autowired
-    private JsonJacksonCodec redissonJsonCodec;
+    private JsonJacksonCodec jsonJacksonCodec;
 
     /**
      * 初始化 Redisson 客户端（单节点模式）
@@ -27,8 +27,9 @@ public class RedissonConfig {
     public RedissonClient redissonClient() {
         Config config = new Config();
 
-        // 设置全局JSON序列化（替换默认二进制序列化）
-        config.setCodec(redissonJsonCodec);
+        // 支持：字符串原生存储 + 对象JSON序列化
+//        config.setCodec(stringFriendlyJsonCodec);
+        config.setCodec(jsonJacksonCodec);
 
         SingleServerConfig serverConfig = config.useSingleServer();
 

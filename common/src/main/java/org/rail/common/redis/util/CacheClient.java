@@ -58,6 +58,22 @@ public class CacheClient implements ICacheClient {
     }
 
     /**
+     * 仅当key不存在时设置缓存
+     */
+    @Override
+    public <T> Boolean setIfAbsent(String key, T value) {
+        return redisCache.setIfAbsent(key, value);
+    }
+
+    /**
+     * 仅当key不存在时设置缓存，并设置过期时间
+     */
+    @Override
+    public <T> Boolean setIfAbsent(String key, T value, Long expireTime, TimeUnit timeUnit) {
+        return redisCache.setIfAbsent(key, value, expireTime, timeUnit);
+    }
+
+    /**
      * 批量设置缓存（无过期时间）
      */
     @Override

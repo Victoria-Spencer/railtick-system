@@ -100,7 +100,7 @@ class TicketServiceImplGetAvailableSeatTest {
                 anyInt(),
                 anyInt()
         )).thenReturn(1L);
-        doNothing().when(cacheClient).hPutAll(anyString(), anyMap(), anyLong(), any());
+        doNothing().when(cacheClient).hPutAllWholeExpire(anyString(), anyMap(), anyLong(), any());
         when(trainStopCacheTask.getTrainTerminalSeq(anyLong())).thenReturn(5);
 
         List<AvailableSeatDTO> result = ticketService.getAvailableSeats(queryDTO);
@@ -117,7 +117,7 @@ class TicketServiceImplGetAvailableSeatTest {
                 eq(OrderTypeConstants.PREORDER),        // 断言订单类型=预订单
                 eq(SeatIntervalStatusConstants.LOCKED)  // 断言锁座状态=锁定
         );
-        verify(cacheClient, times(1)).hPutAll(anyString(), anyMap(), anyLong(), any());
+        verify(cacheClient, times(1)).hPutAllWholeExpire(anyString(), anyMap(), anyLong(), any());
     }
 
     /**
@@ -155,7 +155,7 @@ class TicketServiceImplGetAvailableSeatTest {
                 anyInt(),
                 anyInt()
         )).thenReturn(1L);
-        doNothing().when(cacheClient).hPutAll(anyString(), anyMap(), anyLong(), any());
+        doNothing().when(cacheClient).hPutAllWholeExpire(anyString(), anyMap(), anyLong(), any());
         when(trainStopCacheTask.getTrainTerminalSeq(anyLong())).thenReturn(5);
 
         // 执行业务方法
@@ -172,7 +172,7 @@ class TicketServiceImplGetAvailableSeatTest {
                 eq(OrderTypeConstants.PREORDER),
                 eq(SeatIntervalStatusConstants.LOCKED)
         );
-        verify(cacheClient, times(1)).hPutAll(anyString(), anyMap(), anyLong(), any());
+        verify(cacheClient, times(1)).hPutAllWholeExpire(anyString(), anyMap(), anyLong(), any());
     }
 
     /**

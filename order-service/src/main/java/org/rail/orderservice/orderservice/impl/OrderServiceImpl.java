@@ -31,10 +31,7 @@ import org.rail.orderservice.pojo.entity.Order;
 import org.rail.orderservice.pojo.entity.OrderDetails;
 import org.rail.orderservice.pojo.entity.PreOrder;
 import org.rail.orderservice.pojo.entity.PreOrderDetails;
-import org.rail.orderservice.pojo.vo.CreateOrderVO;
-import org.rail.orderservice.pojo.vo.OrderDetailsVO;
-import org.rail.orderservice.pojo.vo.OrderPageQueryVO;
-import org.rail.orderservice.pojo.vo.SelfTicketPageVO;
+import org.rail.orderservice.pojo.vo.*;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -84,7 +81,7 @@ public class OrderServiceImpl implements OrderService {
      *      *********************************************************************************
      *  ）
      * @param createPreOrderDTO 预订单创建参数（包含用户ID、列车ID、乘客信息、选座信息等）
-     * @return 预订单号（唯一标识预订单，格式：PRE + 雪花ID）
+     * @return 预订单数据（预订单号、订单防重令牌），供前端展示和后续订单创建使用
      */
     // 全局事务
     @Override
@@ -107,11 +104,14 @@ public class OrderServiceImpl implements OrderService {
             String preOrderKey = buildPreOrderKey(createPreOrderDTO.getUserId(), trainId);
             PreOrder preOrder = cacheClient.get(preOrderKey);
 
+            String preOrderSn;
             if(ObjectUtil.isNotNull(preOrder)) {
-                return updateExistPreOrder(createPreOrderDTO, preOrder);
+                preOrderSn = updateExistPreOrder(createPreOrderDTO, preOrder);
             } else {
-                return createNewPreOrder(createPreOrderDTO);
+                preOrderSn = createNewPreOrder(createPreOrderDTO);
             }
+
+            return preOrderSn;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new UserOperateInterruptedException("预订单创建被中断，请重试", e);
@@ -258,10 +258,16 @@ public class OrderServiceImpl implements OrderService {
     public CreateOrderVO createOrder(CreateOrderDTO createOrderDTO) {
         // 查询预订单
         String preOrderSn = createOrderDTO.getPreOrderSn();
+//        String frontSubmitToken = createOrderDTO.getSubmitToken();
+        // TODO 这里直接查库，后续可以改成查缓存，甚至引入消息队列异步处理订单创建，提升用户体验
         PreOrder preOrder = orderMapper.getByPreOrderSn(preOrderSn);
         if(ObjectUtil.isNull(preOrder)){
             throw new OrderNotFoundException("预订单不存在！");
         }
+
+        /*if (!preOrder.getSubmitToken().equals(frontSubmitToken)) {
+            throw new BusinessException("非法请求，订单令牌无效！");
+        }*/
 
         // 创建订单主表
         Order order = createOrderMain(preOrder);

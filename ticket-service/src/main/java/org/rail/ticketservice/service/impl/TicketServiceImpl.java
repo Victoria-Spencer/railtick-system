@@ -1068,10 +1068,10 @@ public class TicketServiceImpl implements TicketService {
         }
 
         if (isLockedBatch) {
-            cacheClient.hPutAll(recordKey, batchHashMap, RAIL_SEAT_OCCUPY_LOCK_EXPIRE_MINUTES, TimeUnit.MINUTES);
+            cacheClient.hPutAllWholeExpire(recordKey, batchHashMap, RAIL_SEAT_OCCUPY_LOCK_EXPIRE_MINUTES, TimeUnit.MINUTES);
             sendDelayReleaseMsg(delayMsgList);
         } else {
-            cacheClient.hPutAll(recordKey, batchHashMap, RAIL_SEAT_OCCUPY_FORMAL_EXPIRE_MINUTES, TimeUnit.MINUTES);
+            cacheClient.hPutAllWholeExpire(recordKey, batchHashMap, RAIL_SEAT_OCCUPY_FORMAL_EXPIRE_MINUTES, TimeUnit.MINUTES);
             // 非锁定状态：发送1次批量落库消息
             sendBatchSyncDbMsg(occupyList);
         }

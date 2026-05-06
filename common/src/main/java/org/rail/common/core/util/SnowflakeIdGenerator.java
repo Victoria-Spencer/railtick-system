@@ -28,6 +28,7 @@ public class SnowflakeIdGenerator {
     // 静态常量
     private static final String PRE_ORD_PREFIX = "PRE_ORD_";
     private static final String ORD_PREFIX = "ORD_";
+    private static final String SUBMIT_TOKEN_PREFIX = "SUBMIT_";
 
     // Spring初始化完成后执行（核心：保证注入完成后再初始化静态变量）
     @PostConstruct
@@ -75,6 +76,13 @@ public class SnowflakeIdGenerator {
 
     public static String generateOrderSn() {
         return ORD_PREFIX + snowflake.nextId();
+    }
+
+    /**
+     * 生成防重令牌
+     */
+    public static String generateSubmitToken() {
+        return SUBMIT_TOKEN_PREFIX + snowflake.nextId();
     }
 
     public static long nextId() {

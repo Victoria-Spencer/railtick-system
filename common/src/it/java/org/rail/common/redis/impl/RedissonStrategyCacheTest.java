@@ -1,7 +1,10 @@
 package org.rail.common.redis.impl;
 
 import cn.hutool.core.lang.TypeReference;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.rail.common.redis.impl.config.CommonTestConfig;
+import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
@@ -15,17 +18,25 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import static org.junit.jupiter.api.Assertions.*;
 
-@SpringBootTest
+@SpringBootTest(classes = CommonTestConfig.class)
 @ActiveProfiles("test")
 public class RedissonStrategyCacheTest {
 
     @Autowired
     private RedisStrategyCache redisStrategyCache;
 
+    @Autowired
+    private RedissonClient redissonClient;
+
     // 模拟DB查询函数（缓存未命中时返回数据）
     private final Function<Long, String> mockDbFunc = id -> "db-data:" + id;
     private final Function<List<Long>, Map<Long, String>> mockBatchDbFunc = ids ->
             ids.stream().collect(Collectors.toMap(id -> id, id -> "batch-db:" + id));
+
+    @BeforeEach
+    void cleanRedisTestDb() {
+        redissonClient.getKeys().flushdb();
+    }
 
     @Test
     void testQueryWithPassThrough() {
@@ -157,11 +168,13 @@ public class RedissonStrategyCacheTest {
 
         // 动态DB函数：每次查询返回版本号递增
         AtomicInteger callCount = new AtomicInteger(0);
-        Function<List<Long>, Map<Long, String>> dynamicBatchDbFunc = idList ->
-                idList.stream().collect(Collectors.toMap(
-                        id -> id,
-                        id -> "batch-db-v" + callCount.incrementAndGet()
-                ));
+        Function<List<Long>, Map<Long, String>> dynamicBatchDbFunc = idList -> {
+            int version = callCount.incrementAndGet(); // 批量只加1次
+            return idList.stream().collect(Collectors.toMap(
+                    id -> id,
+                    id -> "batch-db-v" + version
+            ));
+        };
 
         // 第一次查询：缓存未命中 → 同步查库 + 写入逻辑过期缓存（1秒过期）
         Map<Long, String> firstResult = redisStrategyCache.batchQueryWithLogicalExpire(

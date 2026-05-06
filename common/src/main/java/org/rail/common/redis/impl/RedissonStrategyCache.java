@@ -724,31 +724,49 @@ public class RedissonStrategyCache implements RedisStrategyCache {
             // 线程池异步重建缓存
             validateCacheAsync();
             cacheRebuildExecutor.submit(() -> {
-                // 1. 二次检查缓存
-                List<String> checkKeys = expiredDtos.stream()
-                        .map(dtoKeyMap::get)
-                        .toList();
-                Map<String, RedisData<D>> doubleCheckMap = redisCache.batchGet(checkKeys);
+                String batchLockKey = REDIS_LOCK_PREFIX + "batch:logical:expire:" + expiredDtos.hashCode();
+                RLock globalLock = redissonClient.getLock(batchLockKey);
+                try {
+                    // 尝试加锁，只允许一个线程执行重建
+                    if (!globalLock.tryLock(0, 10, TimeUnit.SECONDS)) {
+                        log.debug("批量重建锁已被占用，跳过本次重建");
+                        return;
+                    }
 
-                // 2. 筛选真正需要重建的数据
-                List<DTO> finalRebuildDtos = expiredDtos.stream()
-                        .filter(dto -> {
-                            RedisData<D> redisData = doubleCheckMap.get(dtoKeyMap.get(dto));
-                            return redisData == null || redisData.getExpireTime().isBefore(LocalDateTime.now());
-                        })
-                        .toList();
+                    // 二次检查缓存
+                    List<String> checkKeys = expiredDtos.stream()
+                            .map(dtoKeyMap::get)
+                            .toList();
+                    Map<String, RedisData<D>> doubleCheckMap = redisCache.batchGet(checkKeys);
 
-                if (CollectionUtil.isEmpty(finalRebuildDtos)) {
-                    return;
-                }
+                    // 筛选真正需要重建的数据
+                    List<DTO> finalRebuildDtos = expiredDtos.stream()
+                            .filter(dto -> {
+                                RedisData<D> redisData = doubleCheckMap.get(dtoKeyMap.get(dto));
+                                return redisData == null || redisData.getExpireTime().isBefore(LocalDateTime.now());
+                            })
+                            .toList();
 
-                // 3. 批量查库 + 写入逻辑过期缓存
-                log.debug("批量逻辑过期策略-异步重建缓存，重建数:{}", finalRebuildDtos.size());
-                Map<DTO, D> dbMap = batchDbFallback.apply(finalRebuildDtos);
-                for (DTO dto : finalRebuildDtos) {
-                    D data = dbMap.get(dto);
-                    if (data != null) {
-                        redisCache.setWithLogicalExpire(dtoKeyMap.get(dto), data, time, timeUnit);
+                    if (CollectionUtil.isEmpty(finalRebuildDtos)) {
+                        return;
+                    }
+
+                    // 批量查库 + 写入逻辑过期缓存
+                    log.debug("批量逻辑过期策略-异步重建缓存，重建数:{}", finalRebuildDtos.size());
+                    Map<DTO, D> dbMap = batchDbFallback.apply(finalRebuildDtos);
+                    for (DTO dto : finalRebuildDtos) {
+                        D data = dbMap.get(dto);
+                        if (data != null) {
+                            redisCache.setWithLogicalExpire(dtoKeyMap.get(dto), data, time, timeUnit);
+                        }
+                    }
+                } catch (InterruptedException e) {
+                    log.warn("批量重建缓存被中断", e);
+                    Thread.currentThread().interrupt();
+                } finally {
+                    // 释放全局锁
+                    if (globalLock.isHeldByCurrentThread()) {
+                        globalLock.unlock();
                     }
                 }
             });

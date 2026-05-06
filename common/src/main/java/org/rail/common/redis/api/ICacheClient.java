@@ -18,6 +18,10 @@ public interface ICacheClient {
 
     <T> void setWithLogicalExpire(String key, T value, Long expireTime, TimeUnit timeUnit);
 
+    <T> Boolean setIfAbsent(String key, T value);
+
+    <T> Boolean setIfAbsent(String key, T value, Long expireTime, TimeUnit timeUnit);
+
     <T> void batchSet(Map<String, T> keyValueMap);
 
     <T> void batchSet(Map<String, T> keyValueMap, Long expireTime, TimeUnit timeUnit);

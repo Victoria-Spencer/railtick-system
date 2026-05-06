@@ -15,6 +15,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -28,7 +29,6 @@ import java.util.stream.LongStream;
 @Component
 public class RedissonCache implements RedisCache {
 
-    private final Map<String, String> scriptContentCache = new ConcurrentHashMap<>();
     private final Map<String, String> scriptShaCache = new ConcurrentHashMap<>();
 
     @Autowired
@@ -74,6 +74,36 @@ public class RedissonCache implements RedisCache {
             bucket.set(redisData);
         } catch (Exception e) {
             throw new CacheException("逻辑过期缓存设置失败", e);
+        }
+    }
+
+    /**
+     * setIfAbsent：仅当key不存在时设置值，返回true表示成功设置，false表示key已存在未设置
+     */
+    @Override
+    public <T> Boolean setIfAbsent(String key, T value) {
+        if (StrUtil.isBlank(key) || value == null) return false;
+        try {
+            RBucket<T> bucket = redissonClient.getBucket(key);
+            return bucket.setIfAbsent(value);
+        } catch (Exception e) {
+            throw new CacheException("setIfAbsent操作失败", e);
+        }
+    }
+
+    @Override
+    public <T> Boolean setIfAbsent(String key, T value, Long expireTime, TimeUnit timeUnit) {
+        if (StrUtil.isBlank(key) || value == null
+                || expireTime == null || expireTime <= 0
+                || timeUnit == null) {
+            return false;
+        }
+        try {
+            RBucket<T> bucket = redissonClient.getBucket(key);
+            Duration duration = Duration.of(expireTime, timeUnit.toChronoUnit());
+            return bucket.setIfAbsent(value, duration);
+        } catch (Exception e) {
+            throw new CacheException("setIfAbsent(带过期时间)操作失败", e);
         }
     }
 
@@ -425,7 +455,7 @@ public class RedissonCache implements RedisCache {
             return;
         }
         try {
-            RMap<String, T> map = redissonClient.getMap(key);
+            RMapCache<String, T> map = redissonClient.getMapCache(key);
             map.put(hashKey, value == null ? (T) "" : value);
         } catch (Exception e) {
             throw new CacheException("Hash存入单个字段失败", e);
@@ -437,12 +467,12 @@ public class RedissonCache implements RedisCache {
      * 效果：仅当前hashKey到期删除，其他field正常保留
      */
     @Override
+    @Deprecated
     public <T> void hPut(String key, String hashKey, T value, Long expireTime, TimeUnit timeUnit) {
         if (StrUtil.isBlank(key) || StrUtil.isBlank(hashKey)) {
             return;
         }
         try {
-            // 用RMapCache替代普通RMap，支持单个entry设置TTL
             RMapCache<String, T> mapCache = redissonClient.getMapCache(key);
             mapCache.put(
                     hashKey,
@@ -464,7 +494,7 @@ public class RedissonCache implements RedisCache {
             return;
         }
         try {
-            RMap<String, T> rMap = redissonClient.getMap(key);
+            RMapCache<String, T> rMap = redissonClient.getMapCache(key);
             Map<String, T> finalMap = handleNullValue(map);
             rMap.putAll(finalMap);
         } catch (Exception e) {
@@ -499,7 +529,7 @@ public class RedissonCache implements RedisCache {
             return;
         }
         try {
-            RMap<String, T> rMap = redissonClient.getMap(key);
+            RMapCache<String, T> rMap = redissonClient.getMapCache(key);
             Map<String, T> finalMap = handleNullValue(map);
             rMap.putAll(finalMap);
 
@@ -520,9 +550,8 @@ public class RedissonCache implements RedisCache {
             return null;
         }
         try {
-            RMap<String, T> map = redissonClient.getMap(key);
+            RMapCache<String, T> map = redissonClient.getMapCache(key);
             T data = map.get(hashKey);
-            // 空字符串转回null
             return "".equals(data) ? null : data;
         } catch (Exception e) {
             throw new CacheException("Hash获取单个字段失败", e);
@@ -538,7 +567,7 @@ public class RedissonCache implements RedisCache {
             return Collections.emptyList();
         }
         try {
-            RMap<String, T> map = redissonClient.getMap(key);
+            RMapCache<String, T> map = redissonClient.getMapCache(key);
             Set<String> keySet = new HashSet<>(hashKeys);
             Map<String, T> multiGet = map.getAll(keySet);
             return multiGet.values().stream()
@@ -558,8 +587,7 @@ public class RedissonCache implements RedisCache {
             return Collections.emptyMap();
         }
         try {
-            RMap<String, T> map = redissonClient.getMap(key);
-            // 处理空值
+            RMapCache<String, T> map = redissonClient.getMapCache(key);
             return map.entrySet().stream()
                     .collect(Collectors.toMap(
                             Map.Entry::getKey,
@@ -579,7 +607,7 @@ public class RedissonCache implements RedisCache {
             return Collections.emptySet();
         }
         try {
-            RMap<String, Object> map = redissonClient.getMap(key);
+            RMapCache<String, Object> map = redissonClient.getMapCache(key);
             return map.keySet();
         } catch (Exception e) {
             throw new CacheException("Hash获取所有字段名失败", e);
@@ -595,8 +623,7 @@ public class RedissonCache implements RedisCache {
             return Collections.emptyList();
         }
         try {
-            RMap<String, T> map = redissonClient.getMap(key);
-            // 处理空值
+            RMapCache<String, T> map = redissonClient.getMapCache(key);
             return map.values().stream()
                     .map(v -> "".equals(v) ? null : v)
                     .collect(Collectors.toList());
@@ -614,7 +641,7 @@ public class RedissonCache implements RedisCache {
             return 0L;
         }
         try {
-            RMap<String, Object> map = redissonClient.getMap(key);
+            RMapCache<String, Object> map = redissonClient.getMapCache(key);
             return map.fastRemove(hashKeys);
         } catch (Exception e) {
             throw new CacheException("Hash删除字段失败", e);
@@ -630,7 +657,7 @@ public class RedissonCache implements RedisCache {
             return false;
         }
         try {
-            RMap<String, Object> map = redissonClient.getMap(key);
+            RMapCache<String, Object> map = redissonClient.getMapCache(key);
             return map.containsKey(hashKey);
         } catch (Exception e) {
             throw new CacheException("Hash判断字段是否存在失败", e);
@@ -646,7 +673,7 @@ public class RedissonCache implements RedisCache {
             return 0L;
         }
         try {
-            RMap<String, Long> map = redissonClient.getMap(key);
+            RMapCache<String, Long> map = redissonClient.getMapCache(key);
             return map.addAndGet(hashKey, delta);
         } catch (Exception e) {
             throw new CacheException("Hash字段自增失败", e);
