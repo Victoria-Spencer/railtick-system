@@ -23,6 +23,8 @@ public class CommonRequestInterceptor implements HandlerInterceptor {
 
     private static final String USER_ID_HEADER = "user-id";
     private static final String REQUEST_ID_HEADER = "request-id";
+    private static final String X_REAL_IP_HEADER = "X-Real-IP";
+    private static final String X_FORWARDED_FOR_HEADER = "X-Forwarded-For";
 
     @Autowired
     private RequestInterceptorProperties interceptorProperties;
@@ -90,18 +92,17 @@ public class CommonRequestInterceptor implements HandlerInterceptor {
      */
     private String getClientIp(HttpServletRequest request) {
         // 优先从代理请求头获取真实IP
-        String xForwardedFor = request.getHeader("X-Forwarded-For");
+        String xForwardedFor = request.getHeader(X_FORWARDED_FOR_HEADER);
         if (xForwardedFor != null && !xForwardedFor.isEmpty() && !"unknown".equalsIgnoreCase(xForwardedFor)) {
             return xForwardedFor.split(",")[0].trim();
         }
 
-        String xRealIp = request.getHeader("X-Real-IP");
+        String xRealIp = request.getHeader(X_REAL_IP_HEADER);
         if (xRealIp != null && !xRealIp.isEmpty() && !"unknown".equalsIgnoreCase(xRealIp)) {
             return xRealIp.trim();
         }
 
-        // 无代理时直接获取本地IP
-        return request.getRemoteAddr();
+        return "unknown";
     }
 
 
