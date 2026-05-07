@@ -1,6 +1,7 @@
 package org.rail.orderservice.controller;
 
 import jakarta.validation.constraints.NotBlank;
+import org.rail.common.core.annotation.OperationLog;
 import org.rail.common.core.context.RequestContext;
 import org.rail.common.core.context.RequestContextHolder;
 import org.rail.common.core.result.PageResult;
@@ -29,6 +30,7 @@ public class OrderController {
     @Autowired
     private OrderService orderService;
 
+    @OperationLog(value = "创建预订单", saveParam = true)
     @PostMapping("/pre-order/create")
     public Result<String> createPreOrder(@RequestBody  @Validated CreatePreOrderDTO createPreOrderDTO) {
         RequestContext context = RequestContextHolder.getRequestContext();
@@ -48,6 +50,7 @@ public class OrderController {
         }
     }
 
+    @OperationLog(value = "创建订单", saveParam = true)
     @PostMapping("/order/create")
     public Result<CreateOrderVO> createOrder(@RequestBody  @Validated CreateOrderDTO createOrderDTO) {
         RequestContext context = RequestContextHolder.getRequestContext();
@@ -79,6 +82,7 @@ public class OrderController {
         return Result.success(pageResult);
     }
 
+    @OperationLog(value = "取消订单", saveParam = true)
     @DeleteMapping("/order/cancel")
     public Result<Void> cancel(@RequestParam @NotBlank(message = "订单编号不能为空") String orderSn) {
         orderService.cancelOrder(orderSn);

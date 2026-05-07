@@ -49,6 +49,12 @@ spring:
         # password: 你的ES密码（安装时生成的）
         connection-timeout: 10s # 连接超时
         read-timeout: 30s # 读取超时
+  rabbitmq:
+    host: 192.168.43.143
+    port: 5672
+    username: allen
+    password: allen
+    virtual-host: /
 
 # 网关认证相关配置
 request:

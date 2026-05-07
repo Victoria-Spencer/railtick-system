@@ -2,6 +2,7 @@ package org.rail.userservice.controller;
 
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import org.rail.common.core.annotation.OperationLog;
 import org.rail.common.core.result.PageResult;
 import org.rail.common.core.result.Result;
 import org.rail.userservice.pojo.dto.PsgrPageQueryDTO;
@@ -40,18 +41,21 @@ public class PassengerController {
         return Result.success(passenger);
     }
 
+    @OperationLog(value = "添加乘客信息", saveParam = true)
     @PostMapping("/save")
     public Result<Void> save(@RequestBody @Validated Passenger passenger) {
         passengerService.save(passenger);
         return Result.success();
     }
 
+    @OperationLog(value = "修改乘客信息", saveParam = true)
     @PutMapping("/update")
     public Result<Void> update(@RequestBody @Validated PsgrUpdateDTO psgrUpdateDTO) {
         passengerService.update(psgrUpdateDTO);
         return Result.success();
     }
 
+    @OperationLog(value = "删除乘客信息", saveParam = true)
     @DeleteMapping("/delete")
     public Result<Void> delete(@RequestParam @NotEmpty(message = "乘客ID列表不能为空") List<Long> ids) {
         passengerService.deleteByIds(ids);

@@ -3,6 +3,7 @@ package org.rail.userservice.controller;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import org.rail.api.dto.UserIdCardDTO;
+import org.rail.common.core.annotation.OperationLog;
 import org.rail.common.core.result.Result;
 import org.rail.userservice.pojo.dto.UserLoginDTO;
 import org.rail.userservice.pojo.dto.UserRegisterDTO;
@@ -34,12 +35,14 @@ public class UserController {
         return Result.success();
     }
 
+    @OperationLog(value = "用户注册", saveParam = true)
     @PostMapping("/register")
     public Result<UserVO> register(@RequestBody  @Validated UserRegisterDTO userRegisterDTO) {
         UserVO userVO = userService.register(userRegisterDTO);
         return Result.success(userVO);
     }
 
+    @OperationLog(value = "修改用户信息", saveParam = true)
     @PutMapping("/update")
     public Result<UserVO> update(@RequestBody  @Validated UserUpdateInfoDTO userUpdateInfoDTO) {
         UserVO userVO = userService.update(userUpdateInfoDTO);
@@ -56,7 +59,7 @@ public class UserController {
         return null;
     }
 
-
+    @OperationLog(value = "修改用户信息", saveParam = true)
     @GetMapping("/user/{id}")
     public Result<UserIdCardDTO> getIdCardInfo(@PathVariable @NotNull(message = "用户ID不能为空") Long id) {
         UserIdCardDTO userIdCardDTO = userService.getIdCardInfoById(id);

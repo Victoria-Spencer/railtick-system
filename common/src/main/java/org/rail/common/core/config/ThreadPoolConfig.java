@@ -1,4 +1,4 @@
-package org.rail.common.redis.config;
+package org.rail.common.core.config;
 
 import jakarta.annotation.PreDestroy;
 import org.springframework.beans.factory.annotation.Value;

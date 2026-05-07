@@ -3,6 +3,7 @@ package org.rail.ticketservice.controller;
 import org.rail.api.dto.AvailableSeatDTO;
 import org.rail.api.dto.BatchSeatIntervalInsertDTO;
 import org.rail.api.dto.RandomSeatQueryDTO;
+import org.rail.common.core.annotation.OperationLog;
 import org.rail.common.core.context.RequestContext;
 import org.rail.common.core.context.RequestContextHolder;
 import org.rail.common.core.result.Result;
@@ -59,6 +60,7 @@ public class TicketController {
         }
     }
 
+    @OperationLog(value = "更新座位状态", saveParam = true)
     @PutMapping("/seat-status/update")
     public Result<Void> updateSeatStatus(@RequestBody @Validated BatchSeatIntervalInsertDTO batchDTO) {
         ticketService.updateSeatStatus(batchDTO);
