@@ -1,7 +1,10 @@
 package org.rail.common.core.context;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.io.Serializable;
 
@@ -10,6 +13,9 @@ import java.io.Serializable;
  */
 
 @Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class RequestContext implements Serializable {
 
     /** 请求开始时间戳（计算接口耗时） */

@@ -1,6 +1,7 @@
 package org.rail.common.core.config;
 
 import jakarta.annotation.PreDestroy;
+import org.rail.common.core.util.thread.RequestContextTaskDecorator;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -94,6 +95,35 @@ public class ThreadPoolConfig {
                 new ThreadPoolExecutor.DiscardPolicy() // 拒绝策略：静默丢弃
         );
         return lowPriorityExecutor;
+    }
+
+    // ====================== 统一提交任务（自动包装上下文）======================
+    /**
+     * 执行异步任务（不支持返回值，自动传递上下文）
+     */
+    public static void execute(ExecutorService executor, Runnable task) {
+        executor.execute(RequestContextTaskDecorator.decorate(task));
+    }
+
+    /**
+     * 执行异步任务（不支持返回值，自动传递上下文）
+     */
+    public static void submit(ExecutorService executor, Runnable task) {
+        executor.submit(RequestContextTaskDecorator.decorate(task));
+    }
+
+    /**
+     * 提交异步任务（支持返回值，自动传递上下文）
+     */
+    public static <T> Future<T> submit(ExecutorService executor, Callable<T> task) {
+        return executor.submit(RequestContextTaskDecorator.decorate(task));
+    }
+
+    /**
+     * 提交无返回值任务 + 自定义固定返回值 (Runnable + T result)
+     */
+    public static <T> Future<T> submit(ExecutorService executor, Runnable task, T result) {
+        return executor.submit(RequestContextTaskDecorator.decorate(task), result);
     }
 
     // ====================== 优雅关闭 ======================

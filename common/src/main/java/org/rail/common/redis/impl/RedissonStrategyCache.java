@@ -5,6 +5,7 @@ import cn.hutool.core.lang.TypeReference;
 import cn.hutool.core.map.MapUtil;
 import cn.hutool.core.util.StrUtil;
 import lombok.extern.slf4j.Slf4j;
+import org.rail.common.core.config.ThreadPoolConfig;
 import org.rail.common.redis.core.RedisCache;
 import org.rail.common.redis.core.RedisStrategyCache;
 import org.rail.common.redis.exception.CacheException;
@@ -36,8 +37,7 @@ public class RedissonStrategyCache implements RedisStrategyCache {
     @Autowired
     private RedissonClient redissonClient;
     @Autowired
-    private ExecutorService cacheRebuildExecutor;
-
+    ExecutorService cacheRebuildExecutor;
 
     private final Integer DEFAULT_RETRY_COUNT = 5; // 默认重试次数
     private final Integer RETRY_INTERVAL = 50; // 重试间隔（毫秒）
@@ -73,9 +73,6 @@ public class RedissonStrategyCache implements RedisStrategyCache {
         validateRequired(typeRef, "typeRef");
         validateRequired(batchDbFallback, "batchDbFallback");
         validateTimeParams(time, timeUnit);
-    }
-    private void validateCacheAsync() {
-        validateRequired(cacheRebuildExecutor, "cacheRebuildExecutor");
     }
 
     /**
@@ -470,8 +467,7 @@ public class RedissonStrategyCache implements RedisStrategyCache {
         // 缓存过期，加锁，异步重建
         try {
             if(lock.tryLock(2, TimeUnit.SECONDS)) {
-                validateCacheAsync();
-                cacheRebuildExecutor.submit(() -> {
+                ThreadPoolConfig.submit(cacheRebuildExecutor, () -> {
                     try {
                         D dbData = dbFallback.apply(dto);
                         if (dbData != null) {
@@ -722,8 +718,7 @@ public class RedissonStrategyCache implements RedisStrategyCache {
     ) {
         try {
             // 线程池异步重建缓存
-            validateCacheAsync();
-            cacheRebuildExecutor.submit(() -> {
+            ThreadPoolConfig.submit(cacheRebuildExecutor, () -> {
                 String batchLockKey = REDIS_LOCK_PREFIX + "batch:logical:expire:" + expiredDtos.hashCode();
                 RLock globalLock = redissonClient.getLock(batchLockKey);
                 try {
