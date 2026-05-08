@@ -6,10 +6,14 @@ import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.rail.common.core.annotation.CommonRepeatSubmit;
+import org.rail.common.core.constant.AspectOrderConstants;
 import org.rail.common.core.exception.RepeatSubmitException;
 import org.rail.common.core.exception.RepeatSubmitTokenInvalidException;
 import org.rail.common.core.exception.UserConcurrentLockException;
 import org.rail.common.redis.api.ICacheClient;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
@@ -21,8 +25,10 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 @Aspect
 @Component
 @RequiredArgsConstructor
+@Order(AspectOrderConstants.REPEAT_SUBMIT)
 public class CommonRepeatSubmitAspect {
 
+    private final RedissonClient redissonClient;
     private final ICacheClient cacheClient;
 
     private static final String LOCK_PREFIX = "COMMON:REPEAT:LOCK:";
@@ -37,17 +43,15 @@ public class CommonRepeatSubmitAspect {
         String tokenKey = TOKEN_PREFIX + token;
 
         // 分布式锁：防瞬时并发点击
-        boolean lockSuccess = cacheClient.setIfAbsent(
-                lockKey,
-                "1",
-                commonRepeatSubmit.lockExpire(),
-                commonRepeatSubmit.lockUnit()
-        );
-        if (!lockSuccess) {
-            throw new UserConcurrentLockException(commonRepeatSubmit.message());
-        }
+        RLock lock = redissonClient.getLock(lockKey);
+        boolean lockSuccess = false;
 
         try {
+            lockSuccess = lock.tryLock(100, commonRepeatSubmit.lockExpire(), commonRepeatSubmit.lockUnit());
+            if (!lockSuccess) {
+                throw new UserConcurrentLockException(commonRepeatSubmit.message());
+            }
+
             // 校验Token是否有效/已使用
             String cacheValue = cacheClient.get(tokenKey);
             if (cacheValue == null) {
@@ -63,7 +67,9 @@ public class CommonRepeatSubmitAspect {
 
             return result;
         } finally {
-            cacheClient.delete(lockKey);
+            if (lockSuccess && lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
         }
     }
 

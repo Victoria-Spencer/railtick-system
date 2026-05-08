@@ -10,11 +10,13 @@ import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Pointcut;
 import org.aspectj.lang.reflect.MethodSignature;
 import org.rail.common.core.annotation.OperationLog;
+import org.rail.common.core.constant.AspectOrderConstants;
 import org.rail.common.core.context.RequestContext;
 import org.rail.common.core.context.RequestContextHolder;
 import org.rail.common.core.event.OperationLogEvent;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.ServletRequestAttributes;
@@ -32,6 +34,7 @@ import java.util.List;
 @Component
 @RequiredArgsConstructor
 @Slf4j
+@Order(AspectOrderConstants.OPERATION_LOG)
 public class OperationLogAspect {
 
     /**
