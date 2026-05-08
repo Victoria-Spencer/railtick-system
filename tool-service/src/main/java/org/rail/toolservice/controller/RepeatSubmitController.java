@@ -35,7 +35,6 @@ public class RepeatSubmitController {
     public Result<String> getRepeatSubmitToken() {
         String token = RepeatTokenUtil.generateToken();
 
-        // 存入Redis（空值代表未使用）
         String tokenKey = TOKEN_PREFIX + token;
         cacheClient.set(tokenKey, UNUSED_FLAG, TOKEN_EXPIRE, TOKEN_UNIT);
 
