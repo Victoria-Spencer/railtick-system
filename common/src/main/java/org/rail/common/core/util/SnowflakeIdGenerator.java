@@ -25,11 +25,6 @@ public class SnowflakeIdGenerator {
     private static long finalDatacenterId;
     private static Snowflake snowflake;
 
-    // 静态常量
-    private static final String PRE_ORD_PREFIX = "PRE_ORD_";
-    private static final String ORD_PREFIX = "ORD_";
-    private static final String SUBMIT_TOKEN_PREFIX = "SUBMIT_";
-
     // Spring初始化完成后执行（核心：保证注入完成后再初始化静态变量）
     @PostConstruct
     public void init() {
@@ -47,7 +42,6 @@ public class SnowflakeIdGenerator {
 
     private SnowflakeIdGenerator() {}
 
-    // ============================== 辅助方法 ==============================
     /**
      * 基于IP生成机器ID（容器化环境兜底）
      */
@@ -67,22 +61,6 @@ public class SnowflakeIdGenerator {
         if (id < 0 || id > 31) {
             throw new IllegalStateException(name + "必须在0~31范围内，当前值：" + id);
         }
-    }
-
-    // ============================== 业务方法 ==============================
-    public static String generatePreOrderSn() {
-        return PRE_ORD_PREFIX + snowflake.nextId();
-    }
-
-    public static String generateOrderSn() {
-        return ORD_PREFIX + snowflake.nextId();
-    }
-
-    /**
-     * 生成防重令牌
-     */
-    public static String generateSubmitToken() {
-        return SUBMIT_TOKEN_PREFIX + snowflake.nextId();
     }
 
     public static long nextId() {

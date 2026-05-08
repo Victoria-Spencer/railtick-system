@@ -1,6 +1,7 @@
 package org.rail.orderservice.controller;
 
 import jakarta.validation.constraints.NotBlank;
+import org.rail.common.core.annotation.CommonRepeatSubmit;
 import org.rail.common.core.annotation.OperationLog;
 import org.rail.common.core.context.RequestContext;
 import org.rail.common.core.context.RequestContextHolder;
@@ -50,6 +51,7 @@ public class OrderController {
         }
     }
 
+    @CommonRepeatSubmit(message = "请勿重复创建订单")
     @OperationLog(value = "创建订单", saveParam = true)
     @PostMapping("/order/create")
     public Result<CreateOrderVO> createOrder(@RequestBody  @Validated CreateOrderDTO createOrderDTO) {

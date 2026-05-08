@@ -93,6 +93,28 @@ public class GlobalExceptionHandler{
     }
 
     /**
+     * 处理重复提交异常
+     */
+    @ExceptionHandler(RepeatSubmitException.class)
+    public Result<?> handleRepeatSubmitException(RepeatSubmitException e) {
+        String[] location = getErrorLocation(e);
+        String errorMsg = getErrorMessage(e, "请勿重复提交操作");
+        LogUtils.warn(location[0], location[1], errorMsg, e);
+        return Result.error(errorMsg);
+    }
+
+    /**
+     * 处理防重令牌无效/过期异常
+     */
+    @ExceptionHandler(RepeatSubmitTokenInvalidException.class)
+    public Result<?> handleRepeatSubmitTokenInvalidException(RepeatSubmitTokenInvalidException e) {
+        String[] location = getErrorLocation(e);
+        String errorMsg = getErrorMessage(e, "请求已过期，请刷新重试");
+        LogUtils.warn(location[0], location[1], errorMsg, e);
+        return Result.error(errorMsg);
+    }
+
+    /**
      * 处理 @RequestBody DTO 校验异常
      */
     @ExceptionHandler(MethodArgumentNotValidException.class)

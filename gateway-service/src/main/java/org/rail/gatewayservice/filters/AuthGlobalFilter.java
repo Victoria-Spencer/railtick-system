@@ -24,6 +24,7 @@ public class AuthGlobalFilter implements GlobalFilter, Ordered {
     private static final String TOKEN_HEADER = "token";
     private static final String X_REAL_IP_HEADER = "X-Real-IP";
     private static final String X_FORWARDED_FOR_HEADER = "X-Forwarded-For";
+    private static final String REPEAT_TOKEN_HEADER = "Repeat-Token";
 
     @Autowired
     private GatewayAuthProperties gatewayAuthProperties;
@@ -33,30 +34,32 @@ public class AuthGlobalFilter implements GlobalFilter, Ordered {
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         ServerHttpRequest request = exchange.getRequest();
-        // 所有请求都获取并传递IP
-        String clientIp = getClientRealIp(request);
-        ServerWebExchange newExchange = exchange.mutate()
-                .request(builder -> builder
-                        .header(X_REAL_IP_HEADER, clientIp)
-                        .header(X_FORWARDED_FOR_HEADER, clientIp)
-                )
-                .build();
 
-        // 判断是否需要拦截
+        String clientIp = getClientRealIp(request);
+        String repeatToken = request.getHeaders().getFirst(REPEAT_TOKEN_HEADER);
+
+        // 构建请求头：统一透传 IP + 防重Token
+        ServerHttpRequest.Builder requestBuilder = request.mutate()
+                .header(X_REAL_IP_HEADER, clientIp)
+                .header(X_FORWARDED_FOR_HEADER, clientIp);
+
+        if (repeatToken != null && !repeatToken.isBlank()) {
+            requestBuilder.header(REPEAT_TOKEN_HEADER, repeatToken);
+        }
+
+        // 白名单直接放行
         String path = request.getPath().toString();
         if(isExcludePath(path)) {
-            return chain.filter(newExchange);
+            return chain.filter(exchange.mutate().request(requestBuilder.build()).build());
         }
 
         // 从请求头中获取token
         String token = exchange.getRequest().getHeaders().getFirst(TOKEN_HEADER);
 
-        // 需要先去掉 Bearer 前缀才能进行解析
         if (token != null && token.startsWith("Bearer ")) {
-            token = token.substring(7); // 截取第7位之后的内容，得到真实Token
+            token = token.substring(7);
         }
 
-        // 校验token
         String userId = JwtTokenUtil.parseToken(token).toString();
         if (userId.isEmpty()) {
             ServerHttpResponse response = exchange.getResponse();
@@ -65,8 +68,10 @@ public class AuthGlobalFilter implements GlobalFilter, Ordered {
         }
 
         // 将userId存入请求头中
-        newExchange = newExchange.mutate()
-                .request(builder -> builder.header(USER_ID_HEADER, userId))
+        requestBuilder.header(USER_ID_HEADER, userId);
+
+        ServerWebExchange newExchange = exchange.mutate()
+                .request(requestBuilder.build())
                 .build();
 
         return chain.filter(newExchange);

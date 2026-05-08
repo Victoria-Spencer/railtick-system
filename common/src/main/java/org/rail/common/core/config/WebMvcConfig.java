@@ -7,7 +7,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
-// 标记为 Spring MVC 配置类
 @Configuration
 @EnableConfigurationProperties(RequestInterceptorProperties.class)
 public class WebMvcConfig implements WebMvcConfigurer {

@@ -58,7 +58,6 @@ class TicketServiceImplUpdateSeatStatusTest {
     void setUp() {
         snowflakeMock = Mockito.mockStatic(SnowflakeIdGenerator.class);
         snowflakeMock.when(SnowflakeIdGenerator::nextId).thenReturn(123456789L);
-        snowflakeMock.when(SnowflakeIdGenerator::generatePreOrderSn).thenReturn("PRE_ORD_123456");
 
         ReflectionTestUtils.setField(ticketService, "preOrderExpireMinutes", 15);
 

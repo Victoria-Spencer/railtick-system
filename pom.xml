@@ -26,6 +26,7 @@
         <module>ticket-service</module>
         <module>user-service</module>
         <module>log-service</module>
+        <module>tool-service</module>
     </modules>
 
     <properties>

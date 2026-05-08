@@ -33,6 +33,7 @@ import org.rail.orderservice.pojo.entity.OrderDetails;
 import org.rail.orderservice.pojo.entity.PreOrder;
 import org.rail.orderservice.pojo.entity.PreOrderDetails;
 import org.rail.orderservice.pojo.vo.*;
+import org.rail.orderservice.util.OrderSnUtil;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -397,7 +398,7 @@ public class OrderServiceImpl implements OrderService {
      */
     private Order createOrderMain(PreOrder preOrder) {
         Order order = BeanUtil.copyProperties(preOrder, Order.class);
-        order.setOrderSn(SnowflakeIdGenerator.generateOrderSn());
+        order.setOrderSn(OrderSnUtil.generateOrderSn());
         order.setCreateTime(LocalDateTime.now());
         order.setUpdateTime(LocalDateTime.now());
         orderMapper.insertOrder(order);
@@ -665,7 +666,7 @@ public class OrderServiceImpl implements OrderService {
     private String createNewPreOrder(CreatePreOrderDTO createPreOrderDTO) {
         //  构建预订单主表
         Long preOrderId = SnowflakeIdGenerator.nextId();
-        String preOrderSn = SnowflakeIdGenerator.generatePreOrderSn();
+        String preOrderSn = OrderSnUtil.generatePreOrderSn();
         BigDecimal totalAmount = calculateTotalAmount(createPreOrderDTO.getPassengerOrderDetailDTOList());
 
         PreOrder preOrder = BeanUtil.copyProperties(createPreOrderDTO, PreOrder.class);
