@@ -2,7 +2,7 @@ package org.rail.logservice.mapper;
 
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
-import org.rail.logservice.dataobject.SysOperationLog;
+import org.rail.logservice.entity.SysOperationLog;
 
 /**
  * 操作日志

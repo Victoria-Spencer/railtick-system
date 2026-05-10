@@ -1,7 +1,6 @@
 package org.rail.toolservice.controller;
 
 import lombok.RequiredArgsConstructor;
-import org.rail.common.core.result.Result;
 import org.rail.common.redis.api.ICacheClient;
 import org.rail.toolservice.util.RepeatTokenUtil;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -32,12 +31,12 @@ public class RepeatSubmitController {
      * 前端使用：表单提交/下单前 先调用此接口获取Token
      */
     @GetMapping("/token")
-    public Result<String> getRepeatSubmitToken() {
+    public String getRepeatSubmitToken() {
         String token = RepeatTokenUtil.generateToken();
 
         String tokenKey = TOKEN_PREFIX + token;
         cacheClient.set(tokenKey, UNUSED_FLAG, TOKEN_EXPIRE, TOKEN_UNIT);
 
-        return Result.success(token);
+        return token;
     }
 }

@@ -2,8 +2,7 @@ package org.rail.api.fallback;
 
 import org.rail.api.client.UserFeignClient;
 import org.rail.api.dto.UserIdCardDTO;
-import org.rail.common.core.result.Result;
-import org.rail.common.core.util.LogUtils;
+import org.rail.common.core.model.result.Result;
 import org.springframework.stereotype.Component;
 
 /**

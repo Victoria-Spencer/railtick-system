@@ -43,6 +43,10 @@
         <hutool.version>5.8.12</hutool.version>
         <pagehelper-spring-boot-starter.version>1.4.7</pagehelper-spring-boot-starter.version>
         <logstash-logback-encoder.version>7.2</logstash-logback-encoder.version>
+        <elasticsearch-rest-high-level-client.version>7.12.1</elasticsearch-rest-high-level-client.version>
+        <redisson-spring-boot-starter.version>3.50.0</redisson-spring-boot-starter.version>
+        <commons-lang3.version>3.19.0</commons-lang3.version>
+        <bcprov-jdk18on.version>1.84</bcprov-jdk18on.version>
         <common.version>0.0.1-SNAPSHOT</common.version>
         <api.version>0.0.1-SNAPSHOT</api.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -135,6 +139,29 @@
                 <artifactId>logstash-logback-encoder</artifactId>
                 <version>${logstash-logback-encoder.version}</version>
             </dependency>
+
+            <dependency>
+                <groupId>org.elasticsearch.client</groupId>
+                <artifactId>elasticsearch-rest-high-level-client</artifactId>
+                <version>${elasticsearch-rest-high-level-client.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.redisson</groupId>
+                <artifactId>redisson-spring-boot-starter</artifactId>
+                <version>${redisson-spring-boot-starter.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-lang3</artifactId>
+                <version>${commons-lang3.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.bouncycastle</groupId>
+                <artifactId>bcprov-jdk18on</artifactId>
+                <version>${bcprov-jdk18on.version}</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
@@ -155,7 +182,7 @@
                             <path>
                                 <groupId>org.projectlombok</groupId>
                                 <artifactId>lombok</artifactId>
-                                <version>${lombok.version}</version> <!-- 使用父工程管理的lombok版本 -->
+                                <version>${lombok.version}</version>
                             </path>
                         </annotationProcessorPaths>
                     </configuration>

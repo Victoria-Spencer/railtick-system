@@ -1,11 +1,11 @@
 package org.rail.userservice.service;
 
 import org.rail.api.dto.UserIdCardDTO;
-import org.rail.userservice.pojo.dto.UserLoginDTO;
-import org.rail.userservice.pojo.dto.UserRegisterDTO;
-import org.rail.userservice.pojo.dto.UserUpdateInfoDTO;
-import org.rail.userservice.pojo.entity.User;
-import org.rail.userservice.pojo.vo.UserVO;
+import org.rail.userservice.model.dto.UserLoginDTO;
+import org.rail.userservice.model.dto.UserRegisterDTO;
+import org.rail.userservice.model.dto.UserUpdateInfoDTO;
+import org.rail.userservice.model.entity.User;
+import org.rail.userservice.model.vo.UserVO;
 
 public interface UserService {
 

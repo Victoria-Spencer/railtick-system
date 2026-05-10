@@ -1,12 +1,12 @@
 package org.rail.ticketservice.service.impl;
 
 import lombok.extern.slf4j.Slf4j;
-import org.rail.common.core.result.PageResult;
+import org.rail.common.core.model.result.PageResult;
 import org.rail.ticketservice.mapper.StationMapper;
-import org.rail.ticketservice.pojo.dto.StationPageQueryDTO;
-import org.rail.ticketservice.pojo.entity.Station;
-import org.rail.ticketservice.pojo.vo.StationPageQueryVO;
-import org.rail.ticketservice.pojo.vo.TrainStopStationVO;
+import org.rail.ticketservice.model.dto.StationPageQueryDTO;
+import org.rail.ticketservice.model.entity.Station;
+import org.rail.ticketservice.model.vo.StationPageQueryVO;
+import org.rail.ticketservice.model.vo.TrainStopStationVO;
 import org.rail.ticketservice.service.StationService;
 import org.rail.ticketservice.task.StationLocalCacheTask;
 import org.springframework.beans.factory.annotation.Autowired;

@@ -5,7 +5,7 @@ import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.rail.common.redis.exception.CacheInitException;
 import org.rail.ticketservice.mapper.StationMapper;
-import org.rail.ticketservice.pojo.entity.Station;
+import org.rail.ticketservice.model.entity.Station;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;

@@ -3,12 +3,11 @@ package org.rail.ticketservice.mapper;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
-import org.rail.ticketservice.pojo.dto.StationPageQueryDTO;
-import org.rail.ticketservice.pojo.dto.TicketQueryDTO;
-import org.rail.ticketservice.pojo.entity.Station;
-import org.rail.ticketservice.pojo.vo.StationPageQueryVO;
-import org.rail.ticketservice.pojo.vo.TrainDetailVO;
-import org.rail.ticketservice.pojo.vo.TrainStopStationVO;
+import org.rail.ticketservice.model.dto.StationPageQueryDTO;
+import org.rail.ticketservice.model.entity.Station;
+import org.rail.ticketservice.model.vo.StationPageQueryVO;
+import org.rail.ticketservice.model.vo.TrainDetailVO;
+import org.rail.ticketservice.model.vo.TrainStopStationVO;
 
 import java.time.LocalDate;
 import java.util.List;

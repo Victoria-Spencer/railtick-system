@@ -6,7 +6,7 @@
 <!-- namespace 必须与 Mapper 接口的全类名一致 -->
 <mapper namespace="org.rail.userservice.mapper.PassengerMapper">
 
-    <select id="query" resultType="org.rail.userservice.pojo.entity.Passenger">
+    <select id="query" resultType="org.rail.userservice.model.entity.Passenger">
         SELECT id, real_name, id_type, id_card,
                discount_type, phone, verify_status, create_time
         FROM passenger

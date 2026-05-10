@@ -8,11 +8,11 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.rail.common.core.util.ThreadLocalUtils;
+import org.rail.common.core.util.thread.ThreadLocalUtils;
 import org.rail.ticketservice.mapper.*;
-import org.rail.ticketservice.pojo.dto.*;
-import org.rail.ticketservice.pojo.entity.Train;
-import org.rail.ticketservice.pojo.vo.*;
+import org.rail.ticketservice.model.dto.*;
+import org.rail.ticketservice.model.entity.Train;
+import org.rail.ticketservice.model.vo.*;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;

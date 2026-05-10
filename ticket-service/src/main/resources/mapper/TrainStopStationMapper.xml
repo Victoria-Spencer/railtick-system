@@ -5,8 +5,8 @@
 
 <mapper namespace="org.rail.ticketservice.mapper.TrainStopStationMapper">
 
-    <select id="getStopInfoByQueryDTO" resultType="org.rail.ticketservice.pojo.dto.StopInfoDTO"
-            parameterType="org.rail.ticketservice.pojo.dto.PlannedTicketQueryDTO">
+    <select id="getStopInfoByQueryDTO" resultType="org.rail.ticketservice.model.dto.StopInfoDTO"
+            parameterType="org.rail.ticketservice.model.dto.PlannedTicketQueryDTO">
         SELECT
             s_start.name AS departure,
             s_end.name AS arrival,
@@ -31,8 +31,8 @@
             AND s_end.code = #{arrivalCode}
     </select>
 
-    <select id="getSequenceInfo" resultType="org.rail.ticketservice.pojo.dto.SequenceDTO"
-            parameterType="org.rail.ticketservice.pojo.dto.SequenceQueryDTO">
+    <select id="getSequenceInfo" resultType="org.rail.ticketservice.model.dto.SequenceDTO"
+            parameterType="org.rail.ticketservice.model.dto.SequenceQueryDTO">
         SELECT
             tss_a.sequence AS startSequence,
             tss_b.sequence AS endSequence
@@ -50,7 +50,7 @@
             AND s_end.code = #{arrivalCode}
     </select>
 
-    <select id="selectAll" resultType="org.rail.ticketservice.pojo.entity.TrainStopStation">
+    <select id="selectAll" resultType="org.rail.ticketservice.model.entity.TrainStopStation">
         SELECT
             train_id,
             station_id,
@@ -58,7 +58,7 @@
         FROM train_stop_station
     </select>
 
-    <select id="selectByTrainId" resultType="org.rail.ticketservice.pojo.entity.TrainStopStation">
+    <select id="selectByTrainId" resultType="org.rail.ticketservice.model.entity.TrainStopStation">
         SELECT
             train_id,
             station_id,

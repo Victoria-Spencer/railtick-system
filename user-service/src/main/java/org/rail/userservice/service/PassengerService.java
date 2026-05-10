@@ -1,9 +1,9 @@
 package org.rail.userservice.service;
 
-import org.rail.common.core.result.PageResult;
-import org.rail.userservice.pojo.dto.PsgrPageQueryDTO;
-import org.rail.userservice.pojo.dto.PsgrUpdateDTO;
-import org.rail.userservice.pojo.entity.Passenger;
+import org.rail.common.core.model.result.PageResult;
+import org.rail.userservice.model.dto.PsgrPageQueryDTO;
+import org.rail.userservice.model.dto.PsgrUpdateDTO;
+import org.rail.userservice.model.entity.Passenger;
 
 import java.util.List;
 

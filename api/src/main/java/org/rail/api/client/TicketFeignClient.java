@@ -4,7 +4,7 @@ import org.rail.api.dto.AvailableSeatDTO;
 import org.rail.api.dto.BatchSeatIntervalInsertDTO;
 import org.rail.api.dto.RandomSeatQueryDTO;
 import org.rail.api.fallback.TicketFeignFallback;
-import org.rail.common.core.result.Result;
+import org.rail.common.core.model.result.Result;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;

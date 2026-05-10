@@ -1,6 +1,6 @@
 package org.rail.ticketservice.service;
 
-import org.rail.ticketservice.pojo.vo.SeatBusinessVO;
+import org.rail.ticketservice.model.vo.SeatBusinessVO;
 
 import java.util.List;
 

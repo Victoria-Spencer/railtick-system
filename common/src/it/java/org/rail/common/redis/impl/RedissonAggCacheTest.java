@@ -3,7 +3,7 @@ package org.rail.common.redis.impl;
 import cn.hutool.core.lang.TypeReference;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.rail.common.core.result.PageResult;
+import org.rail.common.core.model.result.PageResult;
 import org.rail.common.redis.core.RedisAggCache;
 import org.rail.common.redis.impl.config.CommonTestConfig;
 import org.rail.common.redis.result.AggBatchResult;

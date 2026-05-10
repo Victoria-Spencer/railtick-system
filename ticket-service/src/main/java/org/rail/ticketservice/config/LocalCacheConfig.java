@@ -2,8 +2,8 @@ package org.rail.ticketservice.config;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import org.rail.ticketservice.pojo.dto.TrainStopStationCacheDTO;
-import org.rail.ticketservice.pojo.entity.Station;
+import org.rail.ticketservice.model.dto.TrainStopStationCacheDTO;
+import org.rail.ticketservice.model.entity.Station;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

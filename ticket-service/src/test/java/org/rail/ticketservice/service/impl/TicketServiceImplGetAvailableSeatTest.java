@@ -12,10 +12,10 @@ import org.rail.api.dto.AvailableSeatDTO;
 import org.rail.api.dto.RandomSeatQueryDTO;
 import org.rail.common.core.exception.SeatLockFailedException;
 import org.rail.common.core.util.SnowflakeIdGenerator;
-import org.rail.common.core.util.ThreadLocalUtils;
+import org.rail.common.core.util.thread.ThreadLocalUtils;
 import org.rail.common.redis.api.ICacheClient;
-import org.rail.ticketservice.pojo.entity.Station;
-import org.rail.ticketservice.pojo.vo.SeatBusinessVO;
+import org.rail.ticketservice.model.entity.Station;
+import org.rail.ticketservice.model.vo.SeatBusinessVO;
 import org.rail.ticketservice.service.SeatService;
 import org.rail.ticketservice.task.StationLocalCacheTask;
 import org.rail.ticketservice.task.TrainStopStationLocalCacheTask;
@@ -278,6 +278,6 @@ class TicketServiceImplGetAvailableSeatTest {
 
         // 经停站缓存Mock
         when(trainStopCacheTask.getCacheByTrainId(anyLong()))
-                .thenReturn(new org.rail.ticketservice.pojo.dto.TrainStopStationCacheDTO(Map.of(1L, DEP_SEQ, 2L, ARR_SEQ), 5));
+                .thenReturn(new org.rail.ticketservice.model.dto.TrainStopStationCacheDTO(Map.of(1L, DEP_SEQ, 2L, ARR_SEQ), 5));
     }
 }

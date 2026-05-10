@@ -4,7 +4,7 @@ package org.rail.userservice.mapper;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Select;
-import org.rail.userservice.pojo.entity.User;
+import org.rail.userservice.model.entity.User;
 
 @Mapper
 public interface UserMapper {

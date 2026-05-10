@@ -1,14 +1,14 @@
 package org.rail.orderservice.mapper;
 
 import org.apache.ibatis.annotations.*;
-import org.rail.orderservice.pojo.dto.OrderPageQueryDTO;
-import org.rail.orderservice.pojo.dto.SelfTicketPageDTO;
-import org.rail.orderservice.pojo.entity.Order;
-import org.rail.orderservice.pojo.entity.OrderDetails;
-import org.rail.orderservice.pojo.entity.PreOrder;
-import org.rail.orderservice.pojo.entity.PreOrderDetails;
-import org.rail.orderservice.pojo.vo.OrderPageQueryVO;
-import org.rail.orderservice.pojo.vo.SelfTicketPageVO;
+import org.rail.orderservice.model.dto.OrderPageQueryDTO;
+import org.rail.orderservice.model.dto.SelfTicketPageDTO;
+import org.rail.orderservice.model.entity.Order;
+import org.rail.orderservice.model.entity.OrderDetails;
+import org.rail.orderservice.model.entity.PreOrder;
+import org.rail.orderservice.model.entity.PreOrderDetails;
+import org.rail.orderservice.model.vo.OrderPageQueryVO;
+import org.rail.orderservice.model.vo.SelfTicketPageVO;
 
 import java.util.List;
 

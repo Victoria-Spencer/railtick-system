@@ -2,11 +2,11 @@ package org.rail.ticketservice.mapper;
 
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Select;
-import org.rail.ticketservice.pojo.dto.PlannedTicketQueryDTO;
-import org.rail.ticketservice.pojo.dto.SequenceDTO;
-import org.rail.ticketservice.pojo.dto.SequenceQueryDTO;
-import org.rail.ticketservice.pojo.dto.StopInfoDTO;
-import org.rail.ticketservice.pojo.entity.TrainStopStation;
+import org.rail.ticketservice.model.dto.PlannedTicketQueryDTO;
+import org.rail.ticketservice.model.dto.SequenceDTO;
+import org.rail.ticketservice.model.dto.SequenceQueryDTO;
+import org.rail.ticketservice.model.dto.StopInfoDTO;
+import org.rail.ticketservice.model.entity.TrainStopStation;
 
 import java.util.List;
 

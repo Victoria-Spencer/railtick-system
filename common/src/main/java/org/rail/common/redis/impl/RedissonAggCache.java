@@ -5,7 +5,7 @@ import cn.hutool.core.lang.TypeReference;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
 import lombok.extern.slf4j.Slf4j;
-import org.rail.common.core.result.PageResult;
+import org.rail.common.core.model.result.PageResult;
 import org.rail.common.redis.core.RedisAggCache;
 import org.rail.common.redis.core.RedisCache;
 import org.rail.common.redis.result.AggBatchResult;

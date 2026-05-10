@@ -2,13 +2,11 @@ package org.rail.logservice.listener;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.rail.common.core.event.OperationLogEvent;
+import org.rail.common.core.model.event.OperationLogEvent;
 import org.rail.logservice.config.RabbitMQConfig;
-import org.rail.logservice.dataobject.SysOperationLog;
+import org.rail.logservice.entity.SysOperationLog;
 import org.rail.logservice.mapper.SysOperationLogMapper;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
-import org.springframework.context.event.EventListener;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
 /**

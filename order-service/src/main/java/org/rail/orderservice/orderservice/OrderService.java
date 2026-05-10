@@ -1,13 +1,13 @@
 package org.rail.orderservice.orderservice;
 
-import org.rail.common.core.result.PageResult;
-import org.rail.orderservice.pojo.dto.CreateOrderDTO;
-import org.rail.orderservice.pojo.dto.CreatePreOrderDTO;
-import org.rail.orderservice.pojo.dto.FrontSelfTicketPageDTO;
-import org.rail.orderservice.pojo.dto.OrderPageQueryDTO;
-import org.rail.orderservice.pojo.vo.CreateOrderVO;
-import org.rail.orderservice.pojo.vo.OrderPageQueryVO;
-import org.rail.orderservice.pojo.vo.SelfTicketPageVO;
+import org.rail.common.core.model.result.PageResult;
+import org.rail.orderservice.model.dto.CreateOrderDTO;
+import org.rail.orderservice.model.dto.CreatePreOrderDTO;
+import org.rail.orderservice.model.dto.FrontSelfTicketPageDTO;
+import org.rail.orderservice.model.dto.OrderPageQueryDTO;
+import org.rail.orderservice.model.vo.CreateOrderVO;
+import org.rail.orderservice.model.vo.OrderPageQueryVO;
+import org.rail.orderservice.model.vo.SelfTicketPageVO;
 
 public interface OrderService {
 

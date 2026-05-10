@@ -4,9 +4,8 @@ import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
-import org.rail.userservice.pojo.dto.PsgrPageQueryDTO;
-import org.rail.userservice.pojo.dto.PsgrUpdateDTO;
-import org.rail.userservice.pojo.entity.Passenger;
+import org.rail.userservice.model.dto.PsgrPageQueryDTO;
+import org.rail.userservice.model.entity.Passenger;
 
 import java.util.List;
 

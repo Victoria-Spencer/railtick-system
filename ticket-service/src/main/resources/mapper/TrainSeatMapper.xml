@@ -53,7 +53,7 @@
             </foreach>
     </select>
 
-    <select id="selectAllSeatDetails" resultType="org.rail.ticketservice.pojo.vo.SeatDetailVO">
+    <select id="selectAllSeatDetails" resultType="org.rail.ticketservice.model.vo.SeatDetailVO">
         SELECT
             s.id,
             s.train_seat_class_id,

@@ -6,7 +6,7 @@
 <mapper namespace="org.rail.ticketservice.mapper.SeatClassMapper">
 
 
-    <select id="batchQuerySeatInfoByDTOList" resultType="org.rail.ticketservice.pojo.vo.SeatClassVO"
+    <select id="batchQuerySeatInfoByDTOList" resultType="org.rail.ticketservice.model.vo.SeatClassVO"
             parameterType="java.util.List">
         -- 1. 定义临时表：将List[DTO]转换为包含trainId、startSeq、endSeq的数据集
         WITH query_params AS (

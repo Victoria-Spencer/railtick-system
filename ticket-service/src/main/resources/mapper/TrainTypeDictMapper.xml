@@ -5,7 +5,7 @@
 
 <mapper namespace="org.rail.ticketservice.mapper.TrainTypeDictMapper">
 
-    <select id="getTrainTypeDictByTrainId" resultType="org.rail.ticketservice.pojo.vo.TrainTypeVO"
+    <select id="getTrainTypeDictByTrainId" resultType="org.rail.ticketservice.model.vo.TrainTypeVO"
             parameterType="java.lang.Long">
         SELECT
             ttd.id AS typeId,

@@ -5,8 +5,8 @@
 
 <mapper namespace="org.rail.ticketservice.mapper.StationMapper">
 
-    <select id="pageQuery" resultType="org.rail.ticketservice.pojo.vo.StationPageQueryVO"
-            parameterType="org.rail.ticketservice.pojo.dto.StationPageQueryDTO">
+    <select id="pageQuery" resultType="org.rail.ticketservice.model.vo.StationPageQueryVO"
+            parameterType="org.rail.ticketservice.model.dto.StationPageQueryDTO">
         SELECT name, code, spell
         FROM station
         <where>
@@ -19,7 +19,7 @@
         </where>
     </select>
 
-    <select id="batchQueryByTrainId" resultType="org.rail.ticketservice.pojo.vo.TrainStopStationVO"
+    <select id="batchQueryByTrainId" resultType="org.rail.ticketservice.model.vo.TrainStopStationVO"
             parameterType="java.lang.Long">
         SELECT tss.sequence AS sequence,
                tss.arrival_time AS arrivalTime,
@@ -37,7 +37,7 @@
 
 
     <!--&lt;!&ndash; 定义TrainDetailVO的结果映射，包含嵌套的列车类型列表 &ndash;&gt;
-    <resultMap id="TrainDetailVOResultMap" type="org.rail.ticketservice.pojo.vo.TrainDetailVO">
+    <resultMap id="TrainDetailVOResultMap" type="org.rail.ticketservice.model.vo.TrainDetailVO">
         &lt;!&ndash; 映射列车基本信息字段 &ndash;&gt;
         <id column="trainId" property="trainId"/>
         <result column="trainNumber" property="trainNumber"/>
@@ -58,14 +58,14 @@
         &lt;!&ndash; 嵌套映射列车类型列表：通过子查询获取当前列车的所有类型 &ndash;&gt;
         <collection
             property="trainTypeVOList"
-            ofType="org.rail.ticketservice.pojo.vo.TrainTypeVO"
+            ofType="org.rail.ticketservice.model.vo.TrainTypeVO"
             select="getTrainTypesByTrainId"
             column="trainId"
         />
     </resultMap>
 
     &lt;!&ndash; 子查询：根据列车ID查询所有关联的类型 &ndash;&gt;
-    <select id="getTrainTypesByTrainId" resultType="org.rail.ticketservice.pojo.vo.TrainTypeVO">
+    <select id="getTrainTypesByTrainId" resultType="org.rail.ticketservice.model.vo.TrainTypeVO">
         SELECT
         ttd.id AS typeId,
         ttd.type_name AS typeName,
@@ -75,7 +75,7 @@
         WHERE ttt.train_id = #{trainId}
     </select>
     <select id="getTrainDetailsByDTO" resultMap="TrainDetailVOResultMap"
-            parameterType="org.rail.ticketservice.pojo.dto.TicketQueryDTO">
+            parameterType="org.rail.ticketservice.model.dto.TicketQueryDTO">
         SELECT
             s_start.id AS departureStationId,  &#45;&#45; 出发站ID
             s_end.id AS arrivalStationId,      &#45;&#45; 到达站ID
@@ -147,7 +147,7 @@
 
 
     <!-- 定义TrainDetailVO的结果映射，包含嵌套的列车类型列表 -->
-    <resultMap id="TrainDetailVOResultMap" type="org.rail.ticketservice.pojo.vo.TrainDetailVO">
+    <resultMap id="TrainDetailVOResultMap" type="org.rail.ticketservice.model.vo.TrainDetailVO">
         <!-- 映射列车基本信息字段 -->
         <id column="trainId" property="trainId"/>
         <result column="trainNumber" property="trainNumber"/>
@@ -168,14 +168,14 @@
         <!-- 嵌套映射列车类型列表：通过子查询获取当前列车的所有类型 -->
         <collection
                 property="trainTypeVOList"
-                ofType="org.rail.ticketservice.pojo.vo.TrainTypeVO"
+                ofType="org.rail.ticketservice.model.vo.TrainTypeVO"
                 select="getTrainTypesByTrainId"
                 column="trainId"
         />
     </resultMap>
 
     <!-- 子查询：根据列车ID查询所有关联的类型 -->
-    <select id="getTrainTypesByTrainId" resultType="org.rail.ticketservice.pojo.vo.TrainTypeVO">
+    <select id="getTrainTypesByTrainId" resultType="org.rail.ticketservice.model.vo.TrainTypeVO">
         SELECT
             ttd.id AS typeId,
             ttd.type_name AS typeName,

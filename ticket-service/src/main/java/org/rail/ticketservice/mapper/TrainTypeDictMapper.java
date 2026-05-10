@@ -1,7 +1,7 @@
 package org.rail.ticketservice.mapper;
 
 import org.apache.ibatis.annotations.Mapper;
-import org.rail.ticketservice.pojo.vo.TrainTypeVO;
+import org.rail.ticketservice.model.vo.TrainTypeVO;
 
 import java.util.List;
 

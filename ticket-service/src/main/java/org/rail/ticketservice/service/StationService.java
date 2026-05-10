@@ -1,10 +1,10 @@
 package org.rail.ticketservice.service;
 
 
-import org.rail.common.core.result.PageResult;
-import org.rail.ticketservice.pojo.dto.StationPageQueryDTO;
-import org.rail.ticketservice.pojo.vo.StationPageQueryVO;
-import org.rail.ticketservice.pojo.vo.TrainStopStationVO;
+import org.rail.common.core.model.result.PageResult;
+import org.rail.ticketservice.model.dto.StationPageQueryDTO;
+import org.rail.ticketservice.model.vo.StationPageQueryVO;
+import org.rail.ticketservice.model.vo.TrainStopStationVO;
 
 import java.util.List;
 

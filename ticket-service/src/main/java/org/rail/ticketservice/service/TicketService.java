@@ -3,12 +3,10 @@ package org.rail.ticketservice.service;
 import org.rail.api.dto.AvailableSeatDTO;
 import org.rail.api.dto.BatchSeatIntervalInsertDTO;
 import org.rail.api.dto.RandomSeatQueryDTO;
-import org.rail.ticketservice.pojo.dto.PlannedTicketQueryDTO;
-import org.rail.ticketservice.pojo.dto.TicketQueryDTO;
-import org.rail.ticketservice.pojo.vo.SeatBusinessVO;
-import org.rail.ticketservice.pojo.vo.TicketQueryVO;
+import org.rail.ticketservice.model.dto.PlannedTicketQueryDTO;
+import org.rail.ticketservice.model.dto.TicketQueryDTO;
+import org.rail.ticketservice.model.vo.TicketQueryVO;
 
-import java.util.ArrayList;
 import java.util.List;
 
 public interface TicketService {

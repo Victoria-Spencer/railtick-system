@@ -2,6 +2,8 @@ package org.rail.common.core.util;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.rail.common.core.util.thread.ThreadLocalUtils;
+
 import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 

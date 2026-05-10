@@ -1,9 +1,9 @@
 package org.rail.ticketservice.mapper;
 
 import org.apache.ibatis.annotations.Mapper;
-import org.rail.ticketservice.pojo.vo.SeatDetailVO;
-import org.rail.ticketservice.pojo.dto.SeatInfoQueryDTO;
-import org.rail.ticketservice.pojo.dto.SeatStatusUpdateConditionDTO;
+import org.rail.ticketservice.model.vo.SeatDetailVO;
+import org.rail.ticketservice.model.dto.SeatInfoQueryDTO;
+import org.rail.ticketservice.model.dto.SeatStatusUpdateConditionDTO;
 
 import java.util.List;
 

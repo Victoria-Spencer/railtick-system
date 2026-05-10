@@ -5,7 +5,7 @@
 
 <mapper namespace="org.rail.ticketservice.mapper.SeatIntervalOccupyMapper">
 
-    <resultMap id="IntervalOccupyDTOResultMap" type="org.rail.ticketservice.pojo.dto.IntervalOccupyDTO">
+    <resultMap id="IntervalOccupyDTOResultMap" type="org.rail.ticketservice.model.dto.IntervalOccupyDTO">
         <!-- 基础字段映射 -->
         <result property="trainId" column="trainId"/>
         <result property="seatType" column="seatType"/>
@@ -14,13 +14,13 @@
 
         <!-- 嵌套映射区间列表：将同一座位的多个区间映射为List<SequenceDTO> -->
         <collection property="intervalList"
-                    ofType="org.rail.ticketservice.pojo.dto.SequenceDTO"
+                    ofType="org.rail.ticketservice.model.dto.SequenceDTO"
         resultMap="SequenceDTOResultMap"
         />
     </resultMap>
 
     <!-- 为SequenceDTO创建专用的resultMap -->
-    <resultMap id="SequenceDTOResultMap" type="org.rail.ticketservice.pojo.dto.SequenceDTO">
+    <resultMap id="SequenceDTOResultMap" type="org.rail.ticketservice.model.dto.SequenceDTO">
         <result property="startSequence" column="start_sequence"/>  <!-- 映射到SequenceDTO的startSequence属性 -->
         <result property="endSequence" column="end_sequence"/>      <!-- 映射到SequenceDTO的endSequence属性 -->
     </resultMap>
@@ -66,7 +66,7 @@
         </if>
     </select>
 
-    <select id="selectValidAll" resultType="org.rail.ticketservice.pojo.entity.SeatIntervalOccupy">
+    <select id="selectValidAll" resultType="org.rail.ticketservice.model.entity.SeatIntervalOccupy">
         SELECT
             sio.id, sio.seat_id, tsc.train_id, sio.start_sequence,
             sio.end_sequence, sio.order_id, sio.order_type, sio.status,
