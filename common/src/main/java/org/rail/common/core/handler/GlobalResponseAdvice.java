@@ -1,5 +1,7 @@
 package org.rail.common.core.handler;
 
+import cn.hutool.json.JSONConfig;
+import cn.hutool.json.JSONUtil;
 import org.rail.common.core.model.result.Result;
 import org.springframework.core.MethodParameter;
 import org.springframework.http.MediaType;
@@ -18,13 +20,20 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyAdvice;
 @RestControllerAdvice(basePackages = "org.rail")
 public class GlobalResponseAdvice implements ResponseBodyAdvice<Object> {
 
+    private final JSONConfig hutoolJsonConfig;
+
+    public GlobalResponseAdvice(JSONConfig hutoolJsonConfig) {
+        this.hutoolJsonConfig = hutoolJsonConfig;
+    }
+
     /**
      * 开启支持：如果返回值已经是 Result 类型，不重复包装
      */
     @Override
     public boolean supports(@NonNull MethodParameter returnType,
                             @NonNull Class<? extends HttpMessageConverter<?>> converterType) {
-        return !(returnType.getParameterType().equals(Result.class));
+
+        return !returnType.getParameterType().equals(Result.class);
     }
 
     /**
@@ -38,8 +47,8 @@ public class GlobalResponseAdvice implements ResponseBodyAdvice<Object> {
                                   @NonNull ServerHttpRequest request,
                                   @NonNull ServerHttpResponse response) {
 
-        if (body == null) {
-            return Result.success();
+        if (returnType.getParameterType() == String.class) {
+            return JSONUtil.toJsonStr(Result.success(body), hutoolJsonConfig);
         }
 
         return Result.success(body);

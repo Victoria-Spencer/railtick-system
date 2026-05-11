@@ -18,13 +18,12 @@
 	<!-- 依赖：直接引用父工程已管理的依赖，无需写version -->
 	<dependencies>
 		<dependency>
-			<groupId>mysql</groupId>
-			<artifactId>mysql-connector-java</artifactId>
-			<version>8.0.30</version>
-		</dependency>
-		<dependency>
 			<groupId>org.rail</groupId>
 			<artifactId>common</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>mysql</groupId>
+			<artifactId>mysql-connector-java</artifactId>
 		</dependency>
 
 		<!-- 测试依赖 -->

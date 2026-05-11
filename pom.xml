@@ -47,6 +47,9 @@
         <redisson-spring-boot-starter.version>3.50.0</redisson-spring-boot-starter.version>
         <commons-lang3.version>3.19.0</commons-lang3.version>
         <bcprov-jdk18on.version>1.84</bcprov-jdk18on.version>
+        <spring-cloud-starter.version>4.3.0</spring-cloud-starter.version>
+        <spring-cloud-starter-gateway.version>4.3.2</spring-cloud-starter-gateway.version>
+        <jjwt.version>0.11.5</jjwt.version>
         <common.version>0.0.1-SNAPSHOT</common.version>
         <api.version>0.0.1-SNAPSHOT</api.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -161,6 +164,42 @@
                 <groupId>org.bouncycastle</groupId>
                 <artifactId>bcprov-jdk18on</artifactId>
                 <version>${bcprov-jdk18on.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-starter-openfeign</artifactId>
+                <version>${spring-cloud-starter.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-starter-loadbalancer</artifactId>
+                <version>${spring-cloud-starter.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-starter-gateway</artifactId>
+                <version>${spring-cloud-starter-gateway.version}</version>
+            </dependency>
+
+            <!-- JWT 核心依赖（兼容 Spring Boot 3.x） -->
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-api</artifactId>
+                <version>${jjwt.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-impl</artifactId>
+                <version>${jjwt.version}</version>
+                <scope>runtime</scope>
+            </dependency>
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-jackson</artifactId>
+                <version>${jjwt.version}</version>
+                <scope>runtime</scope>
             </dependency>
         </dependencies>
     </dependencyManagement>
