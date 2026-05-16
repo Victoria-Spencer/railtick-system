@@ -13,7 +13,6 @@ public class CreatePreOrderDTO {
     @NotNull(message = "列车ID不能为空")
     private Long trainId;
 
-    @NotNull(message = "用户ID不能为空")
     private Long userId;
 
     @NotBlank(message = "出发站编码不能为空")

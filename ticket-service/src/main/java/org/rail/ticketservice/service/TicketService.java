@@ -1,6 +1,6 @@
 package org.rail.ticketservice.service;
 
-import org.rail.api.dto.AvailableSeatDTO;
+import org.rail.api.dto.AvailableSeatRemoteDTO;
 import org.rail.api.dto.BatchSeatIntervalInsertDTO;
 import org.rail.api.dto.RandomSeatQueryDTO;
 import org.rail.ticketservice.model.dto.PlannedTicketQueryDTO;
@@ -30,7 +30,7 @@ public interface TicketService {
      * @param randomSeatQueryDTO 查询条件
      * @return 可用座位列表
      */
-    List<AvailableSeatDTO> getAvailableSeats(RandomSeatQueryDTO randomSeatQueryDTO);
+    List<AvailableSeatRemoteDTO> getAvailableSeats(RandomSeatQueryDTO randomSeatQueryDTO);
 
     /**
      * 更新座位占用区间，并同步新的座位状态

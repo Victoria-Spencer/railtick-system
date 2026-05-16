@@ -18,6 +18,9 @@ public class RandomSeatQueryDTO {
     @NotNull(message = "车次ID不能为空")
     private Long trainId;
 
+    @NotNull(message = "订单ID不能为空")
+    private Long orderId;
+
     @NotNull(message = "席别类型不能为空")
     private Integer seatType;
 
@@ -32,9 +35,6 @@ public class RandomSeatQueryDTO {
 
     // 用户偏好的座位序号（A/B/C/D/F）（非必须）
     private List<String> preferredSeatSymbols;
-
-    @NotNull(message = "订单ID不能为空")
-    private Long orderId;
 
     @NotNull(message = "订单类型不能为空")
     private Integer orderType;

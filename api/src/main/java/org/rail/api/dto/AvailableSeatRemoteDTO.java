@@ -9,7 +9,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class AvailableSeatDTO {
+public class AvailableSeatRemoteDTO {
 
     // 席别类型：0-商等座 1-一等座 2-二务座...
     private Integer seatType;

@@ -16,6 +16,8 @@ import org.rail.common.core.exception.*;
 import org.rail.common.core.util.BeanConvertUtil;
 import org.rail.common.core.util.LogUtils;
 import org.rail.common.core.util.SnowflakeIdGenerator;
+import org.rail.common.core.util.security.AESCryptUtils;
+import org.rail.common.core.util.security.CryptoUtils;
 import org.rail.common.redis.api.ICacheClient;
 import org.rail.common.redis.constant.RedisConstants;
 import org.rail.common.redis.result.AggCacheResult;
@@ -25,6 +27,7 @@ import org.rail.api.dto.*;
 import org.rail.orderservice.constant.PreOrderStatusConstants;
 import org.rail.api.constant.SeatIntervalStatusConstants;
 import org.rail.orderservice.mapper.OrderMapper;
+import org.rail.orderservice.model.bo.PreOrderContext;
 import org.rail.orderservice.orderservice.OrderService;
 import org.rail.orderservice.model.dto.*;
 import org.rail.orderservice.model.entity.Order;
@@ -89,8 +92,16 @@ public class OrderServiceImpl implements OrderService {
 //    @GlobalTransactional
     public String createPreOrder(CreatePreOrderDTO createPreOrderDTO) {
         RequestContext context = RequestContextHolder.getRequestContext();
+        if (context == null || context.getAccountId() == null) {
+            throw new BizException("请先登录");
+        }
         String userId = context.getAccountId();
+        createPreOrderDTO.setUserId(Long.valueOf(userId));
         Long trainId = createPreOrderDTO.getTrainId();
+        String preOrderKey = buildPreOrderKey(Long.valueOf(userId), trainId);
+
+        PreOrderContext ctx = preparePreOrderContext(createPreOrderDTO, preOrderKey);
+
         String lockKey = RedisConstants.USER_TRAIN_PRE_ORDER_LOCK_PREFIX + userId + ":" + trainId;
         RLock lock = redissonClient.getLock(lockKey);
 
@@ -101,15 +112,13 @@ public class OrderServiceImpl implements OrderService {
                 throw new UserConcurrentLockException("操作频繁，请稍后再试！");
             }
 
-            // 根据用户ID和列车ID，查询是否已存在预订单
-            String preOrderKey = buildPreOrderKey(createPreOrderDTO.getUserId(), trainId);
             PreOrder preOrder = cacheClient.get(preOrderKey);
 
             String preOrderSn;
             if(ObjectUtil.isNotNull(preOrder)) {
-                preOrderSn = updateExistPreOrder(createPreOrderDTO, preOrder);
+                preOrderSn = updateExistPreOrder(ctx, preOrder);
             } else {
-                preOrderSn = createNewPreOrder(createPreOrderDTO);
+                preOrderSn = createNewPreOrder(ctx);
             }
 
             return preOrderSn;
@@ -123,6 +132,48 @@ public class OrderServiceImpl implements OrderService {
         }
     }
 
+    /**
+     * 预订单上下文统一准备
+     */
+    private PreOrderContext preparePreOrderContext(CreatePreOrderDTO createPreOrderDTO, String preOrderKey) {
+        PreOrderContext ctx = buildPreOrderContext(createPreOrderDTO);
+        clearOldPreOrderSeatAndCache(preOrderKey, ctx);
+        return ctx;
+    }
+
+    /**
+     * 清理旧预订单缓存和座位锁
+     */
+    private void clearOldPreOrderSeatAndCache(String preOrderKey, PreOrderContext ctx) {
+        PreOrder oldPreOrder = cacheClient.get(preOrderKey);
+        if (ObjectUtil.isNotNull(oldPreOrder)) {
+            String detailsKey = buildPreOrderDetailsKey(oldPreOrder.getId());
+            List<PreOrderDetails> oldDetails = new ArrayList<>(cacheClient.getSetMembers(detailsKey));
+            // 释放旧明细关联的座位锁
+            releaseOldPreOrderSeatLock(ctx.getReqDTO(), oldPreOrder, oldDetails);
+            // 删除旧明细（仅删明细，不删主记录）
+            cacheClient.delete(detailsKey);
+        }
+    }
+
+    /**
+     * 锁外前置处理，封装业务上下文
+     */
+    private PreOrderContext buildPreOrderContext(CreatePreOrderDTO createPreOrderDTO) {
+        List<Long> passengerIds = createPreOrderDTO.getPassengerOrderDetailDTOList().stream()
+                .map(PassengerOrderDetailDTO::getId)
+                .toList();
+        Result<List<PassengerRemoteDTO>> passengerResult = userFeignClient.batchListPassenger(passengerIds);
+        if (!passengerResult.isSuccess() || CollectionUtil.isEmpty(passengerResult.getData())) {
+            throw new OpenFeignException("获取乘客信息失败");
+        }
+
+        PreOrderContext ctx = new PreOrderContext();
+        ctx.setReqDTO(createPreOrderDTO);
+        ctx.setPassengerList(passengerResult.getData());
+        return ctx;
+    }
+
     private String buildPreOrderKey(Long userId, Long trainId) {
         if (userId == null || trainId == null) {
             throw new IllegalArgumentException("userId 和 trainId 不能为 null");
@@ -134,21 +185,12 @@ public class OrderServiceImpl implements OrderService {
     /**
      * 更新已存在的预订单，保留主记录，仅替换明细
      */
-    private String updateExistPreOrder(CreatePreOrderDTO createPreOrderDTO, PreOrder preOrder) {
-        // 释放旧明细关联的座位锁
-        String detailsKey = buildPreOrderDetailsKey(preOrder.getId());
-        Set<PreOrderDetails> oldSet = cacheClient.getSetMembers(detailsKey);
-        List<PreOrderDetails> oldDetails = oldSet.stream().toList();
-        releaseOldPreOrderSeatLock(createPreOrderDTO, preOrder, oldDetails);
-
-        // 删除旧明细（仅删明细，不删主记录）
-        cacheClient.delete(detailsKey);
-
+    private String updateExistPreOrder(PreOrderContext ctx, PreOrder preOrder) {
         // 更新预订单主记录（重置过期时间、状态）
-        updatePreOrderMainInfo(createPreOrderDTO, preOrder);
+        updatePreOrderMainInfo(ctx.getReqDTO(), preOrder);
 
         // 插入新明细
-        insertNewPreOrderDetails(createPreOrderDTO, preOrder.getId());
+        insertNewPreOrderDetails(ctx, preOrder.getId());
 
         return preOrder.getPreOrderSn();
     }
@@ -235,12 +277,26 @@ public class OrderServiceImpl implements OrderService {
     /**
      * 构建单个预订单明细对象
      */
-    private PreOrderDetails buildPreOrderDetail(Long preOrderId, PassengerOrderDetailDTO passengerDTO) {
+    private PreOrderDetails buildPreOrderDetail(
+            Long preOrderId,
+            PassengerOrderDetailDTO preOrderPsgrDTO,
+            PassengerRemoteDTO actualPsgrDTO
+    ) {
         long detailId = SnowflakeIdGenerator.nextId();
 
-        PreOrderDetails preOrderDetails = BeanUtil.copyProperties(passengerDTO, PreOrderDetails.class);
+        PreOrderDetails preOrderDetails = new PreOrderDetails();
         preOrderDetails.setId(detailId);
         preOrderDetails.setPreOrderId(preOrderId);
+
+        // 后端查询（敏感字段）
+        preOrderDetails.setRealName(actualPsgrDTO.getRealName());
+        preOrderDetails.setIdType(actualPsgrDTO.getIdType());
+        preOrderDetails.setIdCard(AESCryptUtils.encrypt(actualPsgrDTO.getIdCard()));
+
+        //前端传递
+        preOrderDetails.setTicketType(preOrderPsgrDTO.getTicketType());
+        preOrderDetails.setSeatType(preOrderPsgrDTO.getSeatType());
+        preOrderDetails.setAmount(preOrderPsgrDTO.getAmount());
 
         // 默认不选座
         preOrderDetails.setCarriageNumber(null);
@@ -371,7 +427,7 @@ public class OrderServiceImpl implements OrderService {
      * 仅为 无座位 的订单详情分配随机座位，有座位直接跳过
      */
     private void assignRandomSeatIfAbsent(List<OrderDetails> detailsList) {
-        List<AvailableSeatDTO> availableSeatList = getAvailableSeatList(detailsList);
+        List<AvailableSeatRemoteDTO> availableSeatList = getAvailableSeatList(detailsList);
         if (CollectionUtil.isEmpty(availableSeatList)) {
             return;
         }
@@ -383,10 +439,10 @@ public class OrderServiceImpl implements OrderService {
             }
 
             if (CollectionUtil.isEmpty(availableSeatList)) {
-                throw new BusinessException("无可分配的随机座位");
+                throw new BizException("无可分配的随机座位");
             }
 
-            AvailableSeatDTO seat = availableSeatList.removeFirst();
+            AvailableSeatRemoteDTO seat = availableSeatList.removeFirst();
             detail.setCarriageNumber(seat.getCarriageNumber());
             detail.setSeatNo(seat.getSeatNo());
         }
@@ -407,7 +463,7 @@ public class OrderServiceImpl implements OrderService {
     /**
      * 订单专用：获取待分配座位
      */
-    private List<AvailableSeatDTO> getAvailableSeatList(List<OrderDetails> detailsList) {
+    private List<AvailableSeatRemoteDTO> getAvailableSeatList(List<OrderDetails> detailsList) {
         if (CollectionUtil.isEmpty(detailsList)) {
             throw new IllegalArgumentException("订单详情不能为空");
         }
@@ -428,7 +484,6 @@ public class OrderServiceImpl implements OrderService {
                 .arrivalCode(detailsListFirst.getArrivalCode())
                 .passengerCount(need)
                 .preferredSeatSymbols(null)
-                .orderId(detailsListFirst.getOrderId())
                 .orderType(OrderTypeConstants.ORDER)
                 .status(SeatIntervalStatusConstants.ALREADY_SOLD)
                 .build();
@@ -439,10 +494,10 @@ public class OrderServiceImpl implements OrderService {
     /**
      * 远程调用座位服务 + 统一校验
      */
-    private List<AvailableSeatDTO> doGetAvailableSeat(RandomSeatQueryDTO randomSeatQueryDTO, Integer need) {
+    private List<AvailableSeatRemoteDTO> doGetAvailableSeat(RandomSeatQueryDTO randomSeatQueryDTO, Integer need) {
         String params = randomSeatQueryDTO.toString();
 
-        Result<List<AvailableSeatDTO>> feignResult = ticketFeignClient.getAvailableSeats(randomSeatQueryDTO);
+        Result<List<AvailableSeatRemoteDTO>> feignResult = ticketFeignClient.getAvailableSeats(randomSeatQueryDTO);
         if (!feignResult.isSuccess()) {
             LogUtils.error("OrderService", "doGetAvailableSeat", "/api/ticket-service/ticket/seats/available", params,
                     feignResult.getMessage());
@@ -451,9 +506,9 @@ public class OrderServiceImpl implements OrderService {
 
         LogUtils.info("OrderService", "doGetAvailableSeat", "/api/ticket-service/ticket/seats/available", params, feignResult);
 
-        List<AvailableSeatDTO> availableSeatList = feignResult.getData();
+        List<AvailableSeatRemoteDTO> availableSeatList = feignResult.getData();
         if (availableSeatList == null || availableSeatList.size() < need) {
-            throw new BusinessException("可用座位数不足");
+            throw new BizException("可用座位数不足");
         }
 
         return new ArrayList<>(availableSeatList);
@@ -466,6 +521,12 @@ public class OrderServiceImpl implements OrderService {
      */
     @Override
     public PageResult<OrderPageQueryVO> orderPageQuery(OrderPageQueryDTO orderPageQueryDTO) {
+        RequestContext context = RequestContextHolder.getRequestContext();
+        if (context == null || context.getAccountId() == null) {
+            throw new BizException("请先登录");
+        }
+        orderPageQueryDTO.setUserId(Long.valueOf(context.getAccountId()));
+
         return queryOrderPageCache(orderPageQueryDTO);
     }
 
@@ -496,6 +557,20 @@ public class OrderServiceImpl implements OrderService {
         // 分页必须放在dbFallback内部（PageHelper线程绑定）
         PageHelper.startPage(dto.getPageNumber(), dto.getPageSize());
         List<OrderPageQueryVO> orderPageQueryVOList = orderMapper.getOrderPageByQueryDTO(dto);
+
+        // 身份证脱敏处理
+        for (OrderPageQueryVO orderVO : orderPageQueryVOList) {
+            List<OrderDetailsVO> detailsList = orderVO.getOrderDetailsVOList();
+            if (CollectionUtil.isNotEmpty(detailsList)) {
+                for (OrderDetailsVO detailVO : detailsList) {
+                    String encryptedIdCard = detailVO.getIdCard();
+                    if (StrUtil.isNotBlank(encryptedIdCard)) {
+                        String realIdCard = AESCryptUtils.decrypt(encryptedIdCard);
+                        detailVO.setIdCard(CryptoUtils.mask(realIdCard));
+                    }
+                }
+            }
+        }
 
         // 组装所有依赖的单表Key
         List<String> dependSingleKeys = new ArrayList<>();
@@ -573,7 +648,7 @@ public class OrderServiceImpl implements OrderService {
         String params = String.valueOf(frontSelfTicketPageDTO.getUserId());
 
         // 远程调用user-service，根据userId查询idType和idCard
-        Result<UserIdCardDTO> userIdCardDTOResult = userFeignClient.getIdCardInfo(frontSelfTicketPageDTO.getUserId());
+        Result<UserIdCardDTO> userIdCardDTOResult = userFeignClient.getIdCardInfo();
 
         if (!userIdCardDTOResult.isSuccess()) {
             LogUtils.error("OrderService", "loadSelfTicketFromDb", "/api/user-service/user/{id}", params, userIdCardDTOResult.getMessage());
@@ -590,6 +665,12 @@ public class OrderServiceImpl implements OrderService {
         // 分页查询
         PageHelper.startPage(selfTicketPageDTO.getPageNumber(), selfTicketPageDTO.getPageSize());
         List<SelfTicketPageVO> selfTicketPageVOList = orderMapper.getSelfTicketPageByQueryDTO(selfTicketPageDTO);
+
+        for (SelfTicketPageVO vo : selfTicketPageVOList) {
+            String realIdCard = AESCryptUtils.decrypt(vo.getIdCard());
+            String maskIdCard = CryptoUtils.mask(realIdCard);
+            vo.setIdCard(maskIdCard);
+        }
 
         // 组装所有依赖的单表Key
         List<String> selfTicketKeys = selfTicketPageVOList.stream()
@@ -610,7 +691,7 @@ public class OrderServiceImpl implements OrderService {
         // 先远程获取idType和idCard，用于拼接Key（保证Key唯一性）
         String idType = "";
         String idCard = "";
-        Result<UserIdCardDTO> userIdCardDTOResult = userFeignClient.getIdCardInfo(dto.getUserId());
+        Result<UserIdCardDTO> userIdCardDTOResult = userFeignClient.getIdCardInfo();
         if (userIdCardDTOResult.isSuccess() && userIdCardDTOResult.getData() != null) {
             UserIdCardDTO userIdCardDTO = userIdCardDTOResult.getData();
             idType = Objects.toString(userIdCardDTO.getIdType(), "");
@@ -662,7 +743,8 @@ public class OrderServiceImpl implements OrderService {
     /**
      * 创建全新预订单
      */
-    private String createNewPreOrder(CreatePreOrderDTO createPreOrderDTO) {
+    private String createNewPreOrder(PreOrderContext ctx) {
+        CreatePreOrderDTO createPreOrderDTO = ctx.getReqDTO();
         //  构建预订单主表
         Long preOrderId = SnowflakeIdGenerator.nextId();
         String preOrderSn = OrderSnUtil.generatePreOrderSn();
@@ -680,7 +762,7 @@ public class OrderServiceImpl implements OrderService {
         cacheClient.set(preOrderKey, preOrder, RedisConstants.RAIL_DEFAULT_TTL, TimeUnit.MINUTES);
 
         // 插入明细
-        insertNewPreOrderDetails(createPreOrderDTO, preOrderId);
+        insertNewPreOrderDetails(ctx, preOrderId);
 
         return preOrderSn;
     }
@@ -688,22 +770,27 @@ public class OrderServiceImpl implements OrderService {
     /**
      * 插入新预订单明细
      */
-    private void insertNewPreOrderDetails(CreatePreOrderDTO createPreOrderDTO, Long preOrderId) {
-        List<PassengerOrderDetailDTO> passengerList = createPreOrderDTO.getPassengerOrderDetailDTOList();
+    private void insertNewPreOrderDetails(PreOrderContext ctx, Long preOrderId) {
+        CreatePreOrderDTO reqDTO = ctx.getReqDTO();
+        List<PassengerRemoteDTO> psgrRemoteList = new ArrayList<>(ctx.getPassengerList());
+        List<AvailableSeatRemoteDTO> availableSeatList = new ArrayList<>(getAvailableSeatListFromRemote(ctx, preOrderId));
 
-        if (ObjectUtil.isEmpty(passengerList)) {
+        List<PassengerOrderDetailDTO> psgrDetailList = reqDTO.getPassengerOrderDetailDTOList();
+
+        if (ObjectUtil.isEmpty(psgrDetailList)) {
             throw new IllegalArgumentException("预订单乘客详情列表不能为空");
         }
 
-        Integer seatType = passengerList.getFirst().getSeatType();
-        Integer need = passengerList.size();
-        List<AvailableSeatDTO> availableSeatList = getAvailableSeatList(createPreOrderDTO, seatType, need, preOrderId);
-
         List<PreOrderDetails> detailsList = new ArrayList<>();
-        for (PassengerOrderDetailDTO passengerDTO : passengerList) {
-            PreOrderDetails details = buildPreOrderDetail(preOrderId, passengerDTO);
+        for (PassengerOrderDetailDTO passengerDTO : psgrDetailList) {
+            PassengerRemoteDTO realPassenger = psgrRemoteList.removeFirst();
+            if (realPassenger == null) {
+                throw new BizException("乘客信息不存在");
+            }
 
-            AvailableSeatDTO seat = availableSeatList.removeFirst();
+            PreOrderDetails details = buildPreOrderDetail(preOrderId, passengerDTO, realPassenger);
+
+            AvailableSeatRemoteDTO seat = availableSeatList.removeFirst();
             details.setCarriageNumber(seat.getCarriageNumber());
             details.setTempSeatNo(seat.getSeatNo());
 
@@ -716,22 +803,26 @@ public class OrderServiceImpl implements OrderService {
     }
 
     /**
-     * 预订单专用：获取待分配座位
+     * 远程申请可用座位
      */
-    private List<AvailableSeatDTO> getAvailableSeatList(CreatePreOrderDTO createPreOrderDTO, Integer seatType, Integer need, Long preOrderId) {
-        if (ObjectUtil.isEmpty(createPreOrderDTO) || ObjectUtil.isEmpty(seatType)
-                || ObjectUtil.isEmpty(need) || ObjectUtil.isEmpty(preOrderId)) {
-            throw new IllegalArgumentException("参数不完整：缺少列车ID、席别类型、需分配人数或预订单ID");
+    private List<AvailableSeatRemoteDTO> getAvailableSeatListFromRemote(PreOrderContext ctx, Long preOrderId) {
+        CreatePreOrderDTO reqDTO = ctx.getReqDTO();
+        List<PassengerOrderDetailDTO> psgrDetailList = reqDTO.getPassengerOrderDetailDTOList();
+
+        if (ObjectUtil.isEmpty(psgrDetailList)) {
+            throw new IllegalArgumentException("预订单乘客详情列表不能为空");
         }
+        Integer seatType = psgrDetailList.getFirst().getSeatType();
+        Integer need = psgrDetailList.size();
 
         RandomSeatQueryDTO queryDTO = RandomSeatQueryDTO.builder()
-                .trainId(createPreOrderDTO.getTrainId())
-                .seatType(seatType)
-                .departureCode(createPreOrderDTO.getDepartureCode())
-                .arrivalCode(createPreOrderDTO.getArrivalCode())
-                .passengerCount(need)
-                .preferredSeatSymbols(createPreOrderDTO.getPreferredSeatSymbols())
+                .trainId(reqDTO.getTrainId())
                 .orderId(preOrderId)
+                .seatType(seatType)
+                .departureCode(reqDTO.getDepartureCode())
+                .arrivalCode(reqDTO.getArrivalCode())
+                .passengerCount(need)
+                .preferredSeatSymbols(reqDTO.getPreferredSeatSymbols())
                 .orderType(OrderTypeConstants.PREORDER)
                 .status(SeatIntervalStatusConstants.LOCKED)
                 .build();

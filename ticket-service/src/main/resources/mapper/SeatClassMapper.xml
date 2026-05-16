@@ -62,7 +62,7 @@
         GROUP BY tsc.train_id, tsc.seat_class_id
     </select>
 
-    <select id="getAvailableSeatsBySeatTypeQueryDTO" resultType="org.rail.api.dto.AvailableSeatDTO"
+    <select id="getAvailableSeatsBySeatTypeQueryDTO" resultType="org.rail.api.dto.AvailableSeatRemoteDTO"
             parameterType="org.rail.api.dto.SeatTypeQueryDTO">
         SELECT
             sc.type AS seatType,

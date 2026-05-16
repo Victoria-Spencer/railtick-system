@@ -15,6 +15,9 @@
     <update id="update">
         UPDATE `user`
         <trim prefix="SET" suffixOverrides=",">
+            <if test="username != null">username = #{username},</if>
+            <if test="password != null">password = #{password},</if>
+            <if test="phone != null">phone = #{phone},</if>
             <if test="email != null">email = #{email},</if>
             <if test="userType != null">user_type = #{userType},</if>
             <if test="postCode != null">post_code = #{postCode},</if>

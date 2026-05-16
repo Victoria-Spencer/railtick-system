@@ -3,7 +3,7 @@ package org.rail.ticketservice.task;
 import com.github.benmanes.caffeine.cache.Cache;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
-import org.rail.common.core.exception.BusinessException;
+import org.rail.common.core.exception.BizException;
 import org.rail.common.redis.exception.CacheInitException;
 import org.rail.ticketservice.mapper.TrainStopStationMapper;
 import org.rail.ticketservice.model.dto.TrainStopStationCacheDTO;
@@ -91,7 +91,7 @@ public class TrainStopStationLocalCacheTask {
      */
     public TrainStopStationCacheDTO getCacheByTrainId(Long trainId) {
         if (trainId == null) {
-            throw new BusinessException("列车ID不能为空");
+            throw new BizException("列车ID不能为空");
         }
         try {
             TrainStopStationCacheDTO cache = trainStopStationLocalCache.getIfPresent(trainId);
@@ -126,7 +126,7 @@ public class TrainStopStationLocalCacheTask {
         try {
             return trainStopStationMapper.selectByTrainId(trainId);
         } catch (Exception e) {
-            throw new BusinessException("查询列车经停站信息失败");
+            throw new BizException("查询列车经停站信息失败");
         }
     }
 

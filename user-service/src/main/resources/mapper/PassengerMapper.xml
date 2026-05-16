@@ -7,13 +7,15 @@
 <mapper namespace="org.rail.userservice.mapper.PassengerMapper">
 
     <select id="query" resultType="org.rail.userservice.model.entity.Passenger">
-        SELECT id, real_name, id_type, id_card,
-               discount_type, phone, verify_status, create_time
+        SELECT id, user_id,real_name, id_type, id_card,
+               discount_type, phone, verify_status,
+               create_time, update_time
         FROM passenger
         <where>
             <if test="userId != null">AND user_id = #{userId}</if>
             <if test="realName != null">AND real_name LIKE CONCAT('%', #{realName}, '%')</if>
             <if test="verifyStatus != null">AND verify_status = #{verifyStatus}</if>
+            <if test="discountType != null">AND discount_type = #{discountType}</if>
         </where>
         <if test="sortField != null">
             ORDER BY ${sortField}
@@ -27,9 +29,22 @@
             <if test="sortOrder == null">ASC</if> <!-- 未指定排序方式时默认升序 -->
         </if>
     </select>
+    <select id="selectBatchIds" resultType="org.rail.userservice.model.entity.Passenger">
+        SELECT
+            id, user_id, real_name, id_type,
+            id_card, discount_type, phone,
+            verify_status, create_time, update_time
+        FROM passenger
+        WHERE id IN
+        <foreach collection="list" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
     <delete id="batchDelete">
         DELETE FROM passenger
-        WHERE id IN
+        WHERE
+        user_id = #{userId}
+        AND id IN
         <foreach collection="ids" item="id" open="(" separator="," close=")">
             #{id}
         </foreach>

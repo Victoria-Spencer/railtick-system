@@ -36,7 +36,4 @@ public class CreateOrderDTO {
 
     @NotNull(message = "到达时间不能为空")
     private LocalDateTime arrivalTime;
-
-    /*@NotBlank(message = "防重提交令牌不能为空")
-    private String submitToken;*/
 }

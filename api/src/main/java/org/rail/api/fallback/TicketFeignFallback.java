@@ -1,7 +1,7 @@
 package org.rail.api.fallback;
 
 import org.rail.api.client.TicketFeignClient;
-import org.rail.api.dto.AvailableSeatDTO;
+import org.rail.api.dto.AvailableSeatRemoteDTO;
 import org.rail.api.dto.BatchSeatIntervalInsertDTO;
 import org.rail.api.dto.RandomSeatQueryDTO;
 import org.rail.common.core.model.result.Result;
@@ -21,7 +21,8 @@ public class TicketFeignFallback implements TicketFeignClient {
      * @param randomSeatQueryDTO 请求参数
      * @return 错误提示
      */
-    public Result<List<AvailableSeatDTO>> getAvailableSeats(@RequestBody RandomSeatQueryDTO randomSeatQueryDTO) {
+    @Override
+    public Result<List<AvailableSeatRemoteDTO>> getAvailableSeats(@RequestBody RandomSeatQueryDTO randomSeatQueryDTO) {
         return Result.error("远程调用失败/触发降级");
     }
 

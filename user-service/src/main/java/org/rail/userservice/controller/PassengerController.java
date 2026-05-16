@@ -2,11 +2,13 @@ package org.rail.userservice.controller;
 
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import org.rail.api.dto.PassengerRemoteDTO;
 import org.rail.common.core.annotation.OperationLog;
 import org.rail.common.core.model.result.PageResult;
+import org.rail.userservice.model.dto.PsgrDTO;
 import org.rail.userservice.model.dto.PsgrPageQueryDTO;
 import org.rail.userservice.model.dto.PsgrUpdateDTO;
-import org.rail.userservice.model.entity.Passenger;
+import org.rail.userservice.model.vo.PsgrVO;
 import org.rail.userservice.service.PassengerService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.validation.annotation.Validated;
@@ -23,24 +25,24 @@ public class PassengerController {
     private PassengerService passengerService;
 
     @PostMapping("/pageQuery")
-    public PageResult<Passenger> pageQuery(@RequestBody @Validated PsgrPageQueryDTO psgrPageQueryDTO) {
+    public PageResult<PsgrVO> pageQuery(@RequestBody PsgrPageQueryDTO psgrPageQueryDTO) {
         return passengerService.pageQuery(psgrPageQueryDTO);
     }
 
-    @GetMapping("/user/{id}")
-    public List<Passenger> list(@PathVariable @NotNull(message = "用户ID不能为空") Long id) {
-        return passengerService.getByUserId(id);
+    @GetMapping("/user/list")
+    public List<PsgrVO> list() {
+        return passengerService.list();
     }
 
     @GetMapping("/{id}")
-    public Passenger passengerInfo(@PathVariable @NotNull(message = "用户ID不能为空") Long id) {
+    public PsgrVO passengerInfo(@PathVariable @NotNull(message = "乘车人ID不能为空") Long id) {
         return passengerService.getById(id);
     }
 
     @OperationLog(value = "添加乘客信息", saveParam = true)
     @PostMapping("/save")
-    public void save(@RequestBody @Validated Passenger passenger) {
-        passengerService.save(passenger);
+    public void save(@RequestBody @Validated PsgrDTO passengerDTO) {
+        passengerService.save(passengerDTO);
     }
 
     @OperationLog(value = "修改乘客信息", saveParam = true)
@@ -53,5 +55,10 @@ public class PassengerController {
     @DeleteMapping("/delete")
     public void delete(@RequestParam @NotEmpty(message = "乘客ID列表不能为空") List<Long> ids) {
         passengerService.deleteByIds(ids);
+    }
+
+    @PostMapping("/batch")
+    List<PassengerRemoteDTO> batchListPassenger(@RequestBody @NotEmpty(message = "乘客ID列表不能为空") List<Long> passengerIds) {
+        return passengerService.batchListPassenger(passengerIds);
     }
 }

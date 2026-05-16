@@ -1,19 +1,3 @@
-/*
- * Copyright 2025 the original author or authors.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      https://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package org.rail.common.core.util.security;
 
 import javax.crypto.Cipher;
@@ -21,22 +5,20 @@ import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 
 /**
- * AES encryption and decryption utility class.
- *
- * @since 1.0.0.3
+ * AES 对称加密解密工具类
  */
 public class AESCryptUtils {
 
-	/** AES cipher algorithm specification */
+	/** AES 加密算法：ECB模式 + PKCS5填充方式 */
 	private static final String AES_CIPHER = "AES/ECB/PKCS5Padding";
 
-	/** AES encryption key */
+	/** AES 固定加密密钥 */
 	public static final String AES_KEY = "agentscope_5qAI8#nO-d@xK7$kdF+Dh";
 
 	/**
-	 * Encrypts a string using AES algorithm.
-	 * @param original The string to be encrypted
-	 * @return Base64 encoded encrypted string
+	 * 使用 AES 算法加密字符串
+	 * @param original 待加密的原始字符串
+	 * @return 经过 Base64 编码的加密字符串
 	 */
 	public static String encrypt(String original) {
 		try {
@@ -54,9 +36,9 @@ public class AESCryptUtils {
 	}
 
 	/**
-	 * Decrypts an AES encrypted string.
-	 * @param encrypted Base64 encoded encrypted string
-	 * @return Decrypted string
+	 * 解密 AES 加密后的字符串
+	 * @param encrypted 经过 Base64 编码的加密字符串
+	 * @return 解密后的原始字符串
 	 */
 	public static String decrypt(String encrypted) {
 		try {
@@ -74,7 +56,7 @@ public class AESCryptUtils {
 	}
 
 	/**
-	 * Test method for encryption.
+	 * 加密测试方法
 	 */
 	public static void main(String[] args) {
 		String encrypted = encrypt("sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");

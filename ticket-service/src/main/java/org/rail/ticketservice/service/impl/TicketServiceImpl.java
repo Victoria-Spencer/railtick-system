@@ -10,12 +10,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang.StringUtils;
 import org.rail.api.constant.OrderTypeConstants;
 import org.rail.api.constant.SeatIntervalStatusConstants;
+import org.rail.common.core.exception.BizException;
 import org.rail.common.core.exception.SeatLockFailedException;
 import org.rail.common.core.util.*;
 import org.rail.common.core.util.thread.ThreadLocalUtils;
 import org.rail.common.redis.api.ICacheClient;
 import org.rail.common.redis.constant.RedisConstants;
-import org.rail.common.core.exception.BusinessException;
 import org.rail.common.redis.result.AggBatchResult;
 import org.rail.common.redis.result.AggCacheResult;
 import org.rail.api.dto.*;
@@ -420,7 +420,7 @@ public class TicketServiceImpl implements TicketService {
 
         // 查询经停站相关信息并拷贝属性
         StopInfoDTO stopInfoDTO = trainStopStationMapper.getStopInfoByQueryDTO(plannedTicketQueryDTO);
-        BeanUtils.copyProperties(stopInfoDTO, ticketQueryVO);
+        BeanUtil.copyProperties(stopInfoDTO, ticketQueryVO);
 
         // 查询席别类型
         List<SeatClassFrontVO> seatClassList = buildSeatClassFrontList(trainId, stopInfoDTO.getDepartureSequence(), stopInfoDTO.getArrivalSequence());
@@ -468,16 +468,17 @@ public class TicketServiceImpl implements TicketService {
      * @return 可用座位列表DTO
      */
     @Override
-    public List<AvailableSeatDTO> getAvailableSeats(RandomSeatQueryDTO queryDTO) {
+    public List<AvailableSeatRemoteDTO> getAvailableSeats(RandomSeatQueryDTO queryDTO) {
         if (ObjectUtil.isEmpty(queryDTO)
                 || ObjectUtil.isEmpty(queryDTO.getTrainId())
                 || ObjectUtil.isEmpty(queryDTO.getSeatType())
                 || ObjectUtil.isEmpty(queryDTO.getPassengerCount()) || queryDTO.getPassengerCount() <= 0
                 || StrUtil.isBlank(queryDTO.getDepartureCode())
                 || StrUtil.isBlank(queryDTO.getArrivalCode())
+                || ObjectUtil.isEmpty(queryDTO.getOrderId())
                 || ObjectUtil.isEmpty(queryDTO.getOrderType())
                 || ObjectUtil.isEmpty(queryDTO.getStatus())) {
-            throw new IllegalArgumentException("随机选座参数校验失败：车次ID、席别类型、乘客数量、出发站编码、到达站编码、订单类型、状态为必填项且乘客数量必须大于0");
+            throw new IllegalArgumentException("随机选座参数校验失败：车次ID、席别类型、乘客数量、出发站编码、到达站编码、订单ID、订单类型、状态为必填项且乘客数量必须大于0");
         }
 
         Long trainId = queryDTO.getTrainId();
@@ -491,22 +492,26 @@ public class TicketServiceImpl implements TicketService {
         List<SeatBusinessVO> finalSelectedSeats = null;
 
         for (int i = 0; i < maxRetry; i++) {
-            ThreadLocalUtils.removeKey("lockedSuccessSeats");
+            try {
+                ThreadLocalUtils.removeKey("lockedSuccessSeats");
 
-            List<Long> freeSeatIds = getFreeSeatIds(trainId, departureCode, arrivalCode);
-            List<SeatBusinessVO> freeSeatInfoList = getFreeSeatInfoList(freeSeatIds, trainId);
-            List<SeatBusinessVO> filteredBySeatType = filterSeatsBySeatType(freeSeatInfoList, seatType);
-            List<SeatBusinessVO> selectedSeats = selectMatchedSeats(filteredBySeatType, passengerCount, preferredSeatSymbols);
+                List<Long> freeSeatIds = getFreeSeatIds(trainId, departureCode, arrivalCode);
+                List<SeatBusinessVO> freeSeatInfoList = getFreeSeatInfoList(freeSeatIds, trainId);
+                List<SeatBusinessVO> filteredBySeatType = filterSeatsBySeatType(freeSeatInfoList, seatType);
+                List<SeatBusinessVO> selectedSeats = selectMatchedSeats(filteredBySeatType, passengerCount, preferredSeatSymbols);
 
-            if (CollectionUtils.isEmpty(selectedSeats)) {
-                throw new BusinessException("无符合条件的座位");
-            }
+                if (CollectionUtils.isEmpty(selectedSeats)) {
+                    throw new BizException("无符合条件的座位");
+                }
 
-            boolean lockSuccess = batchLockSelectedSeats(queryDTO, selectedSeats);
+                boolean lockSuccess = batchLockSelectedSeats(queryDTO, selectedSeats);
 
-            if (lockSuccess) {
-                finalSelectedSeats = selectedSeats;
-                break;
+                if (lockSuccess) {
+                    finalSelectedSeats = selectedSeats;
+                    break;
+                }
+            } finally {
+                ThreadLocalUtils.removeKey("lockedSuccessSeats");
             }
 
         }
@@ -578,9 +583,9 @@ public class TicketServiceImpl implements TicketService {
     /**
      * 转换为 AvailableSeatDTO 返回列表
      */
-    private List<AvailableSeatDTO> convertToAvailableSeatDTO(List<SeatBusinessVO> selectedSeats, Integer seatType) {
+    private List<AvailableSeatRemoteDTO> convertToAvailableSeatDTO(List<SeatBusinessVO> selectedSeats, Integer seatType) {
         return selectedSeats.stream()
-                .map(seat -> AvailableSeatDTO.builder()
+                .map(seat -> AvailableSeatRemoteDTO.builder()
                         .seatType(seatType)
                         .carriageNumber(seat.getCarriageNumber())
                         .seatNo(seat.getSeatNo())
@@ -593,7 +598,7 @@ public class TicketServiceImpl implements TicketService {
      */
     private List<SeatBusinessVO> filterSeatsBySeatType(List<SeatBusinessVO> freeSeatInfoList, Integer seatType) {
         if (CollectionUtils.isEmpty(freeSeatInfoList)) {
-            throw new BusinessException("当前席别无可用座位");
+            throw new BizException("当前席别无可用座位");
         }
 
         List<SeatBusinessVO> filteredBySeatType = freeSeatInfoList.stream()
@@ -601,7 +606,7 @@ public class TicketServiceImpl implements TicketService {
                 .collect(Collectors.toList());
 
         if (CollectionUtils.isEmpty(filteredBySeatType)) {
-            throw new BusinessException("当前席别无可用座位");
+            throw new BizException("当前席别无可用座位");
         }
         return filteredBySeatType;
     }
@@ -618,7 +623,7 @@ public class TicketServiceImpl implements TicketService {
             }
         }
         if (CollectionUtils.isEmpty(freeSeatInfoList)) {
-            throw new BusinessException("当前车次无空闲座位");
+            throw new BizException("当前车次无空闲座位");
         }
 
         return freeSeatInfoList;
@@ -630,7 +635,7 @@ public class TicketServiceImpl implements TicketService {
     private List<Long> getFreeSeatIds(Long trainId, String departureCode, String arrivalCode) {
         List<Long> freeSeatIds = seatService.getFreeSeatIdsByBitmap(trainId, departureCode, arrivalCode);
         if (CollectionUtils.isEmpty(freeSeatIds)) {
-            throw new BusinessException("当前车次无空闲座位");
+            throw new BizException("当前车次无空闲座位");
         }
         return freeSeatIds;
     }
@@ -691,8 +696,9 @@ public class TicketServiceImpl implements TicketService {
      * 补齐随机座位
      */
     private List<SeatBusinessVO> fillRandomSeats(List<SeatBusinessVO> sortedSeats, List<SeatBusinessVO> finalSeats, int needRandomCount) {
+        Set<SeatBusinessVO> finalSet = new HashSet<>(finalSeats);
         List<SeatBusinessVO> allAvailableSeats = sortedSeats.stream()
-                .filter(seat -> !finalSeats.contains(seat))
+                .filter(seat -> !finalSet.contains(seat))
                 .toList();
 
         return getRandomSeats(allAvailableSeats, needRandomCount);
@@ -1160,15 +1166,15 @@ public class TicketServiceImpl implements TicketService {
                                          String departureCode,
                                          String arrivalCode) {
         if (!stationId2SeqMap.containsKey(fromStationId)) {
-            throw new BusinessException(trainId + "车次不包含出发站：" + departureCode);
+            throw new BizException(trainId + "车次不包含出发站：" + departureCode);
         }
         if (!stationId2SeqMap.containsKey(toStationId)) {
-            throw new BusinessException(trainId + "车次不包含到达站：" + arrivalCode);
+            throw new BizException(trainId + "车次不包含到达站：" + arrivalCode);
         }
         Integer startSeq = stationId2SeqMap.get(fromStationId);
         Integer endSeq = stationId2SeqMap.get(toStationId);
         if (startSeq >= endSeq) {
-            throw new BusinessException("站点顺序异常：出发站序列不能大于等于到达站序列");
+            throw new BizException("站点顺序异常：出发站序列不能大于等于到达站序列");
         }
     }
 
@@ -1250,10 +1256,10 @@ public class TicketServiceImpl implements TicketService {
             Object seatIdObj = seatIdObjList.get(i);
 
             if (seatIdObj == null) {
-                throw new BusinessException(String.format("%d车次-%s不存在座位", trainId, seatUniqueDesc));
+                throw new BizException(String.format("%d车次-%s不存在座位", trainId, seatUniqueDesc));
             }
             if (!(seatIdObj instanceof Long)) {
-                throw new BusinessException(String.format("%d车次-%s数据异常", trainId, seatUniqueDesc));
+                throw new BizException(String.format("%d车次-%s数据异常", trainId, seatUniqueDesc));
             }
 
             seatIdList.add((Long) seatIdObj);

@@ -3,7 +3,7 @@ package org.rail.ticketservice.service.impl;
 import cn.hutool.core.util.StrUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.rail.api.constant.OrderTypeConstants;
-import org.rail.common.core.exception.BusinessException;
+import org.rail.common.core.exception.BizException;
 import org.rail.common.redis.exception.CacheInitException;
 import org.rail.ticketservice.model.dto.SequenceDTO;
 import org.rail.ticketservice.model.entity.Station;
@@ -204,7 +204,7 @@ public class SeatServiceImpl implements SeatService {
     @Override
     public List<Long> getFreeSeatIdsByBitmap(Long trainId, String departureCode, String arrivalCode) {
         if(trainId == null || departureCode == null || arrivalCode == null) {
-            throw new BusinessException("车次ID、出发站、到达站不能为空");
+            throw new BizException("车次ID、出发站、到达站不能为空");
         }
 
         SequenceDTO seq = getStationSequence(trainId, departureCode, arrivalCode);
@@ -212,7 +212,7 @@ public class SeatServiceImpl implements SeatService {
         int endSeq = seq.getEndSequence();
 
         if (startSeq < 0 || endSeq < 0 || startSeq >= endSeq) {
-            throw new BusinessException("车次不存在或站点信息无效");
+            throw new BizException("车次不存在或站点信息无效");
         }
 
         List<Long> allSeatIds = getAllSeatIdsByTrainId(trainId);
@@ -267,7 +267,7 @@ public class SeatServiceImpl implements SeatService {
 
         } catch (Exception e) {
             String errorMsg = String.format("从Redis获取座位基础信息发生异常，trainId=%s, seatId=%s", trainId, seatId);
-            throw new BusinessException(errorMsg, e);
+            throw new BizException(errorMsg, e);
         }
     }
 
@@ -287,7 +287,7 @@ public class SeatServiceImpl implements SeatService {
      */
     private List<Long> getAllSeatIdsByTrainId(Long trainId) {
         if (trainId == null) {
-            throw new BusinessException("车次ID不能为空");
+            throw new BizException("车次ID不能为空");
         }
 
         String redisHashKey = buildSeatHashKey(trainId);
@@ -340,7 +340,7 @@ public class SeatServiceImpl implements SeatService {
         return allStations.stream()
                 .filter(station -> stationCode.equals(station.getCode()))
                 .findFirst()
-                .orElseThrow(() -> new BusinessException(stationType + "编码不存在：" + stationCode))
+                .orElseThrow(() -> new BizException(stationType + "编码不存在：" + stationCode))
                 .getId();
     }
 
@@ -354,15 +354,15 @@ public class SeatServiceImpl implements SeatService {
                                          String departureCode,
                                          String arrivalCode) {
         if (!stationId2SeqMap.containsKey(fromStationId)) {
-            throw new BusinessException(trainId + "车次不包含出发站：" + departureCode);
+            throw new BizException(trainId + "车次不包含出发站：" + departureCode);
         }
         if (!stationId2SeqMap.containsKey(toStationId)) {
-            throw new BusinessException(trainId + "车次不包含到达站：" + arrivalCode);
+            throw new BizException(trainId + "车次不包含到达站：" + arrivalCode);
         }
         Integer startSeq = stationId2SeqMap.get(fromStationId);
         Integer endSeq = stationId2SeqMap.get(toStationId);
         if (startSeq >= endSeq) {
-            throw new BusinessException("站点顺序异常：出发站序列不能大于等于到达站序列");
+            throw new BizException("站点顺序异常：出发站序列不能大于等于到达站序列");
         }
     }
 

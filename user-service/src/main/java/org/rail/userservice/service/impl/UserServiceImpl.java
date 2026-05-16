@@ -1,19 +1,24 @@
 package org.rail.userservice.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
-import cn.hutool.core.util.ObjectUtil;
+import cn.hutool.core.util.StrUtil;
 import org.rail.api.dto.UserIdCardDTO;
-import org.rail.common.core.exception.BusinessException;
-import org.rail.common.core.util.BeanUtils;
+import org.rail.common.core.context.RequestContext;
+import org.rail.common.core.context.RequestContextHolder;
+import org.rail.common.core.exception.BizException;
+import org.rail.common.core.util.security.AESCryptUtils;
+import org.rail.common.core.util.security.CryptoUtils;
+import org.rail.common.core.util.security.PasswordCryptUtils;
 import org.rail.userservice.mapper.UserMapper;
 import org.rail.userservice.model.dto.UserLoginDTO;
 import org.rail.userservice.model.dto.UserRegisterDTO;
 import org.rail.userservice.model.dto.UserUpdateInfoDTO;
 import org.rail.userservice.model.entity.User;
+import org.rail.userservice.model.vo.UserInfoVO;
+import org.rail.userservice.model.vo.UserUpdateVO;
 import org.rail.userservice.model.vo.UserVO;
 import org.rail.userservice.service.UserService;
 import org.rail.userservice.util.JwtTokenUtil;
-import org.rail.userservice.util.MD5Util;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -32,28 +37,19 @@ public class UserServiceImpl implements UserService {
      */
     @Override
     public UserVO login(UserLoginDTO userLoginDTO) {
-        // 根据用户名查询用户信息
         User user = userMapper.findByUsernameOrMailOrPhone(userLoginDTO.getUsernameOrMailOrPhone());
 
-        // 判断用户是否存在
         if(user == null) {
-            throw new BusinessException("用户不存在");
+            throw new BizException("用户不存在");
         }
 
-
-        // md5加密
-        String password = userLoginDTO.getPassword();
-        password = MD5Util.encrypt(password);
-
-        // 校验密码
-        if(!user.getPassword().equals(password)) {
-            throw new BusinessException("密码错误");
+        boolean isPasswordMatch = PasswordCryptUtils.match(userLoginDTO.getPassword(), user.getPassword());
+        if(!isPasswordMatch) {
+            throw new BizException("密码错误");
         }
 
-        // 封装返回用户信息
-        UserVO userVO = BeanUtils.copyProperties(user, UserVO.class);
+        UserVO userVO = BeanUtil.copyProperties(user, UserVO.class);
 
-        // 生成令牌
         String token = JwtTokenUtil.createToken(user.getId());
         userVO.setAccessToken(token);
 
@@ -75,25 +71,21 @@ public class UserServiceImpl implements UserService {
      */
     @Override
     public UserVO register(UserRegisterDTO userRegisterDTO) {
-        // 根据用户名查询用户信息
         User existingUser  = userMapper.findByUsernameOrMailOrPhone(userRegisterDTO.getUsername());
         if(existingUser != null) {
-            throw new BusinessException("用户已经存在");
+            throw new BizException("用户已经存在");
         }
 
-        // 拷贝信息
         User user = new User();
-        BeanUtils.copyProperties(userRegisterDTO, user);
+        BeanUtil.copyProperties(userRegisterDTO, user);
+        String originalIdCard = userRegisterDTO.getIdCard();
+        user.setIdCard(AESCryptUtils.encrypt(originalIdCard));
         user.setCreateTime(LocalDateTime.now());
         user.setUpdateTime(LocalDateTime.now());
+        user.setPassword(PasswordCryptUtils.encode(user.getPassword()));
 
-        // md5加密
-        String password = user.getPassword();
-        user.setPassword(MD5Util.encrypt(password));
-
-        // 添加到数据库
         userMapper.insert(user);
-        return BeanUtils.copyProperties(user, UserVO.class);
+        return BeanUtil.copyProperties(user, UserVO.class);
     }
 
     /**
@@ -102,34 +94,73 @@ public class UserServiceImpl implements UserService {
      * @return 更新后的用户信息
      */
     @Override
-    public UserVO update(UserUpdateInfoDTO userUpdateInfoDTO) {
-        // 根据用户名查询用户信息
-        User user = userMapper.findByUsernameOrMailOrPhone(userUpdateInfoDTO.getUsername());
-        BeanUtils.copyProperties(userUpdateInfoDTO, user);
+    public UserUpdateVO update(UserUpdateInfoDTO userUpdateInfoDTO) {
+        RequestContext context = RequestContextHolder.getRequestContext();
+        if (context == null || context.getAccountId() == null) {
+            throw new BizException("未获取到用户信息");
+        }
+        long userId = Long.parseLong(context.getAccountId());
+        userUpdateInfoDTO.setId(userId);
+
+        User user = userMapper.getById(userId);
+        if(user == null){
+            throw new BizException("用户不存在，无法更新");
+        }
+
+        String oldPassword = userUpdateInfoDTO.getOldPassword();
+        if (StrUtil.isNotBlank(oldPassword)) {
+            boolean isPasswordMatch = PasswordCryptUtils.match(oldPassword, user.getPassword());
+            if(!isPasswordMatch) {
+                throw new BizException("原密码错误");
+            }
+        }
+
+        BeanUtil.copyProperties(userUpdateInfoDTO, user, "password");
         user.setUpdateTime(LocalDateTime.now());
+        String newPassword = userUpdateInfoDTO.getPassword();
+        if (StrUtil.isNotBlank(newPassword)) {
+            user.setPassword(PasswordCryptUtils.encode(newPassword));
+        }
         userMapper.update(user);
-        return BeanUtils.copyProperties(user, UserVO.class);
+
+        return BeanUtil.copyProperties(user, UserUpdateVO.class);
     }
 
     /**
      * 根据用户id查询用户信息
      */
     @Override
-    public User getById(Long userId) {
-        return userMapper.getById(userId);
+    public UserInfoVO query() {
+        RequestContext context = RequestContextHolder.getRequestContext();
+        if (context == null || context.getAccountId() == null) {
+            throw new BizException("未获取到用户信息");
+        }
+        long userId = Long.parseLong(context.getAccountId());
+
+        User user = userMapper.getById(userId);
+
+        UserInfoVO userInfoVO = BeanUtil.copyProperties(user, UserInfoVO.class);
+        String originalIdCard = AESCryptUtils.decrypt(user.getIdCard());
+        userInfoVO.setIdCard(CryptoUtils.mask(originalIdCard));
+        return userInfoVO;
     }
 
     /**
-     * 查询证类型和证件件号
-     * @param id 用户id
+     * 根据用户id, 查询证件类型和证件件号
      * @return 证件类型和证件号
      */
     @Override
-    public UserIdCardDTO getIdCardInfoById(Long id) {
-        if (ObjectUtil.isEmpty(id)) {
-            throw new IllegalArgumentException("用户ID不能为空");
+    public UserIdCardDTO getIdCardInfoById() {
+        RequestContext context = RequestContextHolder.getRequestContext();
+        if (context == null || context.getAccountId() == null) {
+            throw new BizException("未获取到用户信息");
         }
-        User user = userMapper.getById(id);
-        return BeanUtil.copyProperties(user, UserIdCardDTO.class);
+        long userId = Long.parseLong(context.getAccountId());
+
+        User user = userMapper.getById(userId);
+
+        UserIdCardDTO dto = BeanUtil.copyProperties(user, UserIdCardDTO.class);
+        dto.setIdCard(AESCryptUtils.decrypt(user.getIdCard()));
+        return dto;
     }
 }

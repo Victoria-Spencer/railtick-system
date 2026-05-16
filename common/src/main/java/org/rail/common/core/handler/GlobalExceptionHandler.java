@@ -32,7 +32,7 @@ public class GlobalExceptionHandler{
             case RepeatSubmitTokenInvalidException repeatSubmitTokenInvalidException -> "请求已过期，请刷新重试";
             case OpenFeignException openFeignException -> "服务繁忙，请稍后重试";
             case CacheException cacheException -> "缓存服务异常，请稍后重试";
-            case BusinessException businessException -> "操作失败，请稍后重试";
+            case BizException businessException -> "操作失败，请稍后重试";
             default -> "业务处理失败，请稍后重试";
         };
 

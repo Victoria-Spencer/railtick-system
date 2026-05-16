@@ -1,6 +1,6 @@
 package org.rail.ticketservice.controller;
 
-import org.rail.api.dto.AvailableSeatDTO;
+import org.rail.api.dto.AvailableSeatRemoteDTO;
 import org.rail.api.dto.BatchSeatIntervalInsertDTO;
 import org.rail.api.dto.RandomSeatQueryDTO;
 import org.rail.common.core.annotation.OperationLog;
@@ -34,7 +34,7 @@ public class TicketController {
     }
 
     @PostMapping("/seats/available")
-    public List<AvailableSeatDTO> getAvailableSeats(@RequestBody @Validated RandomSeatQueryDTO randomSeatQueryDTO) {
+    public List<AvailableSeatRemoteDTO> getAvailableSeats(@RequestBody @Validated RandomSeatQueryDTO randomSeatQueryDTO) {
         return ticketService.getAvailableSeats(randomSeatQueryDTO);
     }
 

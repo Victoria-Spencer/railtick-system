@@ -3,23 +3,33 @@ package org.rail.userservice.service.impl;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.lang.TypeReference;
 import com.github.pagehelper.PageHelper;
+import org.rail.api.dto.PassengerRemoteDTO;
 import org.rail.common.core.context.RequestContext;
 import org.rail.common.core.context.RequestContextHolder;
+import org.rail.common.core.exception.BizException;
+import org.rail.common.core.util.security.AESCryptUtils;
+import org.rail.common.core.util.security.CryptoUtils;
 import org.rail.common.redis.api.ICacheClient;
 import org.rail.common.redis.constant.RedisConstants;
 import org.rail.common.core.model.result.PageResult;
 import org.rail.userservice.constant.VerifyStatusConstants;
 import org.rail.userservice.mapper.PassengerMapper;
+import org.rail.userservice.model.dto.PsgrDTO;
 import org.rail.userservice.model.dto.PsgrPageQueryDTO;
 import org.rail.userservice.model.dto.PsgrUpdateDTO;
 import org.rail.userservice.model.entity.Passenger;
+import org.rail.userservice.model.vo.PsgrVO;
 import org.rail.userservice.service.PassengerService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 @Service
 public class PassengerServiceImpl implements PassengerService {
@@ -35,28 +45,32 @@ public class PassengerServiceImpl implements PassengerService {
      * @return 分页结果
      */
     @Override
-    public PageResult<Passenger> pageQuery(PsgrPageQueryDTO psgrPageQueryDTO) {
-        // 1. 开启分页（pageNum：页码，pageSize：每页条数）
-        PageHelper.startPage(psgrPageQueryDTO.getPageNumber(), psgrPageQueryDTO.getPageSize());
-
-        // 2. 执行查询（PageHelper会自动拦截该查询，拼接LIMIT分页）
-        List<Passenger> userList = passengerMapper.query(psgrPageQueryDTO);
-
+    public PageResult<PsgrVO> pageQuery(PsgrPageQueryDTO psgrPageQueryDTO) {
         psgrPageQueryDTO.setVerifyStatus(VerifyStatusConstants.UNREVIEWED);
+        PageHelper.startPage(psgrPageQueryDTO.getPageNumber(), psgrPageQueryDTO.getPageSize());
+        List<Passenger> passengerList = passengerMapper.query(psgrPageQueryDTO);
 
-        // 封装成PageResult返回
-        return new PageResult<>(userList);
+        List<PsgrVO> voList = passengerList.stream()
+                .map(this::convertToPsgrVO)
+                .collect(Collectors.toList());
+
+        return new PageResult<>(voList);
     }
 
     /**
-     * 根据用户id查询所有乘车人信息
-     * @param userId 用户id
+     * 查询该用户所有乘车人信息
      * @return 乘车人列表
      */
     @Override
-    public List<Passenger> getByUserId(Long userId) {
+    public List<PsgrVO> list() {
+        RequestContext context = RequestContextHolder.getRequestContext();
+        if (context == null|| context.getAccountId() == null) {
+            return new ArrayList<>();
+        }
+        Long userId = Long.valueOf(context.getAccountId());
+
         TypeReference<List<Passenger>> typeRef = new TypeReference<>() {};
-        return cacheClient.queryWithMutex(
+        List<Passenger> passengerList = cacheClient.queryWithMutex(
                 RedisConstants.RAIL_PASSENGER_LIST_USER_PREFIX,
                 userId,
                 typeRef,
@@ -64,6 +78,10 @@ public class PassengerServiceImpl implements PassengerService {
                 RedisConstants.RAIL_DEFAULT_TTL,
                 TimeUnit.MINUTES
         );
+
+        return passengerList.stream()
+                .map(this::convertToPsgrVO)
+                .collect(Collectors.toList());
     }
 
     /**
@@ -72,25 +90,46 @@ public class PassengerServiceImpl implements PassengerService {
      * @return 乘车人信息
      */
     @Override
-    public Passenger getById(Long id) {
-        return passengerMapper.getById(id);
+    public PsgrVO getById(Long id) {
+        Passenger passenger = passengerMapper.getById(id);
+
+        if (passenger == null) {
+            throw new BizException("乘车人不存在");
+        }
+
+        // 权限校验
+        RequestContext context = RequestContextHolder.getRequestContext();
+        if (context == null|| context.getAccountId() == null) {
+            throw new BizException("未获取到用户信息");
+        }
+        Long currentUserId = Long.valueOf(context.getAccountId());
+        if (!passenger.getUserId().equals(currentUserId)) {
+            throw new BizException("无权限访问该乘车人信息");
+        }
+
+        return convertToPsgrVO(passenger);
     }
 
     /**
      * 添加新的乘车人
-     * @param passenger 乘车人信息
+     * @param dto 乘车人信息
      */
     @Override
-    public void save(Passenger passenger) {
-        // 从线程中获取乘车人对应的用户标识
-        RequestContext requestContext = RequestContextHolder.getRequestContext();
-        Long userId = Long.valueOf(requestContext.getAccountId());
+    public void save(PsgrDTO dto) {
+        Passenger passenger = BeanUtil.copyProperties(dto, Passenger.class);
+
+        passenger.setIdCard(AESCryptUtils.encrypt(dto.getIdCard()));
+
+        RequestContext context = RequestContextHolder.getRequestContext();
+        if (context == null|| context.getAccountId() == null) {
+            throw new BizException("未获取到用户信息");
+        }
+        Long userId = Long.valueOf(context.getAccountId());
         passenger.setUserId(userId);
 
         // 设置审核状态
         passenger.setVerifyStatus(VerifyStatusConstants.UNREVIEWED);
 
-        // 设置变动时间
         passenger.setCreateTime(LocalDateTime.now());
         passenger.setUpdateTime(LocalDateTime.now());
 
@@ -111,8 +150,11 @@ public class PassengerServiceImpl implements PassengerService {
         passenger.setUpdateTime(LocalDateTime.now());
         passengerMapper.updateById(passenger);
 
-        RequestContext requestContext = RequestContextHolder.getRequestContext();
-        String userId = requestContext.getAccountId();
+        RequestContext context = RequestContextHolder.getRequestContext();
+        if (context == null || context.getAccountId() == null) {
+            throw new BizException("未获取到用户信息");
+        }
+        String userId = context.getAccountId();
         cacheClient.autoClearAggCache(RedisConstants.RAIL_PASSENGER_LIST_USER_PREFIX + userId);
     }
 
@@ -126,10 +168,55 @@ public class PassengerServiceImpl implements PassengerService {
     )*/
     @Override
     public void deleteByIds(List<Long> ids) {
-        passengerMapper.batchDelete(ids);
+        RequestContext context = RequestContextHolder.getRequestContext();
+        if (context == null || context.getAccountId() == null) {
+            throw new BizException("未获取到用户信息");
+        }
+        Long userId = Long.valueOf(context.getAccountId());
+        passengerMapper.batchDelete(ids, userId);
 
-        RequestContext requestContext = RequestContextHolder.getRequestContext();
-        String userId = requestContext.getAccountId();
         cacheClient.autoClearAggCache(RedisConstants.RAIL_PASSENGER_LIST_USER_PREFIX + userId);
+    }
+
+    /**
+     * 批量查询乘车人信息
+     * @param passengerIds 乘客ID列表
+     * @return 乘车人信息列表
+     */
+    @Override
+    public List<PassengerRemoteDTO> batchListPassenger(List<Long> passengerIds) {
+        List<Passenger> passengerList = passengerMapper.selectBatchIds(passengerIds);
+
+        Map<Long, Passenger> passengerMap = passengerList.stream()
+                .collect(Collectors.toMap(Passenger::getId, passenger -> passenger));
+
+        // 保证顺序一致
+        return passengerIds.stream()
+                .map(passengerId -> {
+                    Passenger passenger = passengerMap.get(passengerId);
+                    if (passenger == null) {
+                        return null;
+                    }
+
+                    PassengerRemoteDTO psgrDTO = BeanUtil.copyProperties(passenger, PassengerRemoteDTO.class);
+                    psgrDTO.setIdCard(AESCryptUtils.decrypt(passenger.getIdCard()));
+                    return psgrDTO;
+                })
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 统一转换：实体 → VO（解密+脱敏）
+     */
+    private PsgrVO convertToPsgrVO(Passenger passenger) {
+        PsgrVO vo = BeanUtil.copyProperties(passenger, PsgrVO.class);
+        try {
+            String realIdCard = AESCryptUtils.decrypt(passenger.getIdCard());
+            vo.setIdCard(CryptoUtils.mask(realIdCard));
+        } catch (Exception e) {
+            // 解密失败，设置安全脱敏值
+            vo.setIdCard(CryptoUtils.mask(null));
+        }
+        return vo;
     }
 }

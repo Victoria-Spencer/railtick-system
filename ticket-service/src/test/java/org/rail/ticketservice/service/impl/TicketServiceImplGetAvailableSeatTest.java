@@ -8,7 +8,7 @@ import org.mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.rail.api.constant.OrderTypeConstants;
 import org.rail.api.constant.SeatIntervalStatusConstants;
-import org.rail.api.dto.AvailableSeatDTO;
+import org.rail.api.dto.AvailableSeatRemoteDTO;
 import org.rail.api.dto.RandomSeatQueryDTO;
 import org.rail.common.core.exception.SeatLockFailedException;
 import org.rail.common.core.util.SnowflakeIdGenerator;
@@ -55,6 +55,7 @@ class TicketServiceImplGetAvailableSeatTest {
     private final List<String> PREFERRED_SEATS = List.of("A", "B"); // 偏好座位
     private final Integer ORDER_TYPE = OrderTypeConstants.PREORDER;
     private final Integer STATUS = SeatIntervalStatusConstants.LOCKED;
+    private final Long ORDER_ID = 10086L;
 
     @BeforeEach
     void setUp() {
@@ -102,7 +103,7 @@ class TicketServiceImplGetAvailableSeatTest {
         doNothing().when(cacheClient).hPutAllWholeExpire(anyString(), anyMap(), anyLong(), any());
         when(trainStopCacheTask.getTrainTerminalSeq(anyLong())).thenReturn(5);
 
-        List<AvailableSeatDTO> result = ticketService.getAvailableSeats(queryDTO);
+        List<AvailableSeatRemoteDTO> result = ticketService.getAvailableSeats(queryDTO);
 
         assertNotNull(result);
         assertEquals(PASSENGER_COUNT, result.size());
@@ -158,7 +159,7 @@ class TicketServiceImplGetAvailableSeatTest {
         when(trainStopCacheTask.getTrainTerminalSeq(anyLong())).thenReturn(5);
 
         // 执行业务方法
-        List<AvailableSeatDTO> result = ticketService.getAvailableSeats(queryDTO);
+        List<AvailableSeatRemoteDTO> result = ticketService.getAvailableSeats(queryDTO);
 
         assertNotNull(result);
         assertEquals(PASSENGER_COUNT, result.size());
@@ -242,6 +243,7 @@ class TicketServiceImplGetAvailableSeatTest {
         dto.setArrivalCode(ARR_CODE);
         dto.setOrderType(ORDER_TYPE);
         dto.setStatus(STATUS);
+        dto.setOrderId(ORDER_ID);
         return dto;
     }
 

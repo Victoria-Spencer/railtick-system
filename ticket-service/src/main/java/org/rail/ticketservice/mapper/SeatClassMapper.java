@@ -1,7 +1,7 @@
 package org.rail.ticketservice.mapper;
 
 import org.apache.ibatis.annotations.Mapper;
-import org.rail.api.dto.AvailableSeatDTO;
+import org.rail.api.dto.AvailableSeatRemoteDTO;
 import org.rail.api.dto.SeatTypeQueryDTO;
 import org.rail.ticketservice.model.dto.SeatQueryDTO;
 import org.rail.ticketservice.model.vo.SeatClassVO;
@@ -23,5 +23,5 @@ public interface SeatClassMapper {
      * @param seatTypeQueryDTO 可用座位查询条件
      * @return 可用座位列表
      */
-    List<AvailableSeatDTO> getAvailableSeatsBySeatTypeQueryDTO(SeatTypeQueryDTO seatTypeQueryDTO);
+    List<AvailableSeatRemoteDTO> getAvailableSeatsBySeatTypeQueryDTO(SeatTypeQueryDTO seatTypeQueryDTO);
 }

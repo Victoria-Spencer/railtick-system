@@ -1,18 +1,19 @@
 package org.rail.userservice.controller;
 
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import org.rail.api.dto.UserIdCardDTO;
 import org.rail.common.core.annotation.OperationLog;
 import org.rail.userservice.model.dto.UserLoginDTO;
 import org.rail.userservice.model.dto.UserRegisterDTO;
 import org.rail.userservice.model.dto.UserUpdateInfoDTO;
-import org.rail.userservice.model.entity.User;
+import org.rail.userservice.model.vo.UserInfoVO;
+import org.rail.userservice.model.vo.UserUpdateVO;
 import org.rail.userservice.model.vo.UserVO;
 import org.rail.userservice.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/user-service")
@@ -40,22 +41,22 @@ public class UserController {
 
     @OperationLog(value = "修改用户信息", saveParam = true)
     @PutMapping("/update")
-    public UserVO update(@RequestBody  @Validated UserUpdateInfoDTO userUpdateInfoDTO) {
+    public UserUpdateVO update(@RequestBody  @Validated UserUpdateInfoDTO userUpdateInfoDTO) {
         return userService.update(userUpdateInfoDTO);
     }
 
     @GetMapping("/query")
-    public User query(@RequestParam @NotNull(message = "用户ID不能为空") Long id) {
-        return userService.getById(id);
+    public UserInfoVO query() {
+        return userService.query();
     }
 
-    @PostMapping("/deletion") // TODO 账号注销
-    public void delete(@RequestParam @NotBlank(message = "用户名不能为空") String username) {
+    @PostMapping("/delete") // TODO 账号注销
+    public void delete() {
     }
 
-    @OperationLog(value = "修改用户信息", saveParam = true)
-    @GetMapping("/user/{id}")
-    public UserIdCardDTO getIdCardInfo(@PathVariable @NotNull(message = "用户ID不能为空") Long id) {
-        return userService.getIdCardInfoById(id);
+    @OperationLog(value = "查询用户证件类型和证件件号", saveParam = true)
+    @GetMapping("/user/id-card-info")
+    public UserIdCardDTO getIdCardInfo() {
+        return userService.getIdCardInfoById();
     }
 }

@@ -17,6 +17,7 @@ public class BatchSeatIntervalInsertDTO {
     @NotNull(message = "车次ID不能为空")
     private Long trainId;
 
+    @NotNull(message = "订单ID不能为空")
     private Long orderId;
 
     @NotNull(message = "订单类型不能为空")

@@ -1,9 +1,6 @@
 package org.rail.userservice.mapper;
 
-import org.apache.ibatis.annotations.Insert;
-import org.apache.ibatis.annotations.Mapper;
-import org.apache.ibatis.annotations.Select;
-import org.apache.ibatis.annotations.Update;
+import org.apache.ibatis.annotations.*;
 import org.rail.userservice.model.dto.PsgrPageQueryDTO;
 import org.rail.userservice.model.entity.Passenger;
 
@@ -34,7 +31,7 @@ public interface PassengerMapper {
      * @param id 乘车人id
      * @return 乘车人信息
      */
-    @Select("SELECT id, real_name, id_type, id_card," +
+    @Select("SELECT id, user_id, real_name, id_type, id_card," +
             " discount_type, phone, verify_status, create_time " +
             "FROM passenger " +
             "WHERE id = #{id}")
@@ -62,6 +59,14 @@ public interface PassengerMapper {
     /**
      * 根据ids移除乘车人
      * @param ids 乘车人id列表
+     * @param userId 当前登录用户ID
      */
-    void batchDelete(List<Long> ids);
+    void batchDelete(@Param("ids") List<Long> ids, @Param("userId") Long userId);
+
+    /**
+     * 根据ids查询乘车人信息列表
+     * @param passengerIds 乘车人id列表
+     * @return 乘车人信息列表
+     */
+    List<Passenger> selectBatchIds(List<Long> passengerIds);
 }

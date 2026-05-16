@@ -4,7 +4,6 @@
 package org.rail.common.core.util;
 
 import cn.hutool.core.util.StrUtil;
-import cn.hutool.json.JSONUtil;
 import lombok.Data;
 import org.rail.common.core.context.RequestContext;
 import org.slf4j.Logger;
@@ -120,7 +119,7 @@ public class LogUtils {
 					value = String.valueOf(obj);
 				}
 				else {
-					value = JSONUtil.toJsonStr(obj);
+					value = JsonUtils.toJson(obj);
 				}
 
 				builder.append(SIMPLE_LOG_SPLIT).append(value);
@@ -153,8 +152,8 @@ public class LogUtils {
 		trace.append(action).append(SIMPLE_LOG_SPLIT);
 		trace.append(resultCode).append(SIMPLE_LOG_SPLIT);
 		trace.append(costTime).append(SIMPLE_LOG_SPLIT);
-		trace.append(JSONUtil.toJsonStr(input)).append(SIMPLE_LOG_SPLIT);
-		trace.append(JSONUtil.toJsonStr(output)).append(SIMPLE_LOG_SPLIT);
+		trace.append(JsonUtils.toJson(input)).append(SIMPLE_LOG_SPLIT);
+		trace.append(JsonUtils.toJson(output)).append(SIMPLE_LOG_SPLIT);
 		trace.append(context.getSource()).append(SIMPLE_LOG_SPLIT);
 
 		for (Object obj : objects) {
@@ -164,7 +163,7 @@ public class LogUtils {
 			} else if (obj instanceof Throwable err) {
 				value = err.getMessage();
 			} else {
-				value = JSONUtil.toJsonStr(obj);
+				value = JsonUtils.toJson(obj);
 			}
 			trace.append(value).append(SIMPLE_LOG_SPLIT);
 		}
@@ -195,7 +194,7 @@ public class LogUtils {
 					value = String.valueOf(obj);
 				}
 				else {
-					value = JSONUtil.toJsonStr(obj);
+					value = JsonUtils.toJson(obj);
 				}
 
 				builder.append(SIMPLE_LOG_SPLIT).append(value);

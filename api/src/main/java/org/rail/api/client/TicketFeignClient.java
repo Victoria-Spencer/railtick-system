@@ -1,6 +1,6 @@
 package org.rail.api.client;
 
-import org.rail.api.dto.AvailableSeatDTO;
+import org.rail.api.dto.AvailableSeatRemoteDTO;
 import org.rail.api.dto.BatchSeatIntervalInsertDTO;
 import org.rail.api.dto.RandomSeatQueryDTO;
 import org.rail.api.fallback.TicketFeignFallback;
@@ -16,7 +16,7 @@ import java.util.List;
 public interface TicketFeignClient {
 
     @PostMapping("/api/ticket-service/ticket/seats/available")
-    Result<List<AvailableSeatDTO>> getAvailableSeats(@RequestBody RandomSeatQueryDTO randomSeatQueryDTO);
+    Result<List<AvailableSeatRemoteDTO>> getAvailableSeats(@RequestBody RandomSeatQueryDTO randomSeatQueryDTO);
 
     @PutMapping("/api/ticket-service/ticket/seat-status/update")
     Result<Void> updateSeatStatus(@RequestBody BatchSeatIntervalInsertDTO batchDTO);

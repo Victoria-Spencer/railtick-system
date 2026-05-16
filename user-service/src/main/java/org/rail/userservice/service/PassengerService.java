@@ -1,9 +1,11 @@
 package org.rail.userservice.service;
 
+import org.rail.api.dto.PassengerRemoteDTO;
 import org.rail.common.core.model.result.PageResult;
+import org.rail.userservice.model.dto.PsgrDTO;
 import org.rail.userservice.model.dto.PsgrPageQueryDTO;
 import org.rail.userservice.model.dto.PsgrUpdateDTO;
-import org.rail.userservice.model.entity.Passenger;
+import org.rail.userservice.model.vo.PsgrVO;
 
 import java.util.List;
 
@@ -14,27 +16,26 @@ public interface PassengerService {
      * @param psgrPageQueryDTO 分页查询参数
      * @return 分页结果
      */
-    PageResult<Passenger> pageQuery(PsgrPageQueryDTO psgrPageQueryDTO);
+    PageResult<PsgrVO> pageQuery(PsgrPageQueryDTO psgrPageQueryDTO);
 
     /**
-     * 根据用户id查询所有乘车人信息
-     * @param userId 用户id
+     * 查询该用户所有乘车人信息
      * @return 乘车人列表
      */
-    List<Passenger> getByUserId(Long userId);
+    List<PsgrVO> list();
 
     /**
      * 根据乘车人id查询乘车人信息
      * @param id 乘车人id
      * @return 乘车人信息
      */
-    Passenger getById(Long id);
+    PsgrVO getById(Long id);
 
     /**
      * 添加新的乘车人
-     * @param passenger 乘车人信息
+     * @param dto 乘车人信息
      */
-    void save(Passenger passenger);
+    void save(PsgrDTO dto);
 
     /**
      * 更新乘车人信息
@@ -47,4 +48,11 @@ public interface PassengerService {
      * @param ids 乘车人id列表
      */
     void deleteByIds(List<Long> ids);
+
+    /**
+     * 批量根据乘客ID查询真实信息
+     * @param passengerIds 乘客ID列表
+     * @return 乘客信息列表
+     */
+    List<PassengerRemoteDTO> batchListPassenger(List<Long> passengerIds);
 }

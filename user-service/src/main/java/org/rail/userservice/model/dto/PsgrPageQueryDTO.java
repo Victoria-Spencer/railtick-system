@@ -1,19 +1,18 @@
 package org.rail.userservice.model.dto;
 
-import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import org.rail.common.core.model.query.PageQuery;
 
+@EqualsAndHashCode(callSuper = true)
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class PsgrPageQueryDTO extends PageQuery {
 
-    @NotNull(message = "用户ID不能为空")
     private Long userId;
-
     private String realName;
     // 审核状态
     private Integer verifyStatus;
