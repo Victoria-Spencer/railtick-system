@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import java.util.List;
 
 /**
- * // 降级类，实现 Feign 接口
+ * 降级类，实现 Feign 接口
  */
 @Component
 public class TicketFeignFallback implements TicketFeignClient {

@@ -6,6 +6,5 @@ import lombok.Data;
 public class UserIdCardDTO {
 
     private Integer idType;
-    // 真实身份证号（未脱敏）
     private String idCard;
 }

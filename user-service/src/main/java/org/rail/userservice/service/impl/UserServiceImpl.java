@@ -6,8 +6,6 @@ import org.rail.api.dto.UserIdCardDTO;
 import org.rail.common.core.context.RequestContext;
 import org.rail.common.core.context.RequestContextHolder;
 import org.rail.common.core.exception.BizException;
-import org.rail.common.core.util.security.AESCryptUtils;
-import org.rail.common.core.util.security.CryptoUtils;
 import org.rail.common.core.util.security.PasswordCryptUtils;
 import org.rail.userservice.mapper.UserMapper;
 import org.rail.userservice.model.dto.UserLoginDTO;
@@ -78,8 +76,6 @@ public class UserServiceImpl implements UserService {
 
         User user = new User();
         BeanUtil.copyProperties(userRegisterDTO, user);
-        String originalIdCard = userRegisterDTO.getIdCard();
-        user.setIdCard(AESCryptUtils.encrypt(originalIdCard));
         user.setCreateTime(LocalDateTime.now());
         user.setUpdateTime(LocalDateTime.now());
         user.setPassword(PasswordCryptUtils.encode(user.getPassword()));
@@ -135,14 +131,11 @@ public class UserServiceImpl implements UserService {
         if (context == null || context.getAccountId() == null) {
             throw new BizException("未获取到用户信息");
         }
-        long userId = Long.parseLong(context.getAccountId());
 
+        long userId = Long.parseLong(context.getAccountId());
         User user = userMapper.getById(userId);
 
-        UserInfoVO userInfoVO = BeanUtil.copyProperties(user, UserInfoVO.class);
-        String originalIdCard = AESCryptUtils.decrypt(user.getIdCard());
-        userInfoVO.setIdCard(CryptoUtils.mask(originalIdCard));
-        return userInfoVO;
+        return BeanUtil.copyProperties(user, UserInfoVO.class);
     }
 
     /**
@@ -155,12 +148,10 @@ public class UserServiceImpl implements UserService {
         if (context == null || context.getAccountId() == null) {
             throw new BizException("未获取到用户信息");
         }
-        long userId = Long.parseLong(context.getAccountId());
 
+        long userId = Long.parseLong(context.getAccountId());
         User user = userMapper.getById(userId);
 
-        UserIdCardDTO dto = BeanUtil.copyProperties(user, UserIdCardDTO.class);
-        dto.setIdCard(AESCryptUtils.decrypt(user.getIdCard()));
-        return dto;
+        return BeanUtil.copyProperties(user, UserIdCardDTO.class);
     }
 }

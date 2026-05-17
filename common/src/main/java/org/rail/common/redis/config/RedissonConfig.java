@@ -28,7 +28,6 @@ public class RedissonConfig {
         Config config = new Config();
 
         // 支持：字符串原生存储 + 对象JSON序列化
-//        config.setCodec(stringFriendlyJsonCodec);
         config.setCodec(jsonJacksonCodec);
 
         SingleServerConfig serverConfig = config.useSingleServer();

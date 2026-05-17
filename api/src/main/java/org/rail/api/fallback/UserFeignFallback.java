@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 
 /**
- * // 降级类，实现 Feign 接口
+ * 降级类，实现 Feign 接口
  */
 @Component
 public class UserFeignFallback implements UserFeignClient {

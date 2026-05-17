@@ -16,8 +16,6 @@ import org.rail.common.core.exception.*;
 import org.rail.common.core.util.BeanConvertUtil;
 import org.rail.common.core.util.LogUtils;
 import org.rail.common.core.util.SnowflakeIdGenerator;
-import org.rail.common.core.util.security.AESCryptUtils;
-import org.rail.common.core.util.security.CryptoUtils;
 import org.rail.common.redis.api.ICacheClient;
 import org.rail.common.redis.constant.RedisConstants;
 import org.rail.common.redis.result.AggCacheResult;
@@ -291,7 +289,7 @@ public class OrderServiceImpl implements OrderService {
         // 后端查询（敏感字段）
         preOrderDetails.setRealName(actualPsgrDTO.getRealName());
         preOrderDetails.setIdType(actualPsgrDTO.getIdType());
-        preOrderDetails.setIdCard(AESCryptUtils.encrypt(actualPsgrDTO.getIdCard()));
+        preOrderDetails.setIdCard(actualPsgrDTO.getIdCard());
 
         //前端传递
         preOrderDetails.setTicketType(preOrderPsgrDTO.getTicketType());
@@ -558,20 +556,6 @@ public class OrderServiceImpl implements OrderService {
         PageHelper.startPage(dto.getPageNumber(), dto.getPageSize());
         List<OrderPageQueryVO> orderPageQueryVOList = orderMapper.getOrderPageByQueryDTO(dto);
 
-        // 身份证脱敏处理
-        for (OrderPageQueryVO orderVO : orderPageQueryVOList) {
-            List<OrderDetailsVO> detailsList = orderVO.getOrderDetailsVOList();
-            if (CollectionUtil.isNotEmpty(detailsList)) {
-                for (OrderDetailsVO detailVO : detailsList) {
-                    String encryptedIdCard = detailVO.getIdCard();
-                    if (StrUtil.isNotBlank(encryptedIdCard)) {
-                        String realIdCard = AESCryptUtils.decrypt(encryptedIdCard);
-                        detailVO.setIdCard(CryptoUtils.mask(realIdCard));
-                    }
-                }
-            }
-        }
-
         // 组装所有依赖的单表Key
         List<String> dependSingleKeys = new ArrayList<>();
         for (OrderPageQueryVO orderPageQueryVO : orderPageQueryVOList) {
@@ -665,12 +649,6 @@ public class OrderServiceImpl implements OrderService {
         // 分页查询
         PageHelper.startPage(selfTicketPageDTO.getPageNumber(), selfTicketPageDTO.getPageSize());
         List<SelfTicketPageVO> selfTicketPageVOList = orderMapper.getSelfTicketPageByQueryDTO(selfTicketPageDTO);
-
-        for (SelfTicketPageVO vo : selfTicketPageVOList) {
-            String realIdCard = AESCryptUtils.decrypt(vo.getIdCard());
-            String maskIdCard = CryptoUtils.mask(realIdCard);
-            vo.setIdCard(maskIdCard);
-        }
 
         // 组装所有依赖的单表Key
         List<String> selfTicketKeys = selfTicketPageVOList.stream()

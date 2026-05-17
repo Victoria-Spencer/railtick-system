@@ -7,8 +7,6 @@ import org.rail.api.dto.PassengerRemoteDTO;
 import org.rail.common.core.context.RequestContext;
 import org.rail.common.core.context.RequestContextHolder;
 import org.rail.common.core.exception.BizException;
-import org.rail.common.core.util.security.AESCryptUtils;
-import org.rail.common.core.util.security.CryptoUtils;
 import org.rail.common.redis.api.ICacheClient;
 import org.rail.common.redis.constant.RedisConstants;
 import org.rail.common.core.model.result.PageResult;
@@ -25,7 +23,6 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -51,7 +48,7 @@ public class PassengerServiceImpl implements PassengerService {
         List<Passenger> passengerList = passengerMapper.query(psgrPageQueryDTO);
 
         List<PsgrVO> voList = passengerList.stream()
-                .map(this::convertToPsgrVO)
+                .map(passenger -> BeanUtil.copyProperties(passenger, PsgrVO.class))
                 .collect(Collectors.toList());
 
         return new PageResult<>(voList);
@@ -80,7 +77,7 @@ public class PassengerServiceImpl implements PassengerService {
         );
 
         return passengerList.stream()
-                .map(this::convertToPsgrVO)
+                .map(passenger -> BeanUtil.copyProperties(passenger, PsgrVO.class))
                 .collect(Collectors.toList());
     }
 
@@ -107,7 +104,7 @@ public class PassengerServiceImpl implements PassengerService {
             throw new BizException("无权限访问该乘车人信息");
         }
 
-        return convertToPsgrVO(passenger);
+        return BeanUtil.copyProperties(passenger, PsgrVO.class);
     }
 
     /**
@@ -117,8 +114,6 @@ public class PassengerServiceImpl implements PassengerService {
     @Override
     public void save(PsgrDTO dto) {
         Passenger passenger = BeanUtil.copyProperties(dto, Passenger.class);
-
-        passenger.setIdCard(AESCryptUtils.encrypt(dto.getIdCard()));
 
         RequestContext context = RequestContextHolder.getRequestContext();
         if (context == null|| context.getAccountId() == null) {
@@ -197,26 +192,8 @@ public class PassengerServiceImpl implements PassengerService {
                     if (passenger == null) {
                         return null;
                     }
-
-                    PassengerRemoteDTO psgrDTO = BeanUtil.copyProperties(passenger, PassengerRemoteDTO.class);
-                    psgrDTO.setIdCard(AESCryptUtils.decrypt(passenger.getIdCard()));
-                    return psgrDTO;
+                    return BeanUtil.copyProperties(passenger, PassengerRemoteDTO.class);
                 })
                 .collect(Collectors.toList());
-    }
-
-    /**
-     * 统一转换：实体 → VO（解密+脱敏）
-     */
-    private PsgrVO convertToPsgrVO(Passenger passenger) {
-        PsgrVO vo = BeanUtil.copyProperties(passenger, PsgrVO.class);
-        try {
-            String realIdCard = AESCryptUtils.decrypt(passenger.getIdCard());
-            vo.setIdCard(CryptoUtils.mask(realIdCard));
-        } catch (Exception e) {
-            // 解密失败，设置安全脱敏值
-            vo.setIdCard(CryptoUtils.mask(null));
-        }
-        return vo;
     }
 }
