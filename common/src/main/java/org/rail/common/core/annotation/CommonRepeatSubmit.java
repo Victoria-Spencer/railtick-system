@@ -8,6 +8,7 @@ import java.util.concurrent.TimeUnit;
  */
 @Target({ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)
+@Documented
 public @interface CommonRepeatSubmit {
 
     /** 请求头名称 */
