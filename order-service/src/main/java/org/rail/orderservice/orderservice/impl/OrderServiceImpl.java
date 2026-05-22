@@ -119,6 +119,7 @@ public class OrderServiceImpl implements OrderService {
                 preOrderSn = createNewPreOrder(ctx);
             }
 
+            sendDelayReleaseMsg(userId, trainId);
             return preOrderSn;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -128,6 +129,17 @@ public class OrderServiceImpl implements OrderService {
                 lock.unlock();
             }
         }
+    }
+
+
+    /**
+     *   TODO 延迟消息队列：发送延迟消息到队列，消息内容包含 userId + trainId
+     *    整的逻辑：发送 PreOrderDelayMessage 到队列 →
+     *    消息处理器根据 key 从 Redis 获取占用记录 → 如果记录存在且过期，进行座位解锁处理（删除占用记录 + 更新Bitmap）
+     */
+    private void sendDelayReleaseMsg(String userId, Long trainId) {
+        // TODO 实现：发送延迟MQ消息(userId + trainId)
+        //  消费者：校验订单过期时间 → 过期则释放座位，否则不处理
     }
 
     /**

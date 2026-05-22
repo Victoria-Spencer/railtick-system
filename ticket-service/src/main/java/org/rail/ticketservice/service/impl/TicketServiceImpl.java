@@ -1030,7 +1030,6 @@ public class TicketServiceImpl implements TicketService {
 
         String recordKey = buildSeatOccupyHashKey(trainId);
         Map<String, Object> batchHashMap = new HashMap<>();
-        List<DelayMsgDTO> delayMsgList = new ArrayList<>();
 
         boolean isLockedBatch = SeatIntervalStatusConstants.LOCKED.equals(occupyList.getFirst().getStatus());
 
@@ -1067,21 +1066,15 @@ public class TicketServiceImpl implements TicketService {
             // 2. 存储占用元数据
             String field = buildSeatLockFieldKey(seatId, lockId);
             batchHashMap.put(field, occupy);
-
-            // 3. 收集延迟消息参数
-            if (isLockedBatch) {
-                delayMsgList.add(new DelayMsgDTO(trainId, seatId, lockId));
-            }
         }
 
         if (isLockedBatch) {
             cacheClient.hPutAllWholeExpire(recordKey, batchHashMap, RAIL_SEAT_OCCUPY_LOCK_EXPIRE_MINUTES, TimeUnit.MINUTES);
-            sendDelayReleaseMsg(delayMsgList);
         } else {
             cacheClient.hPutAllWholeExpire(recordKey, batchHashMap, RAIL_SEAT_OCCUPY_FORMAL_EXPIRE_MINUTES, TimeUnit.MINUTES);
-            // 非锁定状态：发送1次批量落库消息
-            sendBatchSyncDbMsg(occupyList);
         }
+        // 批量落库消息
+        sendBatchSyncDbMsg(occupyList);
     }
 
     /**
@@ -1103,16 +1096,6 @@ public class TicketServiceImpl implements TicketService {
     private void sendBatchSyncDbMsg(List<SeatIntervalOccupy> occupyList) {
         // TODO 实现：发送批量MQ消息
         //  消费者：批量入库 → 批量删除Redis Hash字段
-    }
-
-    /**
-     *   TODO 延迟消息队列：发送延迟消息到队列，消息内容包含 trainId + seatId + lockId
-     *    整的逻辑：发送 (key, lockId) 到队列 → 批量取出 → 进入普通队列 →
-     *    消息处理器根据 key 从 Redis 获取占用记录 → 如果记录存在且 lockId 匹配，则说明锁过期，进行解锁处理（删除占用记录 + 更新Bitmap）
-     */
-    private void sendDelayReleaseMsg(List<DelayMsgDTO> delayMsgList) {
-        // TODO 实现：发送延迟MQ消息(trainId+seatId+lockId)
-        //  消费者：校验lockId → 存在则释放座位 → 发送普通队列落库
     }
 
     /**
