@@ -2,62 +2,10 @@ package org.rail.common.redis.constant;
 
 public final class RedisConstants {
 
-    private RedisConstants() {}
+    private RedisConstants() {
+    }
 
-    // ====================== 分布式锁Key ======================
-    public static final String SEAT_CACHE_INIT_LOCK = "lock:cache:seat:init";
-
-    public static final String USER_TRAIN_PRE_ORDER_LOCK_PREFIX = "lock:user:train:pre-order:";
-
-    // =================== Redis 通用工具常量 ===================
     public static final String REDIS_LOCK_PREFIX = "lock:";
     public static final Long REDIS_CACHE_NULL_TTL = 2L;
     public static final String REDIS_DEP_PREFIX = "dep:";
-
-    // =================== 全局默认缓存配置 ========================
-    public static final Long RAIL_DEFAULT_TTL = 15L;
-
-    // =================== 座位状态缓存（Bitmap + Hash）===================
-    public static final String RAIL_BITMAP_SEAT_FORMAL_PREFIX = "rail:bitmap:seat:formal:"; // 正式售出座位Bitmap + trainId + seatId
-    public static final String RAIL_BITMAP_SEAT_TEMP_LOCK_PREFIX = "rail:bitmap:seat:temp_lock:"; // 临时锁座Bitmap + trainId + seatId
-    public static final String RAIL_HASH_SEAT_INFO_PREFIX = "rail:hash:seat:info:";
-    public static final String RAIL_SEAT_OCCUPY_RECORD_PREFIX = "rail:seat:occupy:record:"; // 座位占用记录元数据（String类型）前缀
-
-    public static final int RAIL_SEAT_LOCK_DELAY_MINUTES = 15;
-    public static final long RAIL_SEAT_OCCUPY_LOCK_EXPIRE_MINUTES = RAIL_SEAT_LOCK_DELAY_MINUTES + 5L; // 临时锁座Hash过期时间
-    public static final long RAIL_SEAT_OCCUPY_FORMAL_EXPIRE_MINUTES = 5L; // 正式订单/已释放Hash过期时间
-
-    // =================== 预订单表缓存 ====================
-    public static final String RAIL_PRE_ORDER_PREFIX = "rail:pre:order:";
-    public static final String RAIL_PRE_ORDER_DETAILS_PREFIX = "rail:pre:order:details:";
-
-    // =============== 单表根key ================
-    public static final String RAIL_PASSENGER_LIST_USER_PREFIX = "rail:passenger:list:user:"; // 乘车人列表
-    public static final String RAIL_ORDER_PREFIX = "rail:order:";    //  + orderSn
-    public static final String RAIL_ORDER_DETAILS_PREFIX = "rail:order:details:";
-
-    public static final String RAIL_SELF_TICKET_PREFIX = "rail:self-ticket:";
-
-    public static final String RAIL_TRAIN_PREFIX = "rail:train:";
-    public static final String RAIL_STATION_PREFIX =  "rail:station:"; // code
-    public static final String RAIL_TRAIN_STOP_STATION_PREFIX = "rail:train:stop-station:"; // trainId
-    public static final String RAIL_TRAIN_TRAIN_TYPE_PREFIX = "rail:train:train-type:";
-
-    public static final String RAIL_TRAIN_SEAT_CLASS_PREFIX = "rail:train:seat-class:";
-    public static final String RAIL_SEAT_CLASS_PREFIX = "rail:seat-class:";
-
-    // =============== 其它单表key（不唯一，查询条件动态变化） ================
-    public static final String RAIL_TICKET_SELF_PAGE_PREFIX = "rail:ticket:self:page:"; // 本人车票分页
-
-    // =============== 多表key ================
-    public static final String RAIL_AGG_ORDER_PAGE_USER_PREFIX = "rail:agg:order:page:user:"; // 订单分页
-    public static final String RAIL_AGG_TRAIN_BASE_INFO_PREFIX = "rail:agg:train:base:info:"; // 列车基础信息
-    public static final String RAIL_AGG_SEAT_CLASS = "rail:agg:seat:class:"; // 余票信息
-
-    public static final Long RAIL_TRAIN_BASE_CACHE_TTL_HOURS = 24L;
-    public static final Long RAIL_AGG_SEAT_CLASS_CACHE_TTL_SECONDS = 5L;
-
-    // ================ 聚合缓存对应的布隆过滤器类型 =================
-    public static final String BLOOM_FILTER_PREFIX = "bloom:filter:";  // 布隆过滤器前缀
-    public static final String AGG_CACHE_ORDER_BIZ_TYPE = "agg_cache:order";  // 订单模块
 }

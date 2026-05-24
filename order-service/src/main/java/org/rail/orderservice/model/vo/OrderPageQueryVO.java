@@ -9,6 +9,7 @@ import java.util.List;
 @Data
 public class OrderPageQueryVO {
 
+    private Long id;
     private String orderSn;
     private String departure;
     private String arrival;

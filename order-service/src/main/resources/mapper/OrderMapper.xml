@@ -121,6 +121,7 @@
     <!-- 订单分页查询结果映射 -->
     <resultMap id="OrderPageQueryVOResultMap" type="org.rail.orderservice.model.vo.OrderPageQueryVO">
         <!-- 订单主表字段映射（来自order表） -->
+        <id column="order_id" property="id"/><!-- 订单id，主键 -->
         <result column="status" property="status"/> <!-- 订单状态 -->
         <result column="order_sn" property="orderSn"/> <!-- 订单号 -->
         <result column="order_date" property="orderDate"/> <!-- 订票日期（主表创建时间的日期） -->

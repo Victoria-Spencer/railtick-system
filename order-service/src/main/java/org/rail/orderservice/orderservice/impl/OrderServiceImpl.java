@@ -10,18 +10,21 @@ import com.github.pagehelper.PageHelper;
 import org.rail.api.client.TicketFeignClient;
 import org.rail.api.client.UserFeignClient;
 import org.rail.api.constant.OrderTypeConstants;
+import org.rail.common.business.constant.AggRedisConstants;
+import org.rail.common.business.constant.OrderRedisConstants;
+import org.rail.common.business.constant.TicketRedisConstants;
 import org.rail.common.core.context.RequestContext;
 import org.rail.common.core.context.RequestContextHolder;
 import org.rail.common.core.exception.*;
-import org.rail.common.core.util.BeanConvertUtil;
 import org.rail.common.core.util.LogUtils;
 import org.rail.common.core.util.SnowflakeIdGenerator;
 import org.rail.common.redis.api.ICacheClient;
-import org.rail.common.redis.constant.RedisConstants;
+import org.rail.common.business.constant.RedisCommonConstants;
 import org.rail.common.redis.result.AggCacheResult;
 import org.rail.common.core.model.result.PageResult;
 import org.rail.common.core.model.result.Result;
 import org.rail.api.dto.*;
+import org.rail.orderservice.constant.OrderPaymentStatusConstants;
 import org.rail.orderservice.constant.PreOrderStatusConstants;
 import org.rail.api.constant.SeatIntervalStatusConstants;
 import org.rail.orderservice.mapper.OrderMapper;
@@ -46,8 +49,6 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
-import static org.rail.common.redis.constant.RedisConstants.*;
 
 @Service
 public class OrderServiceImpl implements OrderService {
@@ -100,11 +101,11 @@ public class OrderServiceImpl implements OrderService {
 
         PreOrderContext ctx = preparePreOrderContext(createPreOrderDTO, preOrderKey);
 
-        String lockKey = RedisConstants.USER_TRAIN_PRE_ORDER_LOCK_PREFIX + userId + ":" + trainId;
+        String lockKey = OrderRedisConstants.RAIL_LOCK_PRE_ORDER_CREATE_PREFIX + userId + ":" + trainId;
         RLock lock = redissonClient.getLock(lockKey);
 
         try {
-            boolean isLocked = lock.tryLock(3, -1, TimeUnit.SECONDS);
+            boolean isLocked = lock.tryLock(3, 30, TimeUnit.SECONDS);
 
             if (!isLocked) {
                 throw new UserConcurrentLockException("操作频繁，请稍后再试！");
@@ -157,7 +158,7 @@ public class OrderServiceImpl implements OrderService {
     private void clearOldPreOrderSeatAndCache(String preOrderKey, PreOrderContext ctx) {
         PreOrder oldPreOrder = cacheClient.get(preOrderKey);
         if (ObjectUtil.isNotNull(oldPreOrder)) {
-            String detailsKey = buildPreOrderDetailsKey(oldPreOrder.getId());
+            String detailsKey = buildPreOrderDetailsSetKey(oldPreOrder.getId());
             List<PreOrderDetails> oldDetails = new ArrayList<>(cacheClient.getSetMembers(detailsKey));
             // 释放旧明细关联的座位锁
             releaseOldPreOrderSeatLock(ctx.getReqDTO(), oldPreOrder, oldDetails);
@@ -189,7 +190,7 @@ public class OrderServiceImpl implements OrderService {
             throw new IllegalArgumentException("userId 和 trainId 不能为 null");
         }
         return String.format("%s%s:%d:%s:%d",
-                RAIL_PRE_ORDER_PREFIX, "userId", userId, "trainId", trainId);
+                OrderRedisConstants.RAIL_PRE_ORDER_PREFIX, "userId", userId, "trainId", trainId);
     }
 
     /**
@@ -205,12 +206,12 @@ public class OrderServiceImpl implements OrderService {
         return preOrder.getPreOrderSn();
     }
 
-    private String buildPreOrderDetailsKey(Long id) {
+    private String buildPreOrderDetailsSetKey(Long id) {
         if (id == null) {
             throw new IllegalArgumentException("id（preOrder）不能为 null");
         }
         return String.format("%s%s:%d",
-                RAIL_PRE_ORDER_DETAILS_PREFIX, "preOrderId", id);
+                OrderRedisConstants.RAIL_PRE_ORDER_DETAILS_PREFIX, "preOrderId", id);
     }
 
     /**
@@ -223,7 +224,7 @@ public class OrderServiceImpl implements OrderService {
         preOrder.setStatus(PreOrderStatusConstants.VALID);
 
         String preOrderKey = buildPreOrderKey(preOrder.getUserId(), preOrder.getTrainId());
-        cacheClient.set(preOrderKey, preOrder, RedisConstants.RAIL_DEFAULT_TTL, TimeUnit.MINUTES);
+        cacheClient.set(preOrderKey, preOrder, RedisCommonConstants.RAIL_DEFAULT_TTL, TimeUnit.MINUTES);
 //        orderMapper.updatePreOrder(preOrder);
     }
 
@@ -323,37 +324,105 @@ public class OrderServiceImpl implements OrderService {
     @Override
 //    @GlobalTransactional
     public CreateOrderVO createOrder(CreateOrderDTO createOrderDTO) {
-        // 查询预订单
+        RequestContext context = RequestContextHolder.getRequestContext();
+        if (context == null) {
+            throw new BizException("请先登录");
+        }
+        Long userId = Long.valueOf(context.getAccountId());
+        Long trainId = createOrderDTO.getTrainId();
+
         String preOrderSn = createOrderDTO.getPreOrderSn();
-//        String frontSubmitToken = createOrderDTO.getSubmitToken();
-        // TODO 这里直接查库，后续可以改成查缓存，甚至引入消息队列异步处理订单创建，提升用户体验
-        PreOrder preOrder = orderMapper.getByPreOrderSn(preOrderSn);
-        if(ObjectUtil.isNull(preOrder)){
-            throw new OrderNotFoundException("预订单不存在！");
+        String orderVoCacheKey = OrderRedisConstants.RAIL_ORDER_CREATE_VO_PREFIX + preOrderSn;
+
+        // 无锁快速拦截重复请求
+        CreateOrderVO existVo = cacheClient.get(orderVoCacheKey, CreateOrderVO.class);
+        if (ObjectUtil.isNotNull(existVo)) {
+            return existVo;
         }
 
-        /*if (!preOrder.getSubmitToken().equals(frontSubmitToken)) {
-            throw new BusinessException("非法请求，订单令牌无效！");
-        }*/
+        String lockKey = OrderRedisConstants.RAIL_LOCK_ORDER_CREATE_PREFIX + preOrderSn;
+        RLock lock = redissonClient.getLock(lockKey);
 
-        // 创建订单主表
-        Order order = createOrderMain(preOrder);
+        Order order = null;
+        List<OrderDetails> orderDetailsList = null;
 
-        // 处理订单明细 & 座位分配
-        List<OrderDetails> orderDetailsList = handleOrderDetails(createOrderDTO, preOrder, order);
+        try {
+            boolean isLocked = lock.tryLock(1, 30, TimeUnit.SECONDS);
+            if (!isLocked) {
+                throw new UserConcurrentLockException("操作频繁，请稍后再试！");
+            }
 
-        // 标记预订单为已转为正式订单
-        markPreOrderStatus2(preOrder.getId());
+            // 锁内双检，防止并发穿透
+            existVo = cacheClient.get(orderVoCacheKey, CreateOrderVO.class);
+            if (ObjectUtil.isNotNull(existVo)) {
+                return existVo;
+            }
 
-        return buildCreateOrderVo(createOrderDTO, orderDetailsList);
+            String preOrderKey = buildPreOrderKey(userId, trainId);
+            PreOrder preOrder = cacheClient.get(preOrderKey);
+            if (ObjectUtil.isNull(preOrder)) {
+                preOrder = orderMapper.getByPreOrderSn(preOrderSn);
+                if (ObjectUtil.isNull(preOrder)) {
+                    throw new OrderNotFoundException("预订单不存在或已过期！");
+                }
+            }
+
+            if (!PreOrderStatusConstants.VALID.equals(preOrder.getStatus())) {
+                throw new BizException("预订单状态无效，无法创建正式订单");
+            }
+            if (preOrder.getExpireTime().isBefore(LocalDateTime.now())) {
+                throw new BizException("预订单已过期，请重新下单");
+            }
+
+            // 创建订单主表
+            order = createOrderMain(preOrder);
+            // 处理订单明细 & 座位分配
+            orderDetailsList = handleOrderDetails(createOrderDTO, preOrder, order);
+
+            // 彻底删除预订单缓存
+            cacheClient.delete(preOrderKey);
+            cacheClient.delete(buildPreOrderDetailsSetKey(preOrder.getId()));
+
+            CreateOrderVO finalVo = buildCreateOrderVo(order.getOrderSn(), createOrderDTO, orderDetailsList);
+            cacheClient.set(orderVoCacheKey, finalVo, RedisCommonConstants.RAIL_DEFAULT_TTL, TimeUnit.MINUTES);
+            return finalVo;
+        } catch (UserConcurrentLockException e) {
+            throw e;
+        } catch (Exception e) {
+            cleanUpOnException(orderVoCacheKey, order.getId(), order.getOrderSn());
+            throw new BizException("订单创建失败，请重试");
+        } finally {
+            if (lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
+        }
     }
+
+    /**
+     * 订单创建异常时的统一清理方法
+     */
+    private void cleanUpOnException(String orderVoCacheKey, Long orderId, String orderSn) {
+        // 清理防重缓存
+        cacheClient.delete(orderVoCacheKey);
+
+        if (StrUtil.isNotBlank(orderSn)) {
+            String orderKey = buildOrderKey(orderSn);
+            cacheClient.delete(orderKey);
+        }
+
+        if (orderId != null) {
+            String orderDetailsHashKey = buildOrderDetailsHashKey(orderId);
+            cacheClient.delete(orderDetailsHashKey);
+        }
+    }
+
 
     /**
      * 构建订单返回VO
      */
-    private CreateOrderVO buildCreateOrderVo(CreateOrderDTO dto, List<OrderDetails> detailsList) {
+    private CreateOrderVO buildCreateOrderVo(String orderSn, CreateOrderDTO dto, List<OrderDetails> detailsList) {
         CreateOrderVO vo = BeanUtil.copyProperties(dto, CreateOrderVO.class);
-        vo.setOrderSn(dto.getPreOrderSn());
+        vo.setOrderSn(orderSn);
         List<OrderDetailsVO> createOrderDetailsVOS = BeanUtil.copyToList(detailsList, OrderDetailsVO.class);
         vo.setCreateOrderDetailsVOList(createOrderDetailsVOS);
         return vo;
@@ -363,8 +432,8 @@ public class OrderServiceImpl implements OrderService {
      * 处理订单明细和座位逻辑
      */
     private List<OrderDetails> handleOrderDetails(CreateOrderDTO createOrderDTO, PreOrder preOrder, Order order) {
-        Long preOrderId = preOrder.getId();
-        List<PreOrderDetails> preDetailsList = orderMapper.getDetailsByPreOrderId(preOrderId);
+        String preOrderDetailsKey = buildPreOrderDetailsSetKey(preOrder.getId());
+        List<PreOrderDetails> preDetailsList = new ArrayList<>(this.cacheClient.getSetMembers(preOrderDetailsKey));
         // 拷贝订单明细
         List<OrderDetails> detailsList = BeanUtil.copyToList(
                 preDetailsList,
@@ -376,86 +445,40 @@ public class OrderServiceImpl implements OrderService {
                         }})
                 );
 
-        // 拷贝属性并设置外键
-        for (OrderDetails orderDetails : detailsList) {
-            BeanUtil.copyProperties(createOrderDTO, orderDetails);
-            orderDetails.setOrderId(order.getId());
+        Map<String, OrderDetails> detailsMap = new HashMap<>();
+        for (OrderDetails details : detailsList) {
+            details.setId(SnowflakeIdGenerator.nextId());
+            details.setOrderId(order.getId());
+            details.setRefundStatus(false);
+
+            details.setDeparture(createOrderDTO.getDeparture());
+            details.setArrival(createOrderDTO.getArrival());
+            details.setDepartureCode(createOrderDTO.getDepartureCode());
+            details.setArrivalCode(createOrderDTO.getArrivalCode());
+            details.setRidingDate(createOrderDTO.getRidingDate());
+            details.setTrainId(createOrderDTO.getTrainId());
+            details.setDepartureTime(createOrderDTO.getDepartureTime());
+            details.setArrivalTime(createOrderDTO.getArrivalTime());
+
+            detailsMap.put(details.getId().toString(), details);
         }
 
-        BatchSeatIntervalInsertDTO batchSeatDTO = handleOrderSeat(detailsList);
-
-        orderMapper.batchInsertOrderDetails(detailsList);
-
-        if (ObjectUtil.isEmpty(batchSeatDTO) || ObjectUtil.isEmpty(batchSeatDTO.getSeatList())) {
-            return detailsList;
-        }
-
-        String params = batchSeatDTO.toString();
-
-        Result<Void> feignResult = ticketFeignClient.updateSeatStatus(batchSeatDTO);
-
-        if (!feignResult.isSuccess()) {
-            LogUtils.error("OrderService", "handleOrderDetails", "/api/ticket-service/ticket/seat-status/update",
-                    params, feignResult.getMessage());
-            throw new OpenFeignException("订单创建-更新座位状态失败：" + feignResult.getMessage());
-        }
-
-        LogUtils.info("OrderService", "handleOrderDetails", "/api/ticket-service/ticket/seat-status/update",
-                params, feignResult);
+        String orderDetailsHashKey = buildOrderDetailsHashKey(order.getId());
+        cacheClient.hPutAllWholeExpire(orderDetailsHashKey, detailsMap,
+                RedisCommonConstants.RAIL_DEFAULT_TTL, TimeUnit.MINUTES);
 
         return detailsList;
     }
 
     /**
-     * 处理订单座位分配逻辑
+     * 构建正式订单明细Hash缓存Key
      */
-    private BatchSeatIntervalInsertDTO handleOrderSeat(List<OrderDetails> detailsList) {
-        // 有座位跳过，无座位随机分配
-        assignRandomSeatIfAbsent(detailsList);
-
-        return buildOrderSeatBatchDTO(detailsList);
-    }
-
-    /**
-     * 构建订单座位批量更新DTO
-     */
-    private BatchSeatIntervalInsertDTO buildOrderSeatBatchDTO(List<OrderDetails> detailsList) {
-        BatchSeatIntervalInsertDTO batchSeatDTO = BeanConvertUtil.convertToBatchDto(
-                detailsList,
-                BatchSeatIntervalInsertDTO.class,
-                SeatBaseDTO.class,
-                "seatList"
-        );
-
-        batchSeatDTO.setOrderType(OrderTypeConstants.ORDER);
-        batchSeatDTO.setStatus(SeatIntervalStatusConstants.ALREADY_SOLD);
-
-        return batchSeatDTO;
-    }
-
-    /**
-     * 仅为 无座位 的订单详情分配随机座位，有座位直接跳过
-     */
-    private void assignRandomSeatIfAbsent(List<OrderDetails> detailsList) {
-        List<AvailableSeatRemoteDTO> availableSeatList = getAvailableSeatList(detailsList);
-        if (CollectionUtil.isEmpty(availableSeatList)) {
-            return;
+    private String buildOrderDetailsHashKey(Long orderId) {
+        if (orderId == null) {
+            throw new IllegalArgumentException("orderId 不能为 null");
         }
-
-        // 分配座位：仅处理无车厢+无座位号的明细
-        for (OrderDetails detail : detailsList) {
-            if (StrUtil.isNotBlank(detail.getCarriageNumber()) && StrUtil.isNotBlank(detail.getSeatNo())) {
-                continue;
-            }
-
-            if (CollectionUtil.isEmpty(availableSeatList)) {
-                throw new BizException("无可分配的随机座位");
-            }
-
-            AvailableSeatRemoteDTO seat = availableSeatList.removeFirst();
-            detail.setCarriageNumber(seat.getCarriageNumber());
-            detail.setSeatNo(seat.getSeatNo());
-        }
+        return String.format("%sorderId:%d",
+                OrderRedisConstants.RAIL_ORDER_DETAILS_PREFIX, orderId);
     }
 
     /**
@@ -463,42 +486,26 @@ public class OrderServiceImpl implements OrderService {
      */
     private Order createOrderMain(PreOrder preOrder) {
         Order order = BeanUtil.copyProperties(preOrder, Order.class);
+        order.setId(SnowflakeIdGenerator.nextId());
+        order.setStatus(OrderPaymentStatusConstants.PENDING_PAYMENT);
         order.setOrderSn(OrderSnUtil.generateOrderSn());
         order.setCreateTime(LocalDateTime.now());
         order.setUpdateTime(LocalDateTime.now());
-        orderMapper.insertOrder(order);
+
+        String orderKey = buildOrderKey(order.getOrderSn());
+        cacheClient.setIfAbsent(orderKey, order, RedisCommonConstants.RAIL_DEFAULT_TTL, TimeUnit.MINUTES);
         return order;
     }
 
     /**
-     * 订单专用：获取待分配座位
+     * 构建正式订单主表缓存Key
      */
-    private List<AvailableSeatRemoteDTO> getAvailableSeatList(List<OrderDetails> detailsList) {
-        if (CollectionUtil.isEmpty(detailsList)) {
-            throw new IllegalArgumentException("订单详情不能为空");
+    private String buildOrderKey(String orderSn) {
+        if (StrUtil.isBlank(orderSn)) {
+            throw new IllegalArgumentException("orderSn 不能为 null 或空");
         }
-        OrderDetails detailsListFirst = detailsList.getFirst();
-
-        int need = Math.toIntExact(detailsList.stream()
-                .filter(detail -> StrUtil.isBlank(detail.getCarriageNumber()) && StrUtil.isBlank(detail.getSeatNo()))
-                .count());
-
-        if (need == 0) {
-            return new ArrayList<>();
-        }
-
-        RandomSeatQueryDTO randomSeatQueryDTO = RandomSeatQueryDTO.builder()
-                .trainId(detailsListFirst.getTrainId())
-                .seatType(detailsListFirst.getSeatType())
-                .departureCode(detailsListFirst.getDepartureCode())
-                .arrivalCode(detailsListFirst.getArrivalCode())
-                .passengerCount(need)
-                .preferredSeatSymbols(null)
-                .orderType(OrderTypeConstants.ORDER)
-                .status(SeatIntervalStatusConstants.ALREADY_SOLD)
-                .build();
-
-        return doGetAvailableSeat(randomSeatQueryDTO, need);
+        return String.format("%s%s",
+                OrderRedisConstants.RAIL_ORDER_PREFIX, orderSn);
     }
 
     /**
@@ -553,7 +560,7 @@ public class OrderServiceImpl implements OrderService {
                 // 缓存未命中时，查库
                 this::queryOrderPageDb,
                 orderPageQueryDTO,
-                RedisConstants.RAIL_DEFAULT_TTL,
+                RedisCommonConstants.RAIL_DEFAULT_TTL,
                 TimeUnit.MINUTES
         );
     }
@@ -572,15 +579,12 @@ public class OrderServiceImpl implements OrderService {
         List<String> dependSingleKeys = new ArrayList<>();
         for (OrderPageQueryVO orderPageQueryVO : orderPageQueryVOList) {
             // orderKey
-            String orderKey = RedisConstants.RAIL_ORDER_PREFIX + orderPageQueryVO.getOrderSn();
+            String orderKey = buildOrderKey(orderPageQueryVO.getOrderSn());
             dependSingleKeys.add(orderKey);
 
             // detailKeys
-            List<OrderDetailsVO> detailsVOList = orderPageQueryVO.getOrderDetailsVOList();
-            List<String> detailKeys = detailsVOList.stream()
-                    .map(detail -> RedisConstants.RAIL_ORDER_DETAILS_PREFIX + detail.getId())
-                    .toList();
-            dependSingleKeys.addAll(detailKeys);
+            String orderDetailsHashKey = buildOrderDetailsHashKey(orderPageQueryVO.getId());
+            dependSingleKeys.add(orderDetailsHashKey);
         }
 
 //                    return new PageResult<>(orderPageQueryVOList);
@@ -593,7 +597,7 @@ public class OrderServiceImpl implements OrderService {
      * @return 订单分页查询的唯一缓存Key（格式：前缀 + 用户ID + : + 各查询条件 + 分页参数，确保同一用户相同查询条件的请求命中同一缓存）
      */
     private String buildOrderPageCacheKey(OrderPageQueryDTO dto) {
-        String prefix = RedisConstants.RAIL_AGG_ORDER_PAGE_USER_PREFIX + dto.getUserId() + ":";
+        String prefix = AggRedisConstants.RAIL_AGG_ORDER_PAGE_USER_PREFIX + dto.getUserId() + ":";
 
         // 拼接所有非空的查询条件和分页参数
         String conditions = Stream.of(
@@ -632,7 +636,7 @@ public class OrderServiceImpl implements OrderService {
                 typeRef,
                 this::loadSelfTicketFromDb,
                 frontSelfTicketPageDTO,
-                RedisConstants.RAIL_DEFAULT_TTL,
+                RedisCommonConstants.RAIL_DEFAULT_TTL,
                 TimeUnit.MINUTES
         );
     }
@@ -664,7 +668,7 @@ public class OrderServiceImpl implements OrderService {
 
         // 组装所有依赖的单表Key
         List<String> selfTicketKeys = selfTicketPageVOList.stream()
-                .map(selfTicketPageVO -> RedisConstants.RAIL_SELF_TICKET_PREFIX + selfTicketPageVO.getId())
+                .map(selfTicketPageVO -> TicketRedisConstants.RAIL_SELF_TICKET_PREFIX + selfTicketPageVO.getId())
                 .toList();
         List<String> dependSingleKeys = new ArrayList<>(selfTicketKeys);
 
@@ -705,7 +709,7 @@ public class OrderServiceImpl implements OrderService {
                 "size:" + dto.getPageSize()
         ).filter(s -> !s.endsWith(":")).collect(Collectors.joining(":"));
 
-        return RedisConstants.RAIL_TICKET_SELF_PAGE_PREFIX + conditions;
+        return TicketRedisConstants.RAIL_TICKET_SELF_PAGE_PREFIX + conditions;
     }
 
     /**
@@ -716,18 +720,8 @@ public class OrderServiceImpl implements OrderService {
     public void cancelOrder(String orderSn) {
         orderMapper.updateOrderByOrderSn(orderSn);
         // 自动清理订单及相关聚合key
-        cacheClient.autoClearAggCache(RedisConstants.RAIL_ORDER_PREFIX + orderSn);
-    }
-
-    /**
-     * 标记预订单为已转为正式订单
-     * @param preOrderId 预订单ID
-     */
-    private void markPreOrderStatus2(Long preOrderId) {
-        PreOrder newPreOrder = new PreOrder();
-        newPreOrder.setId(preOrderId);
-        newPreOrder.setStatus(PreOrderStatusConstants.CONVERTED_TO_ORDER);
-        orderMapper.updatePreOrder(newPreOrder);
+        String orderKey = buildOrderKey(orderSn);
+        cacheClient.autoClearAggCache(orderKey);
     }
 
     /**
@@ -749,7 +743,7 @@ public class OrderServiceImpl implements OrderService {
 
         // 插入预订单主表
         String preOrderKey = buildPreOrderKey(preOrder.getUserId(), preOrder.getTrainId());
-        cacheClient.set(preOrderKey, preOrder, RedisConstants.RAIL_DEFAULT_TTL, TimeUnit.MINUTES);
+        cacheClient.set(preOrderKey, preOrder, RedisCommonConstants.RAIL_DEFAULT_TTL, TimeUnit.MINUTES);
 
         // 插入明细
         insertNewPreOrderDetails(ctx, preOrderId);
@@ -788,8 +782,8 @@ public class OrderServiceImpl implements OrderService {
         }
 
         // 批量插入
-        String detailsKey = buildPreOrderDetailsKey(preOrderId);
-        cacheClient.addSetMembersWithExpire(detailsKey, detailsList, RedisConstants.RAIL_DEFAULT_TTL, TimeUnit.MINUTES);
+        String detailsKey = buildPreOrderDetailsSetKey(preOrderId);
+        cacheClient.addSetMembersWithExpire(detailsKey, detailsList, RedisCommonConstants.RAIL_DEFAULT_TTL, TimeUnit.MINUTES);
     }
 
     /**

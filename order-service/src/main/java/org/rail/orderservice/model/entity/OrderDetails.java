@@ -3,6 +3,7 @@ package org.rail.orderservice.model.entity;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
@@ -18,7 +19,7 @@ public class OrderDetails {
     private String arrival;
     private String departureCode;
     private String arrivalCode;
-    private LocalDateTime ridingDate;
+    private LocalDate ridingDate;
     private Long trainId;
     private LocalDateTime departureTime;
     private LocalDateTime arrivalTime;
@@ -34,5 +35,5 @@ public class OrderDetails {
     private Integer ticketType;
     private BigDecimal amount;
     // 退票状态：0-未退票 1已退票
-    private Integer refundStatus;
+    private boolean refundStatus;
 }

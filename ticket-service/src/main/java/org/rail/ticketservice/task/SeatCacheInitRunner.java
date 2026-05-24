@@ -1,8 +1,8 @@
 package org.rail.ticketservice.task;
 
 import lombok.extern.slf4j.Slf4j;
+import org.rail.common.business.constant.SeatRedisConstants;
 import org.rail.common.redis.exception.CacheInitException;
-import org.rail.common.redis.constant.RedisConstants;
 import org.rail.ticketservice.service.SeatService;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
@@ -20,7 +20,7 @@ import java.util.concurrent.TimeUnit;
 @Component
 public class SeatCacheInitRunner implements CommandLineRunner {
 
-    private static final String SEAT_CACHE_INIT_LOCK = RedisConstants.SEAT_CACHE_INIT_LOCK;
+    private static final String SEAT_CACHE_INIT_LOCK = SeatRedisConstants.RAIL_LOCK_SEAT_CACHE_INIT;
 
     @Autowired
     private SeatService seatService;

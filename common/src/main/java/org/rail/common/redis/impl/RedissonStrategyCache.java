@@ -23,7 +23,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import static org.rail.common.redis.constant.RedisConstants.*;
+import static org.rail.common.redis.constant.RedisConstants.REDIS_CACHE_NULL_TTL;
+import static org.rail.common.redis.constant.RedisConstants.REDIS_LOCK_PREFIX;
 
 /**
  * 三大缓存策略

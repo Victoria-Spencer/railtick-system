@@ -3,13 +3,13 @@ package org.rail.ticketservice.service.impl;
 import cn.hutool.core.util.StrUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.rail.api.constant.OrderTypeConstants;
+import org.rail.common.business.constant.SeatRedisConstants;
 import org.rail.common.core.exception.BizException;
 import org.rail.common.redis.exception.CacheInitException;
 import org.rail.ticketservice.model.dto.SequenceDTO;
 import org.rail.ticketservice.model.entity.Station;
 import org.rail.ticketservice.model.vo.SeatBusinessVO;
 import org.rail.ticketservice.model.vo.SeatDetailVO;
-import org.rail.common.redis.constant.RedisConstants;
 import org.rail.common.redis.util.CacheClient;
 import org.rail.ticketservice.mapper.SeatIntervalOccupyMapper;
 import org.rail.ticketservice.mapper.SeatMapper;
@@ -157,7 +157,7 @@ public class SeatServiceImpl implements SeatService {
      * 构建座位Hash的Redis Key
      */
     private String buildSeatHashKey(Long trainId) {
-        return String.format("%strainId:%d", RedisConstants.RAIL_HASH_SEAT_INFO_PREFIX, trainId);
+        return String.format("%strainId:%d", SeatRedisConstants.RAIL_HASH_SEAT_INFO_PREFIX, trainId);
     }
 
     /**
@@ -427,8 +427,8 @@ public class SeatServiceImpl implements SeatService {
      */
     private String buildSeatBitmapKey(Integer orderType, Long trainId, Long seatId) {
         String prefix = OrderTypeConstants.PREORDER.equals(orderType)
-                ? RedisConstants.RAIL_BITMAP_SEAT_TEMP_LOCK_PREFIX
-                : RedisConstants.RAIL_BITMAP_SEAT_FORMAL_PREFIX;
+                ? SeatRedisConstants.RAIL_BITMAP_SEAT_TEMP_LOCK_PREFIX
+                : SeatRedisConstants.RAIL_BITMAP_SEAT_FORMAL_PREFIX;
 
         return String.format("%strainId:%d:seatId:%d",
                 prefix,

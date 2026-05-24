@@ -1,6 +1,6 @@
 package org.rail.common.redis.config;
 
-import org.rail.common.redis.constant.RedisConstants;
+import org.rail.common.business.constant.RedisCommonConstants;
 import org.redisson.api.RBloomFilter;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Value;
@@ -28,7 +28,7 @@ public class BloomFilterConfig {
     public RBloomFilter<String> aggCacheBloomFilter(RedissonClient redissonClient) {
         // 获取布隆过滤器实例
         RBloomFilter<String> bloomFilter = redissonClient.getBloomFilter(
-                RedisConstants.BLOOM_FILTER_PREFIX + RedisConstants.AGG_CACHE_ORDER_BIZ_TYPE
+                RedisCommonConstants.BLOOM_FILTER_PREFIX + RedisCommonConstants.AGG_CACHE_ORDER_BIZ_TYPE
         );
         // 仅在不存在时初始化（配置类完成初始化）
         if (!bloomFilter.isExists()) {

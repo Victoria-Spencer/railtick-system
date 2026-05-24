@@ -10,12 +10,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang.StringUtils;
 import org.rail.api.constant.OrderTypeConstants;
 import org.rail.api.constant.SeatIntervalStatusConstants;
+import org.rail.common.business.constant.AggRedisConstants;
+import org.rail.common.business.constant.SeatRedisConstants;
+import org.rail.common.business.constant.TrainRedisConstants;
 import org.rail.common.core.exception.BizException;
 import org.rail.common.core.exception.SeatLockFailedException;
 import org.rail.common.core.util.*;
 import org.rail.common.core.util.thread.ThreadLocalUtils;
 import org.rail.common.redis.api.ICacheClient;
-import org.rail.common.redis.constant.RedisConstants;
+import org.rail.common.business.constant.RedisCommonConstants;
 import org.rail.common.redis.result.AggBatchResult;
 import org.rail.common.redis.result.AggCacheResult;
 import org.rail.api.dto.*;
@@ -42,9 +45,6 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-
-import static org.rail.common.redis.constant.RedisConstants.RAIL_SEAT_OCCUPY_FORMAL_EXPIRE_MINUTES;
-import static org.rail.common.redis.constant.RedisConstants.RAIL_SEAT_OCCUPY_LOCK_EXPIRE_MINUTES;
 
 @Service
 @Slf4j
@@ -116,7 +116,7 @@ public class TicketServiceImpl implements TicketService {
     private List<SeatClassVO> batchQuerySeatClassCache(List<SeatQueryDTO> seatQueryDTOList, Map<Long, List<SeatQueryDTO>> trainId2DtosMap) {
         Function<SeatQueryDTO, String> keyGenerator = dto ->
                 String.format("%s%d:%d:%d",
-                        RedisConstants.RAIL_AGG_SEAT_CLASS,
+                        AggRedisConstants.RAIL_AGG_SEAT_CLASS,
                         dto.getTrainId(),
                         dto.getStartSequence(),
                         dto.getEndSequence());
@@ -128,7 +128,7 @@ public class TicketServiceImpl implements TicketService {
                 seatQueryDTOList,
                 typeRef,
                 missDtos -> querySeatClassDb(missDtos, keyGenerator, trainId2DtosMap),
-                RedisConstants.RAIL_AGG_SEAT_CLASS_CACHE_TTL_SECONDS,
+                AggRedisConstants.RAIL_AGG_SEAT_CLASS_CACHE_TTL_SECONDS,
                 TimeUnit.SECONDS
         );
     }
@@ -161,14 +161,14 @@ public class TicketServiceImpl implements TicketService {
         List<String> dependSingleKeys = new ArrayList<>();
         for (SeatClassVO seatClassVO : seatClassVOList) {
             // trainSeatClassKey（列车席别关联Key）
-            String trainSeatClassKey = RedisConstants.RAIL_TRAIN_SEAT_CLASS_PREFIX
+            String trainSeatClassKey = TrainRedisConstants.RAIL_TRAIN_SEAT_CLASS_PREFIX
                     + seatClassVO.getTrainId()
                     + ":"
                     + seatClassVO.getSeatClassId();
             dependSingleKeys.add(trainSeatClassKey);
 
             // seatClassKey（席别key)
-            String seatClassKey = RedisConstants.RAIL_SEAT_CLASS_PREFIX +  seatClassVO.getSeatClassId();
+            String seatClassKey = TrainRedisConstants.RAIL_SEAT_CLASS_PREFIX +  seatClassVO.getSeatClassId();
             dependSingleKeys.add(seatClassKey);
         }
         return dependSingleKeys;
@@ -329,7 +329,7 @@ public class TicketServiceImpl implements TicketService {
                 // 缓存未命中时，查库
                 dto -> queryTrainDetailDb(departureDate, depCode, arrCode),
                 ticketQueryDTO,
-                RedisConstants.RAIL_TRAIN_BASE_CACHE_TTL_HOURS,
+                AggRedisConstants.RAIL_TRAIN_BASE_CACHE_TTL_HOURS,
                 TimeUnit.HOURS
         );
     }
@@ -362,17 +362,17 @@ public class TicketServiceImpl implements TicketService {
         List<String> dependSingleKeys = new ArrayList<>();
         for (TrainDetailVO trainDetailVO : trainDetailVOS) {
             // trainKey
-            String trainKey = RedisConstants.RAIL_TRAIN_PREFIX + trainDetailVO.getTrainId();
+            String trainKey = TrainRedisConstants.RAIL_TRAIN_PREFIX + trainDetailVO.getTrainId();
             dependSingleKeys.add(trainKey);
 
             // stationKey
-            String depKey = RedisConstants.RAIL_STATION_PREFIX + trainDetailVO.getDepartureCode();
-            String arrKey = RedisConstants.RAIL_STATION_PREFIX + trainDetailVO.getArrivalCode();
+            String depKey = TrainRedisConstants.RAIL_STATION_PREFIX + trainDetailVO.getDepartureCode();
+            String arrKey = TrainRedisConstants.RAIL_STATION_PREFIX + trainDetailVO.getArrivalCode();
             dependSingleKeys.add(depKey);
             dependSingleKeys.add(arrKey);
 
             // trainStopStationKey
-            String stopStationKey = RedisConstants.RAIL_TRAIN_STOP_STATION_PREFIX + trainDetailVO.getTrainId();
+            String stopStationKey = TrainRedisConstants.RAIL_TRAIN_STOP_STATION_PREFIX + trainDetailVO.getTrainId();
             dependSingleKeys.add(stopStationKey);
 
 
@@ -380,7 +380,7 @@ public class TicketServiceImpl implements TicketService {
             List<TrainTypeVO> trainTypeVOList = trainDetailVO.getTrainTypeVOList();
             List<String> trainTypeKeys = trainTypeVOList.stream()
                     .filter(typeVO -> typeVO.getTypeId() != null) // 防护：typeId为空跳过
-                    .map(trainTypeVO -> RedisConstants.RAIL_TRAIN_TRAIN_TYPE_PREFIX +
+                    .map(trainTypeVO -> TrainRedisConstants.RAIL_TRAIN_TRAIN_TYPE_PREFIX +
                             trainDetailVO.getTrainId() +
                             ":" +
                             trainTypeVO.getTypeId())
@@ -399,7 +399,7 @@ public class TicketServiceImpl implements TicketService {
         String safeArrCode = arrCode == null ? "_" : arrCode;
         // 构建key：格式统一为「前缀:日期:出发站:到达站」
         return String.format("%s%s:%s:%s",
-                RedisConstants.RAIL_AGG_TRAIN_BASE_INFO_PREFIX,
+                AggRedisConstants.RAIL_AGG_TRAIN_BASE_INFO_PREFIX,
                 departureDate,
                 safeDepCode,
                 safeArrCode);
@@ -912,9 +912,9 @@ public class TicketServiceImpl implements TicketService {
         int maxOffset = terminalSeq - 1;
 
         // 读取该座位的正式订单Bitmap（永久占用）
-        String formalKey = RedisConstants.RAIL_BITMAP_SEAT_FORMAL_PREFIX + "trainId:" + trainId + ":seatId:" + seatId;
+        String formalKey = SeatRedisConstants.RAIL_BITMAP_SEAT_FORMAL_PREFIX + "trainId:" + trainId + ":seatId:" + seatId;
         // 读取该座位的预订单Bitmap（临时占用）
-        String tempKey = RedisConstants.RAIL_BITMAP_SEAT_TEMP_LOCK_PREFIX + "trainId:" + trainId + ":seatId:" + seatId;
+        String tempKey = SeatRedisConstants.RAIL_BITMAP_SEAT_TEMP_LOCK_PREFIX + "trainId:" + trainId + ":seatId:" + seatId;
 
         byte[] formalBytes = cacheClient.get(formalKey, byte[].class);
         byte[] tempBytes = cacheClient.get(tempKey, byte[].class);
@@ -1069,9 +1069,9 @@ public class TicketServiceImpl implements TicketService {
         }
 
         if (isLockedBatch) {
-            cacheClient.hPutAllWholeExpire(recordKey, batchHashMap, RAIL_SEAT_OCCUPY_LOCK_EXPIRE_MINUTES, TimeUnit.MINUTES);
+            cacheClient.hPutAllWholeExpire(recordKey, batchHashMap, SeatRedisConstants.RAIL_SEAT_OCCUPY_LOCK_EXPIRE_MINUTES, TimeUnit.MINUTES);
         } else {
-            cacheClient.hPutAllWholeExpire(recordKey, batchHashMap, RAIL_SEAT_OCCUPY_FORMAL_EXPIRE_MINUTES, TimeUnit.MINUTES);
+            cacheClient.hPutAllWholeExpire(recordKey, batchHashMap, SeatRedisConstants.RAIL_SEAT_OCCUPY_FORMAL_EXPIRE_MINUTES, TimeUnit.MINUTES);
         }
         // 批量落库消息
         sendBatchSyncDbMsg(occupyList);
@@ -1166,7 +1166,7 @@ public class TicketServiceImpl implements TicketService {
      */
     private String buildSeatOccupyHashKey(Long trainId) {
         return String.format("%strainId:%d",
-                RedisConstants.RAIL_SEAT_OCCUPY_RECORD_PREFIX,
+                SeatRedisConstants.RAIL_SEAT_OCCUPY_RECORD_PREFIX,
                 trainId);
     }
 
@@ -1183,8 +1183,8 @@ public class TicketServiceImpl implements TicketService {
      */
     private String buildSeatBitmapKey(Integer orderType, Long trainId, Long seatId) {
         String prefix = OrderTypeConstants.PREORDER.equals(orderType)
-                ? RedisConstants.RAIL_BITMAP_SEAT_TEMP_LOCK_PREFIX
-                : RedisConstants.RAIL_BITMAP_SEAT_FORMAL_PREFIX;
+                ? SeatRedisConstants.RAIL_BITMAP_SEAT_TEMP_LOCK_PREFIX
+                : SeatRedisConstants.RAIL_BITMAP_SEAT_FORMAL_PREFIX;
 
         return String.format("%strainId:%d:seatId:%d",
                 prefix,
@@ -1255,7 +1255,7 @@ public class TicketServiceImpl implements TicketService {
      * 构建座位Hash的Redis Key
      */
     private String buildSeatHashKey(Long trainId) {
-        return String.format("%strainId:%d", RedisConstants.RAIL_HASH_SEAT_INFO_PREFIX, trainId);
+        return String.format("%strainId:%d", SeatRedisConstants.RAIL_HASH_SEAT_INFO_PREFIX, trainId);
     }
 
     /**

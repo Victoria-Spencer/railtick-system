@@ -28,8 +28,8 @@ public class CreateOrderDTO {
     @NotNull(message = "乘车日期不能为空")
     private LocalDate ridingDate;
 
-    @NotBlank(message = "车次ID不能为空")
-    private String trainId;
+    @NotNull(message = "车次ID不能为空")
+    private Long trainId;
 
     @NotNull(message = "出发时间不能为空")
     private LocalDateTime departureTime;
