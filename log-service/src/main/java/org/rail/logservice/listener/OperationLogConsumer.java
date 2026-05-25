@@ -1,20 +1,23 @@
 package org.rail.logservice.listener;
 
+import cn.hutool.core.bean.BeanUtil;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.rail.common.core.model.event.OperationLogEvent;
+import org.rail.common.core.model.message.OperationLogMessage;
+import org.rail.common.core.util.LogUtils;
 import org.rail.logservice.config.RabbitMQConfig;
 import org.rail.logservice.entity.SysOperationLog;
 import org.rail.logservice.mapper.SysOperationLogMapper;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Component;
+
+import java.time.LocalDateTime;
 
 /**
  * 操作日志消费者
  * 功能：异步监听日志事件，将日志写入数据库
  */
 @Component
-@Slf4j
 @RequiredArgsConstructor
 public class OperationLogConsumer  {
 
@@ -24,28 +27,30 @@ public class OperationLogConsumer  {
      * 监听日志事件，消费日志数据并入库
      */
     @RabbitListener(queues = RabbitMQConfig.QUEUE)
-    public void consumeLog(OperationLogEvent event) {
-        try {
-            log.info("【日志消费者】收到：{}", event.getOperation());
+    public void consumeLog(OperationLogMessage message) {
+        long start = System.currentTimeMillis();
+        StackTraceElement stackTrace = Thread.currentThread().getStackTrace()[1];
+        String className = stackTrace.getClassName().substring(stackTrace.getClassName().lastIndexOf(".") + 1);
+        String methodName = stackTrace.getMethodName();
+        String action = className + "." + methodName;
+        Object[] args = {message};
 
-            SysOperationLog logEntity = SysOperationLog.builder()
-                    .userId(event.getUserId())
-                    .userName(event.getUserName())
-                    .operation(event.getOperation())
-                    .requestMethod(event.getRequestMethod())
-                    .requestUrl(event.getRequestUrl())
-                    .requestIp(event.getRequestIp())
-                    .requestParam(event.getRequestParam())
-                    .operateStatus(event.getOperateStatus())
-                    .errorMsg(event.getErrorMsg())
-                    .costTime(event.getCostTime())
-                    .createTime(event.getCreateTime())
-                    .build();
+        try {
+            SysOperationLog logEntity = BeanUtil.copyProperties(message, SysOperationLog.class);
+            logEntity.setConsumeTime(LocalDateTime.now());
 
             operationLogMapper.insert(logEntity);
 
+            LogUtils.monitor("log-service", action, start,
+                    LogUtils.SUCCESS, args, null
+            );
+        } catch (DuplicateKeyException e) {
+            // 重复消息：唯一索引冲突，直接忽略
         } catch (Exception e) {
-            log.error("【日志消费者】入库失败", e);
+            LogUtils.monitor("log-service", action, start,
+                    LogUtils.FAIL, args, e
+            );
+            throw e;
         }
     }
 }

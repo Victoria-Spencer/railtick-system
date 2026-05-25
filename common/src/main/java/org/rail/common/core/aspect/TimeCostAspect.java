@@ -10,6 +10,7 @@ import org.rail.common.core.constant.AspectOrderConstants;
 import org.rail.common.core.context.RequestContext;
 import org.rail.common.core.context.RequestContextHolder;
 import org.rail.common.core.util.LogUtils;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
@@ -24,6 +25,9 @@ import org.springframework.stereotype.Component;
 @Order(AspectOrderConstants.TIME_COST)
 public class TimeCostAspect {
 
+    @Value("${spring.application.name:unknown-service}")
+    private String serviceName;
+
     /**
      * 切点：拦截所有 @RestController 下的所有接口
      */
@@ -37,6 +41,7 @@ public class TimeCostAspect {
         RequestContext context = RequestContextHolder.getRequestContext();
         String className = joinPoint.getTarget().getClass().getSimpleName();
         String methodName = joinPoint.getSignature().getName();
+        String action = className + "." + methodName;
         Object[] args = joinPoint.getArgs();
 
         long start = System.currentTimeMillis();
@@ -45,11 +50,11 @@ public class TimeCostAspect {
         try {
             result = joinPoint.proceed();
 
-            LogUtils.monitor(context, className, methodName, start, LogUtils.SUCCESS,
+            LogUtils.monitor(context, serviceName, action, start, LogUtils.SUCCESS,
                     args, result);
             return result;
         } catch (Throwable e) {
-            LogUtils.monitor(context, className, methodName, start, LogUtils.FAIL,
+            LogUtils.monitor(context, serviceName, action, start, LogUtils.FAIL,
                     args, e);
             throw e;
         }

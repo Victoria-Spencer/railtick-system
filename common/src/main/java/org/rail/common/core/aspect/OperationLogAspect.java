@@ -14,7 +14,7 @@ import org.rail.common.core.constant.AspectOrderConstants;
 import org.rail.common.core.context.RequestContext;
 import org.rail.common.core.context.RequestContextHolder;
 import org.rail.common.core.model.event.OperationLogEvent;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestAttributes;
@@ -26,8 +26,8 @@ import java.util.List;
 
 /**
  * 操作日志切面
- * 职责：仅收集日志信息、发布日志事件
- * 解耦：不依赖任何数据库/MyBatis/Mapper
+ * 职责：仅收集 → 发布事件
+ * 无任何第三方中间件依赖
  */
 @Aspect
 @Component
@@ -39,10 +39,7 @@ public class OperationLogAspect {
     /**
      * 注入Spring事件发布器
      */
-    private final RabbitTemplate rabbitTemplate;
-
-    private static final String EXCHANGE = "operation.log.exchange";
-    private static final String ROUTING_KEY = "operation.log.key";
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * 切点：拦截标注 @OperationLog 注解的方法
@@ -93,7 +90,7 @@ public class OperationLogAspect {
                         costTime,
                         createTime
                 );
-                rabbitTemplate.convertAndSend(EXCHANGE, ROUTING_KEY, event);
+                eventPublisher.publishEvent(event);
             } catch (Exception e) {
                 log.error("日志MQ发送失败", e);
             }

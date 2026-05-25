@@ -17,10 +17,12 @@ public interface SysOperationLogMapper {
      */
     @Insert("INSERT INTO sys_operation_log (" +
             "user_id, user_name, operation, request_method, request_url, " +
-            "request_ip, request_param, operate_status, error_msg, cost_time, create_time" +
+            "request_ip, request_param, operate_status, error_msg, cost_time, create_time, " +
+            "message_id, send_time, consume_time" +
             ") VALUES (" +
             "#{userId}, #{userName}, #{operation}, #{requestMethod}, #{requestUrl}, " +
-            "#{requestIp}, #{requestParam}, #{operateStatus}, #{errorMsg}, #{costTime}, #{createTime}" +
+            "#{requestIp}, #{requestParam}, #{operateStatus}, #{errorMsg}, #{costTime}, #{createTime}, " +
+            "#{messageId}, #{sendTime}, #{consumeTime}" +
             ")"
     )
     int insert(SysOperationLog log);

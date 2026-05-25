@@ -14,10 +14,7 @@ import java.time.LocalDateTime;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class OperationLogEvent implements Serializable {
-
-    @Serial
-    private static final long serialVersionUID = 1L;
+public class OperationLogEvent {
 
     /** 操作人ID */
     private Long userId;

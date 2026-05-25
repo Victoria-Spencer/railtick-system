@@ -37,12 +37,7 @@ public class GlobalExceptionHandler{
             default -> "业务处理失败，请稍后重试";
         };
 
-        // 根据状态码区分日志级别
-        if (e.getCode() >= 500) {
-            LogUtils.error(location[0], location[1], realErrorMsg, e);
-        } else {
-            LogUtils.warn(location[0], location[1], realErrorMsg, e);
-        }
+        LogUtils.error(location[0], location[1], realErrorMsg, e);
 
         return Result.error(e.getCode(), frontMsg);
     }

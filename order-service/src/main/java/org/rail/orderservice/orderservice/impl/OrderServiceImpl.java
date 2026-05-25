@@ -389,7 +389,7 @@ public class OrderServiceImpl implements OrderService {
         } catch (UserConcurrentLockException e) {
             throw e;
         } catch (Exception e) {
-            cleanUpOnException(orderVoCacheKey, order.getId(), order.getOrderSn());
+            cleanUpOnException(orderVoCacheKey, order);
             throw new BizException("订单创建失败，请重试");
         } finally {
             if (lock.isHeldByCurrentThread()) {
@@ -401,19 +401,19 @@ public class OrderServiceImpl implements OrderService {
     /**
      * 订单创建异常时的统一清理方法
      */
-    private void cleanUpOnException(String orderVoCacheKey, Long orderId, String orderSn) {
+    private void cleanUpOnException(String orderVoCacheKey, Order order) {
         // 清理防重缓存
         cacheClient.delete(orderVoCacheKey);
 
-        if (StrUtil.isNotBlank(orderSn)) {
-            String orderKey = buildOrderKey(orderSn);
-            cacheClient.delete(orderKey);
+        if (ObjectUtil.isNull(order)) {
+            return;
         }
 
-        if (orderId != null) {
-            String orderDetailsHashKey = buildOrderDetailsHashKey(orderId);
-            cacheClient.delete(orderDetailsHashKey);
-        }
+        String orderKey = buildOrderKey(order.getOrderSn());
+        cacheClient.delete(orderKey);
+
+        String orderDetailsHashKey = buildOrderDetailsHashKey(order.getId());
+        cacheClient.delete(orderDetailsHashKey);
     }
 
 
