@@ -54,7 +54,7 @@ public class StationServiceImpl implements StationService {
                 .map(station -> new StationPageQueryVO(station.getName(), station.getCode(), station.getSpell()))
                 .collect(Collectors.toList());
 
-        return new PageResult<>(total, voList, dto.getPageSize());
+        return new PageResult<>(total, voList, dto.getPageNumber(), dto.getPageSize());
       }
 
     /**

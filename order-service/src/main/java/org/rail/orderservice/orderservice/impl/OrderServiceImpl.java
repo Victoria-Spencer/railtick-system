@@ -44,6 +44,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -542,77 +543,109 @@ public class OrderServiceImpl implements OrderService {
         if (context == null || context.getAccountId() == null) {
             throw new BizException("请先登录");
         }
-        orderPageQueryDTO.setUserId(Long.valueOf(context.getAccountId()));
+        Long userId = Long.valueOf(context.getAccountId());
+        Integer orderStatus = orderPageQueryDTO.getOrderStatus();
+        orderPageQueryDTO.setUserId(userId);
 
-        return queryOrderPageCache(orderPageQueryDTO);
-    }
-
-    /**
-     * 订单分页查询 聚合缓存调用
-     */
-    private PageResult<OrderPageQueryVO> queryOrderPageCache(OrderPageQueryDTO orderPageQueryDTO) {
-        String aggKey = buildOrderPageCacheKey(orderPageQueryDTO);
+        String cacheKey = buildOrderUserAllKey(userId, orderStatus);
         // 缓存订单分页查询信息
-        TypeReference<PageResult<OrderPageQueryVO>> typeRef = new TypeReference<>() {};
-        return cacheClient.queryAggCacheWithNullCache(
-                aggKey,
+        TypeReference<List<OrderPageQueryVO>> typeRef = new TypeReference<>() {};
+        List<OrderPageQueryVO> allOrders = cacheClient.queryAggCacheWithNullCache(
+                cacheKey,
                 typeRef,
                 // 缓存未命中时，查库
-                this::queryOrderPageDb,
+                this::queryUserAllOrderFromDb,
                 orderPageQueryDTO,
                 RedisCommonConstants.RAIL_DEFAULT_TTL,
                 TimeUnit.MINUTES
         );
+
+        // 空值处理
+        if (CollectionUtil.isEmpty(allOrders)) {
+            return new PageResult<>(0L, Collections.emptyList(), orderPageQueryDTO.getPageNumber(), orderPageQueryDTO.getPageSize());
+        }
+
+        // 内存中按查询条件过滤
+        List<OrderPageQueryVO> filteredOrders = filterOrders(allOrders, orderPageQueryDTO);
+
+        // 内存分页逻辑
+        long total = filteredOrders.size();
+        int pageNum = orderPageQueryDTO.getPageNumber();
+        int pageSize = orderPageQueryDTO.getPageSize();
+        int start = (pageNum - 1) * pageSize;
+        int end = Math.min(start + pageSize, filteredOrders.size());
+        List<OrderPageQueryVO> pageList = filteredOrders.subList(start, end);
+
+        return new PageResult<>(total, pageList, pageNum, pageSize);
     }
 
     /**
-     * 订单分页缓存未命中时：数据库查询 + 构建聚合缓存依赖Key
-     * @param dto 订单分页查询参数
-     * @return 聚合缓存结果（分页数据 + 依赖单表Key）
+     * 内存过滤订单（按查询条件）
      */
-    private AggCacheResult<PageResult<OrderPageQueryVO>> queryOrderPageDb(OrderPageQueryDTO dto) {
-        // 分页必须放在dbFallback内部（PageHelper线程绑定）
-        PageHelper.startPage(dto.getPageNumber(), dto.getPageSize());
-        List<OrderPageQueryVO> orderPageQueryVOList = orderMapper.getOrderPageByQueryDTO(dto);
+    private List<OrderPageQueryVO> filterOrders(List<OrderPageQueryVO> allOrders, OrderPageQueryDTO dto) {
+        return allOrders.stream()
+                // 过滤乘车日期范围
+                .filter(order -> {
+                    if (dto.getStartDate() == null || dto.getEndDate() == null) {
+                        return true;
+                    }
+                    LocalDate ridingDate = order.getRidingDate();
+                    return !ridingDate.isBefore(dto.getStartDate()) && !ridingDate.isAfter(dto.getEndDate());
+                })
+                // 过滤订单号
+                .filter(order -> StrUtil.isBlank(dto.getOrderSn()) || order.getOrderSn().contains(dto.getOrderSn()))
+                // 过滤车次号
+                .filter(order -> StrUtil.isBlank(dto.getTrainNumber()) || order.getTrainNumber().contains(dto.getTrainNumber()))
+                // 过滤乘客姓名
+                // 模糊匹配乘车人姓名（遍历订单明细，只要有一个乘客匹配就保留）
+                .filter(order -> {
+                    if (StrUtil.isBlank(dto.getRealName())) {
+                        return true;
+                    }
+                    List<OrderDetailsVO> details = order.getOrderDetailsVOList();
+                    if (CollectionUtil.isEmpty(details)) {
+                        return false;
+                    }
+                    String realName = dto.getRealName();
+                    return details.stream().anyMatch(detail -> StrUtil.contains(detail.getRealName(), realName));
+                })
+                .collect(Collectors.toList());
+    }
 
-        // 组装所有依赖的单表Key
+    /**
+     * 构建订单分页查询的全量聚合缓存Key
+     */
+    private String buildOrderUserAllKey(Long userId, Integer orderStatus) {
+        if (orderStatus == null) {
+            throw new IllegalArgumentException("订单状态不能为空");
+        }
+        return String.format("%suserId:%s:orderStatus:%d",
+                AggRedisConstants.RAIL_AGG_ORDER_USER_ALL_KEY,
+                userId,
+                orderStatus
+        );
+    }
+
+    /**
+     * 缓存未命中：查询该用户所有订单（无分页）
+     */
+    private AggCacheResult<List<OrderPageQueryVO>> queryUserAllOrderFromDb(OrderPageQueryDTO dto) {
+        // 直接查询用户所有订单，禁用PageHelper分页插件，获取完整订单列表（后续在内存中根据查询条件过滤和分页）
+        List<OrderPageQueryVO> allUserOrders = orderMapper.getOrderPageByQueryDTO(dto);
+
+        // 组装缓存依赖Key（用于缓存更新）
         List<String> dependSingleKeys = new ArrayList<>();
-        for (OrderPageQueryVO orderPageQueryVO : orderPageQueryVOList) {
+        for (OrderPageQueryVO vo : allUserOrders) {
             // orderKey
-            String orderKey = buildOrderKey(orderPageQueryVO.getOrderSn());
+            String orderKey = buildOrderKey(vo.getOrderSn());
             dependSingleKeys.add(orderKey);
 
             // detailKeys
-            String orderDetailsHashKey = buildOrderDetailsHashKey(orderPageQueryVO.getId());
+            String orderDetailsHashKey = buildOrderDetailsHashKey(vo.getId());
             dependSingleKeys.add(orderDetailsHashKey);
         }
 
-//                    return new PageResult<>(orderPageQueryVOList);
-        return AggCacheResult.of(new PageResult<>(orderPageQueryVOList), dependSingleKeys);
-    }
-
-    /**
-     * 生成订单唯一的缓存Key
-     * @param dto 订单分页查询参数（包含用户ID、订单状态、订单类型、日期范围、车次等查询条件，以及分页参数）
-     * @return 订单分页查询的唯一缓存Key（格式：前缀 + 用户ID + : + 各查询条件 + 分页参数，确保同一用户相同查询条件的请求命中同一缓存）
-     */
-    private String buildOrderPageCacheKey(OrderPageQueryDTO dto) {
-        String prefix = AggRedisConstants.RAIL_AGG_ORDER_PAGE_USER_PREFIX + dto.getUserId() + ":";
-
-        // 拼接所有非空的查询条件和分页参数
-        String conditions = Stream.of(
-                "orderStatus:" + Objects.toString(dto.getOrderStatus(), ""),
-                "orderType:" + Objects.toString(dto.getOrderType(), ""),
-                "startDate:" + Objects.toString(dto.getStartDate(), ""),
-                "endDate:" + Objects.toString(dto.getEndDate(), ""),
-                "orderSn:" + Objects.toString(dto.getOrderSn(), ""),
-                "trainNumber:" + Objects.toString(dto.getTrainNumber(), ""),
-                "realName:" + Objects.toString(dto.getRealName(), ""),
-                "page:" + dto.getPageNumber(),
-                "size:" + dto.getPageSize()
-        ).filter(s -> !s.endsWith(":")).collect(Collectors.joining(":"));
-
-        return prefix + conditions;
+        return AggCacheResult.of(allUserOrders, dependSingleKeys);
     }
 
     /**

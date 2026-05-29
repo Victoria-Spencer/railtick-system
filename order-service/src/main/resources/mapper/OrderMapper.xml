@@ -114,9 +114,9 @@
 
     <!--
         功能：订单分页多表联查（订单表 + 订单明细表）
-        场景：查询用户的订单列表，包含订单基本信息、关联的订单项列表
+        场景：查询用户的订单列表，仅根据 userId + orderStatus 筛选
         参数： OrderPageQueryDTO
-        返回：分页的OrderVO列表，包含订单和订单明细集合
+        返回：订单VO列表，包含订单和订单明细集合（Java层做内存分页）
     -->
     <!-- 订单分页查询结果映射 -->
     <resultMap id="OrderPageQueryVOResultMap" type="org.rail.orderservice.model.vo.OrderPageQueryVO">
@@ -200,12 +200,12 @@
                 </if>
                 <!-- 历史订单不做筛选 -->
             </if>
-            <if test="queryDTO.orderSn != null and queryDTO.orderSn != ''">
+            <!--<if test="queryDTO.orderSn != null and queryDTO.orderSn != ''">
                 AND o.order_sn = #{queryDTO.orderSn}
             </if>
-            <!-- 根据orderType动态选择时间字段 -->
+            &lt;!&ndash; 根据orderType动态选择时间字段 &ndash;&gt;
             <if test="queryDTO.orderType != null">
-                <!-- 情况1：orderType=0 → 按订票日期（主表create_time）查询 -->
+                &lt;!&ndash; 情况1：orderType=0 → 按订票日期（主表create_time）查询 &ndash;&gt;
                 <if test="queryDTO.orderType == 0">
                     <if test="queryDTO.startDate != null">
                         AND DATE(o.create_time) &gt;= #{queryDTO.startDate}
@@ -215,7 +215,7 @@
                     </if>
                 </if>
 
-                <!-- 情况2：orderType=1 → 按出行时间（明细表riding_date）查询 -->
+                &lt;!&ndash; 情况2：orderType=1 → 按出行时间（明细表riding_date）查询 &ndash;&gt;
                 <if test="queryDTO.orderType == 1">
                     <if test="queryDTO.startDate != null">
                         AND DATE(d.riding_date) &gt;= #{queryDTO.startDate}
@@ -225,32 +225,34 @@
                     </if>
                 </if>
             </if>
-            <!-- 明细表条件 -->
+            &lt;!&ndash; 明细表条件 &ndash;&gt;
             <if test="queryDTO.trainNumber != null and queryDTO.trainNumber != ''">
                 AND d.train_number = #{queryDTO.trainNumber}
             </if>
             <if test="queryDTO.realName != null and queryDTO.realName != ''">
                 AND d.real_name = #{queryDTO.realName}
-            </if>
+            </if>-->
         </where>
         <!-- 按订单ID分组：避免同一订单因多条明细导致重复 -->
         GROUP BY o.id
+        <!-- 默认按创建时间倒序 -->
+        ORDER BY o.create_time DESC
         <!-- 动态排序 -->
-        ORDER BY
+        <!--ORDER BY
         <choose>
-            <!-- 情况1：orderType=0 → 按订票时间（create_time）排序 -->
+            &lt;!&ndash; 情况1：orderType=0 → 按订票时间（create_time）排序 &ndash;&gt;
             <when test="queryDTO.orderType == 0">
-                o.create_time DESC  <!-- 降序：最新订票在前 -->
+                o.create_time DESC  &lt;!&ndash; 降序：最新订票在前 &ndash;&gt;
             </when>
-            <!-- 情况2：orderType=1 → 按出行时间（riding_date）排序 -->
+            &lt;!&ndash; 情况2：orderType=1 → 按出行时间（riding_date）排序 &ndash;&gt;
             <when test="queryDTO.orderType == 1">
-                d.riding_date DESC  <!-- 降序：最近出行在前 -->
+                d.riding_date DESC  &lt;!&ndash; 降序：最近出行在前 &ndash;&gt;
             </when>
-            <!-- 默认：未指定orderType时，按订票时间排序 -->
+            &lt;!&ndash; 默认：未指定orderType时，按订票时间排序 &ndash;&gt;
             <otherwise>
                 o.create_time DESC
             </otherwise>
-        </choose>
+        </choose>-->
     </select>
 
 
