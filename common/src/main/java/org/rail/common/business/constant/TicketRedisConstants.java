@@ -9,6 +9,4 @@ public final class TicketRedisConstants {
     private TicketRedisConstants() {}
 
     public static final String RAIL_PASSENGER_LIST_USER_PREFIX = "rail:passenger:list:user:"; // 乘车人列表
-    public static final String RAIL_SELF_TICKET_PREFIX = "rail:self-ticket:"; // 本人车票
-    public static final String RAIL_TICKET_SELF_PAGE_PREFIX = "rail:ticket:self:page:"; // 本人车票分页
 }

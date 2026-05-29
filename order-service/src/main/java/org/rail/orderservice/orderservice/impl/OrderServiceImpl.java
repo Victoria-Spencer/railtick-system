@@ -6,13 +6,11 @@ import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.lang.TypeReference;
 import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
-import com.github.pagehelper.PageHelper;
 import org.rail.api.client.TicketFeignClient;
 import org.rail.api.client.UserFeignClient;
 import org.rail.api.constant.OrderTypeConstants;
 import org.rail.common.business.constant.AggRedisConstants;
 import org.rail.common.business.constant.OrderRedisConstants;
-import org.rail.common.business.constant.TicketRedisConstants;
 import org.rail.common.core.context.RequestContext;
 import org.rail.common.core.context.RequestContextHolder;
 import org.rail.common.core.exception.*;
@@ -49,7 +47,6 @@ import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 @Service
 public class OrderServiceImpl implements OrderService {
@@ -555,7 +552,7 @@ public class OrderServiceImpl implements OrderService {
                 typeRef,
                 // 缓存未命中时，查库
                 this::queryUserAllOrderFromDb,
-                orderPageQueryDTO,
+                new OrderDbQueryDTO(userId, orderStatus),
                 RedisCommonConstants.RAIL_DEFAULT_TTL,
                 TimeUnit.MINUTES
         );
@@ -583,7 +580,7 @@ public class OrderServiceImpl implements OrderService {
      * 内存过滤订单（按查询条件）
      */
     private List<OrderPageQueryVO> filterOrders(List<OrderPageQueryVO> allOrders, OrderPageQueryDTO dto) {
-        return allOrders.stream()
+        List<OrderPageQueryVO> filteredList = allOrders.stream()
                 // 过滤乘车日期范围
                 .filter(order -> {
                     if (dto.getStartDate() == null || dto.getEndDate() == null) {
@@ -610,6 +607,23 @@ public class OrderServiceImpl implements OrderService {
                     return details.stream().anyMatch(detail -> StrUtil.contains(detail.getRealName(), realName));
                 })
                 .collect(Collectors.toList());
+
+        // 内存动态排序
+        if (dto.getOrderType() != null) {
+            filteredList.sort((o1, o2) -> {
+                if (dto.getOrderType() == 0) {
+                    // 0：按订票日期降序
+                    return o2.getOrderDate().compareTo(o1.getOrderDate());
+                } else if (dto.getOrderType() == 1) {
+                    // 1：按乘车日期降序
+                    return o2.getRidingDate().compareTo(o1.getRidingDate());
+                }
+                return 0;
+            });
+        }
+        // 无orderType：不排序，直接使用数据库默认的 create_time 排序结果
+
+        return filteredList;
     }
 
     /**
@@ -619,8 +633,8 @@ public class OrderServiceImpl implements OrderService {
         if (orderStatus == null) {
             throw new IllegalArgumentException("订单状态不能为空");
         }
-        return String.format("%suserId:%s:orderStatus:%d",
-                AggRedisConstants.RAIL_AGG_ORDER_USER_ALL_KEY,
+        return String.format("%suserId:%d:orderStatus:%s",
+                AggRedisConstants.RAIL_AGG_ORDER_USER_ALL_PREFIX,
                 userId,
                 orderStatus
         );
@@ -629,9 +643,9 @@ public class OrderServiceImpl implements OrderService {
     /**
      * 缓存未命中：查询该用户所有订单（无分页）
      */
-    private AggCacheResult<List<OrderPageQueryVO>> queryUserAllOrderFromDb(OrderPageQueryDTO dto) {
+    private AggCacheResult<List<OrderPageQueryVO>> queryUserAllOrderFromDb(OrderDbQueryDTO dbQueryDTO) {
         // 直接查询用户所有订单，禁用PageHelper分页插件，获取完整订单列表（后续在内存中根据查询条件过滤和分页）
-        List<OrderPageQueryVO> allUserOrders = orderMapper.getOrderPageByQueryDTO(dto);
+        List<OrderPageQueryVO> allUserOrders = orderMapper.getOrderPageByQueryDTO(dbQueryDTO);
 
         // 组装缓存依赖Key（用于缓存更新）
         List<String> dependSingleKeys = new ArrayList<>();
@@ -655,30 +669,81 @@ public class OrderServiceImpl implements OrderService {
      */
     @Override
     public PageResult<SelfTicketPageVO> selfTicketPageQuery(FrontSelfTicketPageDTO frontSelfTicketPageDTO) {
-        return querySelfTicketPageCache(frontSelfTicketPageDTO);
+        RequestContext context = RequestContextHolder.getRequestContext();
+        if (context == null || context.getAccountId() == null) {
+            throw new BizException("请先登录");
+        }
+        Long userId = Long.valueOf(context.getAccountId());
+        frontSelfTicketPageDTO.setUserId(userId);
+
+        // 以userId为key，缓存全量本人车票数据
+        String cacheKey = buildSelfTicketUserAllKey(userId);
+
+        TypeReference<List<SelfTicketPageVO>> typeRef = new TypeReference<>() {};
+        List<SelfTicketPageVO> allSelfTickets = cacheClient.queryAggCacheWithNullCache(
+                cacheKey,
+                typeRef,
+                this::loadSelfTicketFromDb,
+                userId,
+                RedisCommonConstants.RAIL_DEFAULT_TTL,
+                TimeUnit.MINUTES
+        );
+
+        if (CollectionUtil.isEmpty(allSelfTickets)) {
+            return new PageResult<>(0L, Collections.emptyList(),
+                    frontSelfTicketPageDTO.getPageNumber(),
+                    frontSelfTicketPageDTO.getPageSize());
+        }
+
+        // 内存条件过滤
+        List<SelfTicketPageVO> filteredTickets = filterSelfTickets(allSelfTickets, frontSelfTicketPageDTO);
+
+        // 内存分页（和订单分页逻辑完全一致）
+        long total = filteredTickets.size();
+        int pageNum = frontSelfTicketPageDTO.getPageNumber();
+        int pageSize = frontSelfTicketPageDTO.getPageSize();
+        int start = (pageNum - 1) * pageSize;
+        int end = Math.min(start + pageSize, filteredTickets.size());
+        List<SelfTicketPageVO> pageList = filteredTickets.subList(start, end);
+
+        return new PageResult<>(total, pageList, pageNum, pageSize);
     }
 
     /**
-     * 本人车票分页查询 聚合缓存调用
+     * 本人车票：内存条件过滤
      */
-    private PageResult<SelfTicketPageVO> querySelfTicketPageCache(FrontSelfTicketPageDTO frontSelfTicketPageDTO) {
-        String aggKey = buildSelfTicketCacheKey(frontSelfTicketPageDTO);
-        TypeReference<PageResult<SelfTicketPageVO>> typeRef = new TypeReference<>() {};
-        return cacheClient.queryAggCacheWithNullCache(
-                aggKey,
-                typeRef,
-                this::loadSelfTicketFromDb,
-                frontSelfTicketPageDTO,
-                RedisCommonConstants.RAIL_DEFAULT_TTL,
-                TimeUnit.MINUTES
+    private List<SelfTicketPageVO> filterSelfTickets(List<SelfTicketPageVO> allSelfTickets, FrontSelfTicketPageDTO dto) {
+        return allSelfTickets.stream()
+                // 乘车日期范围过滤
+                .filter(ticket -> {
+                    if (dto.getStartDate() == null || dto.getEndDate() == null) {
+                        return true;
+                    }
+                    LocalDate ridingDate = ticket.getRidingDate();
+                    return !ridingDate.isBefore(dto.getStartDate()) && !ridingDate.isAfter(dto.getEndDate());
+                })
+                // 车次号模糊过滤
+                .filter(ticket -> StrUtil.isBlank(dto.getTrainNumber()) || ticket.getTrainNumber().contains(dto.getTrainNumber()))
+                // 车票类型过滤
+                .filter(ticket -> ObjectUtil.isNull(dto.getTicketType()) || Objects.equals(ticket.getTicketType(), dto.getTicketType()))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 构建：本人车票 - 用户全量缓存Key（仅用userId）
+     */
+    private String buildSelfTicketUserAllKey(Long userId) {
+        return String.format("%suserId:%d",
+                AggRedisConstants.RAIL_AGG_SELF_TICKET_USER_ALL_PREFIX,
+                userId
         );
     }
 
     /**
      * 本人车票分页查询：数据库查询 + 构建聚合缓存依赖Key
      */
-    private AggCacheResult<PageResult<SelfTicketPageVO>> loadSelfTicketFromDb(FrontSelfTicketPageDTO frontSelfTicketPageDTO) {
-        String params = String.valueOf(frontSelfTicketPageDTO.getUserId());
+    private AggCacheResult<List<SelfTicketPageVO>> loadSelfTicketFromDb(Long userId) {
+        String params = String.valueOf(userId);
 
         // 远程调用user-service，根据userId查询idType和idCard
         Result<UserIdCardDTO> userIdCardDTOResult = userFeignClient.getIdCardInfo();
@@ -691,58 +756,20 @@ public class OrderServiceImpl implements OrderService {
         LogUtils.info("OrderService", "loadSelfTicketFromDb", "/api/user-service/user/{id}", params, userIdCardDTOResult);
 
         UserIdCardDTO userIdCardDTO = userIdCardDTOResult.getData();
-        SelfTicketPageDTO selfTicketPageDTO = BeanUtil.copyProperties(frontSelfTicketPageDTO, SelfTicketPageDTO.class);
-        selfTicketPageDTO.setIdType(userIdCardDTO.getIdType());
-        selfTicketPageDTO.setIdCard(userIdCardDTO.getIdCard());
+        SelfTicketPageDTO selfTicketDTO = new SelfTicketPageDTO();
+        selfTicketDTO.setIdType(userIdCardDTO.getIdType());
+        selfTicketDTO.setIdCard(userIdCardDTO.getIdCard());
 
-        // 分页查询
-        PageHelper.startPage(selfTicketPageDTO.getPageNumber(), selfTicketPageDTO.getPageSize());
-        List<SelfTicketPageVO> selfTicketPageVOList = orderMapper.getSelfTicketPageByQueryDTO(selfTicketPageDTO);
+        // 查询该用户所有本人车票
+        List<SelfTicketPageVO> selfTicketPageVOList = orderMapper.getSelfTicketPageByQueryDTO(selfTicketDTO);
 
         // 组装所有依赖的单表Key
         List<String> selfTicketKeys = selfTicketPageVOList.stream()
-                .map(selfTicketPageVO -> TicketRedisConstants.RAIL_SELF_TICKET_PREFIX + selfTicketPageVO.getId())
+                .map(selfTicketPageVO -> AggRedisConstants.RAIL_SELF_TICKET_PREFIX + userId)
                 .toList();
         List<String> dependSingleKeys = new ArrayList<>(selfTicketKeys);
 
-        return AggCacheResult.of(new PageResult<>(selfTicketPageVOList), dependSingleKeys);
-    }
-
-    /**
-     * 生成本人车票查询的唯一缓存Key
-     * 包含：身份证信息 + 车票状态 + 日期范围 + 车次 + 分页参数
-     */
-    private String buildSelfTicketCacheKey(FrontSelfTicketPageDTO dto) {
-        String params = String.valueOf(dto.getUserId());
-
-        // 先远程获取idType和idCard，用于拼接Key（保证Key唯一性）
-        String idType = "";
-        String idCard = "";
-        Result<UserIdCardDTO> userIdCardDTOResult = userFeignClient.getIdCardInfo();
-        if (userIdCardDTOResult.isSuccess() && userIdCardDTOResult.getData() != null) {
-            UserIdCardDTO userIdCardDTO = userIdCardDTOResult.getData();
-            idType = Objects.toString(userIdCardDTO.getIdType(), "");
-            idCard = Objects.toString(userIdCardDTO.getIdCard(), "");
-            LogUtils.info("OrderService", "buildSelfTicketCacheKey", "/api/user-service/user/{id}", params,
-                    userIdCardDTOResult);
-        } else {
-            LogUtils.error("OrderService", "buildSelfTicketCacheKey", "/api/user-service/user/{id}", params,
-                    userIdCardDTOResult.getMessage());
-        }
-
-        // 拼接所有非空查询条件和分页参数
-        String conditions = Stream.of(
-                "idType:" + idType,
-                "idCard:" + idCard,
-                "ticketType:" + Objects.toString(dto.getTicketType(), ""),
-                "startDate:" + Objects.toString(dto.getStartDate(), ""),
-                "endDate:" + Objects.toString(dto.getEndDate(), ""),
-                "trainNumber:" + Objects.toString(dto.getTrainNumber(), ""),
-                "page:" + dto.getPageNumber(),
-                "size:" + dto.getPageSize()
-        ).filter(s -> !s.endsWith(":")).collect(Collectors.joining(":"));
-
-        return TicketRedisConstants.RAIL_TICKET_SELF_PAGE_PREFIX + conditions;
+        return AggCacheResult.of(selfTicketPageVOList, dependSingleKeys);
     }
 
     /**

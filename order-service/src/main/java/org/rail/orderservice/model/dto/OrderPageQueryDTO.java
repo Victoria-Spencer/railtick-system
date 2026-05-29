@@ -13,7 +13,6 @@ public class OrderPageQueryDTO extends PageQuery {
     private Long userId;
     // 状态类型 0：未完成 1：未出行 2：历史订单
     private Integer orderStatus;
-    // 排序条件（乘车日期或订票时间）
     private Integer orderType;
     private LocalDate startDate;
     private LocalDate endDate;

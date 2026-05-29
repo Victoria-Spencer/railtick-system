@@ -1,6 +1,7 @@
 package org.rail.orderservice.mapper;
 
 import org.apache.ibatis.annotations.*;
+import org.rail.orderservice.model.dto.OrderDbQueryDTO;
 import org.rail.orderservice.model.dto.OrderPageQueryDTO;
 import org.rail.orderservice.model.dto.SelfTicketPageDTO;
 import org.rail.orderservice.model.entity.Order;
@@ -91,10 +92,10 @@ public interface OrderMapper {
 
     /**
      * 分页查询订单及关联的订单明细
-     * @param orderPageQueryDTO 分页查询条件
+     * @param dbQueryDTO 分页查询条件
      * @return 订单及关联的订单明细列表
      */
-    List<OrderPageQueryVO> getOrderPageByQueryDTO(@Param("queryDTO") OrderPageQueryDTO orderPageQueryDTO);
+    List<OrderPageQueryVO> getOrderPageByQueryDTO(@Param("queryDTO") OrderDbQueryDTO dbQueryDTO);
 
     /**
      * 分页本人订单明细和关联的订单信息
