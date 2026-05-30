@@ -53,8 +53,12 @@ public class DbDecryptInterceptor implements Interceptor {
             return result;
         }
 
-        decryptSensitiveFields(result);
-        return result;
+        try {
+            decryptSensitiveFields(result);
+            return result;
+        } catch (Exception e) {
+            throw new SensitiveDataException("数据库结果集解密失败", e);
+        }
     }
 
     /**
@@ -71,11 +75,30 @@ public class DbDecryptInterceptor implements Interceptor {
             return;
         }
 
-        // Map 结果处理
+        // Map处理
         if (obj instanceof Map<?, ?> map) {
-            map.values().forEach(this::decryptSensitiveFields);
+            @SuppressWarnings("unchecked")
+            Map<Object, Object> typedMap = (Map<Object, Object>) map;
+
+            for (Map.Entry<Object, Object> entry : typedMap.entrySet()) {
+                Object key = entry.getKey();
+                Object value = entry.getValue();
+
+                // 判断key是否为数据库敏感字段 → 解密value
+                if (key instanceof String keyStr && properties.getDbSensitiveFields().contains(keyStr)) {
+                    if (value instanceof String cipherText && !cipherText.isBlank()) {
+                        // 仅解密带前缀的密文
+                        if (cipherText.startsWith(SensitiveConstants.CIPHER_PREFIX)) {
+                            String realCipher = cipherText.substring(SensitiveConstants.CIPHER_PREFIX.length());
+                            entry.setValue(AESCryptUtils.decrypt(realCipher));
+                        }
+                    }
+                }
+                decryptSensitiveFields(value);
+            }
             return;
         }
+
 
         // 数组处理
         if (obj.getClass().isArray()) {
@@ -150,6 +173,7 @@ public class DbDecryptInterceptor implements Interceptor {
                 || Class.class == clazz
                 || LocalDateTime.class.isAssignableFrom(clazz)
                 || LocalDate.class.isAssignableFrom(clazz)
-                || LocalTime.class.isAssignableFrom(clazz);
+                || LocalTime.class.isAssignableFrom(clazz)
+                || clazz.isEnum();
     }
 }

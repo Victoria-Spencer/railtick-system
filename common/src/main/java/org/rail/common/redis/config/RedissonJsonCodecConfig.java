@@ -1,5 +1,6 @@
 package org.rail.common.redis.config;
 
+import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.fasterxml.jackson.datatype.jsr310.deser.LocalDateTimeDeserializer;
@@ -33,9 +34,11 @@ import java.util.*;
 public class RedissonJsonCodecConfig {
 
     private final SensitiveProperties properties;
+    private final ObjectMapper objectMapper;
 
-    public RedissonJsonCodecConfig(SensitiveProperties properties) {
+    public RedissonJsonCodecConfig(SensitiveProperties properties, ObjectMapper objectMapper) {
         this.properties = properties;
+        this.objectMapper = objectMapper;
     }
 
     /**
@@ -44,8 +47,6 @@ public class RedissonJsonCodecConfig {
      */
     @Bean
     public JsonJacksonCodec redissonJsonCodec() {
-        ObjectMapper objectMapper = new ObjectMapper();
-
         // 配置 Java8 时间序列化
         JavaTimeModule javaTimeModule = new JavaTimeModule();
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
@@ -65,12 +66,19 @@ public class RedissonJsonCodecConfig {
                 // 获取原生编码器
                 Encoder originalEncoder = super.getValueEncoder();
                 return in -> {
-                    // 加密敏感字段
-                    if (in != null) {
-                        encryptSensitiveFields(in);
+                    if (in == null) {
+                        // 原生序列化
+                        return originalEncoder.encode(null);
                     }
-                    // 原生序列化
-                    return originalEncoder.encode(in);
+
+                    try {
+                        // 加密敏感字段
+                        Object copyObj = deepCopy(in);
+                        encryptSensitiveFields(copyObj);
+                        return originalEncoder.encode(copyObj);
+                    } catch (Exception e) {
+                        throw new SensitiveDataException("Redis编码器数据加解密失败", e);
+                    }
                 };
             }
 
@@ -82,13 +90,15 @@ public class RedissonJsonCodecConfig {
                 // 获取原生解码器
                 Decoder<Object> originalDecoder = super.getValueDecoder();
                 return (buf, state) -> {
-                    // 原生反序列化
-                    Object obj = originalDecoder.decode(buf, state);
-                    // 解密敏感字段
-                    if (obj != null) {
-                        decryptSensitiveFields(obj);
+                    try {
+                        Object obj = originalDecoder.decode(buf, state);
+                        if (obj != null) {
+                            decryptSensitiveFields(obj);
+                        }
+                        return obj;
+                    } catch (Exception e) {
+                        throw new SensitiveDataException("Redis解码器数据解密失败", e);
                     }
-                    return obj;
                 };
             }
 
@@ -113,7 +123,28 @@ public class RedissonJsonCodecConfig {
                 }
 
                 if (obj instanceof Map<?, ?> map) {
-                    map.values().forEach(this::encryptSensitiveFields);
+                    @SuppressWarnings("unchecked")
+                    Map<Object, Object> typedMap = (Map<Object, Object>) map;
+
+                    for (Map.Entry<Object, Object> entry : typedMap.entrySet()) {
+                        Object key = entry.getKey();
+                        Object value = entry.getValue();
+
+                        // 判断key是否为数据库敏感字段 → 加密value
+                        if (key instanceof String keyStr && properties.getDbSensitiveFields().contains(keyStr)) {
+                            if (value instanceof String original && !original.isBlank()) {
+                                // 已加密则跳过
+                                if (original.startsWith(SensitiveConstants.CIPHER_PREFIX)) {
+                                    continue;
+                                }
+                                String encryptStr = AESCryptUtils.encrypt(original);
+                                entry.setValue(SensitiveConstants.CIPHER_PREFIX + encryptStr);
+                            }
+                        }
+
+                        // 递归处理嵌套结构
+                        encryptSensitiveFields(value);
+                    }
                     return;
                 }
 
@@ -167,7 +198,26 @@ public class RedissonJsonCodecConfig {
                 }
 
                 if (obj instanceof Map<?, ?> map) {
-                    map.values().forEach(this::decryptSensitiveFields);
+                    @SuppressWarnings("unchecked")
+                    Map<Object, Object> typedMap = (Map<Object, Object>) map;
+
+                    for (Map.Entry<Object, Object> entry : typedMap.entrySet()) {
+                        Object key = entry.getKey();
+                        Object value = entry.getValue();
+
+                        // 判断key是否为数据库敏感字段 → 解密value
+                        if (key instanceof String keyStr && properties.getDbSensitiveFields().contains(keyStr)) {
+                            if (value instanceof String cipherText && !cipherText.isBlank()) {
+                                if (cipherText.startsWith(SensitiveConstants.CIPHER_PREFIX)) {
+                                    String realCipher = cipherText.substring(SensitiveConstants.CIPHER_PREFIX.length());
+                                    entry.setValue(AESCryptUtils.decrypt(realCipher));
+                                }
+                            }
+                        }
+
+                        // 递归处理嵌套结构
+                        decryptSensitiveFields(value);
+                    }
                     return;
                 }
 
@@ -233,7 +283,20 @@ public class RedissonJsonCodecConfig {
                         || Class.class == clazz
                         || LocalDateTime.class.isAssignableFrom(clazz)
                         || LocalDate.class.isAssignableFrom(clazz)
-                        || LocalTime.class.isAssignableFrom(clazz);
+                        || LocalTime.class.isAssignableFrom(clazz)
+                        || clazz.isEnum();
+            }
+
+            /**
+             * Jackson深拷贝
+             */
+            private <T> T deepCopy(T obj) throws Exception {
+                if (obj == null) {
+                    return null;
+                }
+                JavaType javaType = objectMapper.getTypeFactory().constructType(obj.getClass());
+                String json = objectMapper.writeValueAsString(obj);
+                return objectMapper.readValue(json, javaType);
             }
         };
     }

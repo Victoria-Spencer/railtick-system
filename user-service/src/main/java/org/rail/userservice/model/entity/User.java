@@ -26,4 +26,5 @@ public class User {
     private String address;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
+    private Boolean isDeleted;
 }

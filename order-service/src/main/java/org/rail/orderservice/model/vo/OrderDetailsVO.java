@@ -7,7 +7,7 @@ import java.math.BigDecimal;
 @Data
 public class OrderDetailsVO {
 
-    private Integer id;
+    private Long id;
     private Integer seatType;
     private String carriageNumber;
     private String seatNo;

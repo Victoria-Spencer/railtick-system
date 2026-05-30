@@ -1,10 +1,12 @@
 package org.rail.common.core.handler;
 
+import com.fasterxml.jackson.databind.JavaType;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.Nullable;
 import org.rail.common.core.config.SensitiveProperties;
 import org.rail.common.core.exception.SensitiveDataException;
-import org.rail.common.core.util.LogUtils;
 import org.rail.common.core.util.security.CryptoUtils;
+import org.rail.common.feign.constant.FeignConstant;
 import org.springframework.core.MethodParameter;
 import org.springframework.http.MediaType;
 import org.springframework.http.converter.HttpMessageConverter;
@@ -31,10 +33,12 @@ public class MaskAdvice implements ResponseBodyAdvice<Object> {
     // 全局缓存字段，避免重复反射获取
     private static final Map<Class<?>, Field[]> FIELD_CACHE = new WeakHashMap<>();
     private final SensitiveProperties properties;
+    private final ObjectMapper objectMapper;
 
     // 构造器注入，消除字段注入警告
-    public MaskAdvice(SensitiveProperties properties) {
+    public MaskAdvice(SensitiveProperties properties, ObjectMapper objectMapper) {
         this.properties = properties;
+        this.objectMapper = objectMapper;
     }
 
     /**
@@ -59,12 +63,23 @@ public class MaskAdvice implements ResponseBodyAdvice<Object> {
             return body;
         }
 
+        // Feign 远程调用 → 直接跳过脱敏
+        if (request != null && request.getHeaders().containsKey(FeignConstant.FEIGN_REQUEST_HEADER)) {
+            return body;
+        }
+
         if (body == null || isSimpleType(body.getClass())) {
             return body;
         }
 
-        maskField(body);
-        return body;
+        try {
+            Object copyBody = deepCopy(body);
+            // 脱敏副本
+            maskField(copyBody);
+            return copyBody;
+        } catch (Exception e) {
+            throw new SensitiveDataException("前端响应体脱敏失败", e);
+        }
     }
 
     /**
@@ -81,9 +96,23 @@ public class MaskAdvice implements ResponseBodyAdvice<Object> {
             return;
         }
 
-        // 处理Map
         if (obj instanceof Map<?, ?> map) {
-            map.values().forEach(this::maskField);
+            @SuppressWarnings("unchecked")
+            Map<Object, Object> typedMap = (Map<Object, Object>) map;
+
+            for (Map.Entry<Object, Object> entry : typedMap.entrySet()) {
+                Object key = entry.getKey();
+                Object value = entry.getValue();
+
+                // 判断key是否符合敏感字段配置，符合则对value脱敏
+                if (key instanceof String keyStr && properties.getMaskSensitiveFields().contains(keyStr)) {
+                    if (value instanceof String original && !original.isBlank()) {
+                        entry.setValue(CryptoUtils.mask(original));
+                    }
+                }
+                // 递归处理嵌套结构
+                maskField(value);
+            }
             return;
         }
 
@@ -116,7 +145,6 @@ public class MaskAdvice implements ResponseBodyAdvice<Object> {
 
                 maskField(fieldValue);
             } catch (Exception e) {
-                LogUtils.error("前端响应字段[{}]脱敏失败", field.getName(), e);
                 throw new SensitiveDataException("字段脱敏失败：" + field.getName(), e);
             }
         }
@@ -154,6 +182,19 @@ public class MaskAdvice implements ResponseBodyAdvice<Object> {
                 || Class.class == clazz
                 || LocalDateTime.class.isAssignableFrom(clazz)
                 || LocalDate.class.isAssignableFrom(clazz)
-                || LocalTime.class.isAssignableFrom(clazz);
+                || LocalTime.class.isAssignableFrom(clazz)
+                || clazz.isEnum();
+    }
+
+    /**
+     * Jackson 深拷贝
+     */
+    private <T> T deepCopy(T obj) throws Exception {
+        if (obj == null) {
+            return null;
+        }
+        JavaType javaType = objectMapper.getTypeFactory().constructType(obj.getClass());
+        String json = objectMapper.writeValueAsString(obj);
+        return objectMapper.readValue(json, javaType);
     }
 }

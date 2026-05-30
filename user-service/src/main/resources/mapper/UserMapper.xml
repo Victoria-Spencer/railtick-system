@@ -8,9 +8,18 @@
     <!-- 查询用户：根据用户名/邮箱/手机号查询 -->
     <select id="findByUsernameOrMailOrPhone" resultType="org.rail.userservice.model.entity.User">
         SELECT * FROM `user`
-        WHERE username = #{usernameOrMailOrPhone}
+        WHERE
+        (
+            username = #{usernameOrMailOrPhone}
             OR email = #{usernameOrMailOrPhone}
             OR phone = #{usernameOrMailOrPhone}
+        )
+        AND
+        (
+            is_deleted = 0
+            OR
+            (is_deleted = 1 AND update_time >= DATE_SUB(NOW(), INTERVAL 30 DAY))
+        )
     </select>
     <update id="update">
         UPDATE `user`
@@ -24,6 +33,6 @@
             <if test="address != null">address = #{address},</if>
             <if test="updateTime != null">update_time = #{updateTime}</if>
         </trim>
-        WHERE id = #{id}
+        WHERE id = #{id} AND is_deleted = 0
     </update>
 </mapper>

@@ -1,5 +1,7 @@
 package org.rail.common.feign.handler;
 
+import com.fasterxml.jackson.databind.JavaType;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.Nullable;
 import jakarta.validation.constraints.NotNull;
 import org.rail.common.core.config.SensitiveProperties;
@@ -36,8 +38,11 @@ public class FeignEncryptAdvice implements ResponseBodyAdvice<Object> {
     private static final Map<Class<?>, Field[]> FIELD_CACHE = new WeakHashMap<>();
     private final SensitiveProperties properties;
 
-    public FeignEncryptAdvice(SensitiveProperties properties) {
+    private final ObjectMapper objectMapper;
+
+    public FeignEncryptAdvice(SensitiveProperties properties, ObjectMapper objectMapper) {
         this.properties = properties;
+        this.objectMapper = objectMapper;
     }
 
     // 开启所有接口支持
@@ -73,8 +78,13 @@ public class FeignEncryptAdvice implements ResponseBodyAdvice<Object> {
             return body;
         }
 
-        encryptSensitiveFields(body);
-        return body;
+        try {
+            Object copyBody = deepCopy(body);
+            encryptSensitiveFields(copyBody);
+            return copyBody;
+        } catch (Exception e) {
+            throw new SensitiveDataException("Feign响应体加密失败", e);
+        }
     }
 
     /**
@@ -93,7 +103,26 @@ public class FeignEncryptAdvice implements ResponseBodyAdvice<Object> {
 
         // Map处理
         if (obj instanceof Map<?, ?> map) {
-            map.values().forEach(this::encryptSensitiveFields);
+            @SuppressWarnings("unchecked")
+            Map<Object, Object> typedMap = (Map<Object, Object>) map;
+
+            for (Map.Entry<Object, Object> entry : typedMap.entrySet()) {
+                Object key = entry.getKey();
+                Object value = entry.getValue();
+
+                // 判断key是否为传输敏感字段 → 加密value
+                if (key instanceof String keyStr && properties.getTransportSensitiveFields().contains(keyStr)) {
+                    if (value instanceof String plainText && !plainText.isBlank()) {
+                        // 已加密则跳过
+                        if (plainText.startsWith(SensitiveConstants.CIPHER_PREFIX)) {
+                            continue;
+                        }
+                        String encryptStr = AESCryptUtils.encrypt(plainText);
+                        entry.setValue(SensitiveConstants.CIPHER_PREFIX + encryptStr);
+                    }
+                }
+                encryptSensitiveFields(value);
+            }
             return;
         }
 
@@ -171,6 +200,19 @@ public class FeignEncryptAdvice implements ResponseBodyAdvice<Object> {
                 || Class.class == clazz
                 || LocalDateTime.class.isAssignableFrom(clazz)
                 || LocalDate.class.isAssignableFrom(clazz)
-                || LocalTime.class.isAssignableFrom(clazz);
+                || LocalTime.class.isAssignableFrom(clazz)
+                || clazz.isEnum();
+    }
+
+    /**
+     * Jackson 深拷贝
+     */
+    private <T> T deepCopy(T obj) throws Exception {
+        if (obj == null) {
+            return null;
+        }
+        JavaType javaType = objectMapper.getTypeFactory().constructType(obj.getClass());
+        String json = objectMapper.writeValueAsString(obj);
+        return objectMapper.readValue(json, javaType);
     }
 }

@@ -46,8 +46,12 @@ public class UserServiceImpl implements UserService {
             throw new BizException("密码错误");
         }
 
-        UserVO userVO = BeanUtil.copyProperties(user, UserVO.class);
+        if (user.getIsDeleted() != null && user.getIsDeleted()) {
+            userMapper.restoreUser(user.getId());
+            user.setIsDeleted(false);
+        }
 
+        UserVO userVO = BeanUtil.copyProperties(user, UserVO.class);
         String token = JwtTokenUtil.createToken(user.getId());
         userVO.setAccessToken(token);
 
@@ -79,6 +83,7 @@ public class UserServiceImpl implements UserService {
         user.setCreateTime(LocalDateTime.now());
         user.setUpdateTime(LocalDateTime.now());
         user.setPassword(PasswordCryptUtils.encode(user.getPassword()));
+        user.setIsDeleted(false);
 
         userMapper.insert(user);
         return BeanUtil.copyProperties(user, UserVO.class);

@@ -48,8 +48,12 @@ public class FeignResponseDecryptDecoder implements Decoder {
             return null;
         }
 
-        decryptFields(body);
-        return body;
+        try {
+            decryptFields(body);
+            return body;
+        } catch (Exception e) {
+            throw new SensitiveDataException("Feign响应体解密失败", e);
+        }
     }
 
     /**
@@ -68,7 +72,26 @@ public class FeignResponseDecryptDecoder implements Decoder {
 
         // Map处理
         if (obj instanceof Map<?, ?> map) {
-            map.values().forEach(this::decryptFields);
+            @SuppressWarnings("unchecked")
+            Map<Object, Object> typedMap = (Map<Object, Object>) map;
+
+            for (Map.Entry<Object, Object> entry : typedMap.entrySet()) {
+                Object key = entry.getKey();
+                Object value = entry.getValue();
+
+                // 判断key是否为传输敏感字段 → 解密value
+                if (key instanceof String keyStr && properties.getTransportSensitiveFields().contains(keyStr)) {
+                    if (value instanceof String cipherText && !cipherText.isBlank()) {
+                        if (cipherText.startsWith(SensitiveConstants.CIPHER_PREFIX)) {
+                            String realCipher = cipherText.substring(SensitiveConstants.CIPHER_PREFIX.length());
+                            entry.setValue(AESCryptUtils.decrypt(realCipher));
+                        }
+                    }
+                }
+
+                // 递归处理嵌套结构
+                decryptFields(value);
+            }
             return;
         }
 
@@ -141,6 +164,7 @@ public class FeignResponseDecryptDecoder implements Decoder {
                 || Class.class == clazz
                 || LocalDateTime.class.isAssignableFrom(clazz)
                 || LocalDate.class.isAssignableFrom(clazz)
-                || LocalTime.class.isAssignableFrom(clazz);
+                || LocalTime.class.isAssignableFrom(clazz)
+                || clazz.isEnum();
     }
 }

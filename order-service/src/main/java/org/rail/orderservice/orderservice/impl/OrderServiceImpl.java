@@ -441,7 +441,7 @@ public class OrderServiceImpl implements OrderService {
                             put("id", "preOrderDetailId");
                             put("tempSeatNo", "seatNo");
                         }})
-                );
+        );
 
         Map<String, OrderDetails> detailsMap = new HashMap<>();
         for (OrderDetails details : detailsList) {
@@ -799,6 +799,7 @@ public class OrderServiceImpl implements OrderService {
         preOrder.setPreOrderSn(preOrderSn);
         preOrder.setExpireTime(calculateExpireTime());
         preOrder.setCreateTime(LocalDateTime.now());
+        preOrder.setStatus(PreOrderStatusConstants.VALID);
         preOrder.setTotalAmount(totalAmount);
 
         // 插入预订单主表
