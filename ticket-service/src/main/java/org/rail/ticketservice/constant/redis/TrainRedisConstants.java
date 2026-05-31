@@ -1,8 +1,8 @@
-package org.rail.common.business.constant;
+package org.rail.ticketservice.constant.redis;
 
 /**
  * 列车基础数据专属Redis常量
- * 包含列车、车站、经停站、座位类型等所有基础数据缓存Key
+ * 包含列车、车站、经停站等所有基础数据缓存Key
  */
 public final class TrainRedisConstants {
 

@@ -1,4 +1,4 @@
-package org.rail.common.business.constant;
+package org.rail.ticketservice.constant.redis;
 
 /**
  * 座位业务专属Redis常量

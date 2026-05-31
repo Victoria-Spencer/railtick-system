@@ -12,6 +12,7 @@ public class CreateOrderVO {
     private String orderSn;
     private List<OrderDetailsVO> createOrderDetailsVOList;
     private LocalDate ridingDate;
+    private String trainId;
     private String trainNumber;
     private String departure;
     private String arrival;

@@ -76,8 +76,10 @@ public class RedissonJsonCodecConfig {
                         Object copyObj = deepCopy(in);
                         encryptSensitiveFields(copyObj);
                         return originalEncoder.encode(copyObj);
+                    } catch (SensitiveDataException e) {
+                        throw e;
                     } catch (Exception e) {
-                        throw new SensitiveDataException("Redis编码器数据加解密失败", e);
+                        throw new RuntimeException(e);
                     }
                 };
             }
@@ -96,8 +98,10 @@ public class RedissonJsonCodecConfig {
                             decryptSensitiveFields(obj);
                         }
                         return obj;
+                    } catch (SensitiveDataException e) {
+                        throw e;
                     } catch (Exception e) {
-                        throw new SensitiveDataException("Redis解码器数据解密失败", e);
+                        throw new RuntimeException(e);
                     }
                 };
             }

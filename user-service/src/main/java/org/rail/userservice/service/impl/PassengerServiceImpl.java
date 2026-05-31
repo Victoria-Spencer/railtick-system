@@ -4,12 +4,12 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.lang.TypeReference;
 import com.github.pagehelper.PageHelper;
 import org.rail.api.dto.PassengerRemoteDTO;
-import org.rail.common.business.constant.TicketRedisConstants;
+import org.rail.userservice.constant.UserRedisConstants;
 import org.rail.common.core.context.RequestContext;
 import org.rail.common.core.context.RequestContextHolder;
 import org.rail.common.core.exception.BizException;
 import org.rail.common.redis.api.ICacheClient;
-import org.rail.common.business.constant.RedisCommonConstants;
+import org.rail.common.core.constant.RedisCommonConstants;
 import org.rail.common.core.model.result.PageResult;
 import org.rail.userservice.constant.VerifyStatusConstants;
 import org.rail.userservice.mapper.PassengerMapper;
@@ -69,7 +69,7 @@ public class PassengerServiceImpl implements PassengerService {
 
         TypeReference<List<Passenger>> typeRef = new TypeReference<>() {};
         List<Passenger> passengerList = cacheClient.queryWithMutex(
-                TicketRedisConstants.RAIL_PASSENGER_LIST_USER_PREFIX,
+                UserRedisConstants.RAIL_PASSENGER_LIST_USER_PREFIX,
                 userId,
                 typeRef,
                 id -> passengerMapper.getByUserId(id),
@@ -151,7 +151,7 @@ public class PassengerServiceImpl implements PassengerService {
             throw new BizException("未获取到用户信息");
         }
         String userId = context.getAccountId();
-        cacheClient.autoClearAggCache(TicketRedisConstants.RAIL_PASSENGER_LIST_USER_PREFIX + userId);
+        cacheClient.autoClearAggCache(UserRedisConstants.RAIL_PASSENGER_LIST_USER_PREFIX + userId);
     }
 
     /**
@@ -171,7 +171,7 @@ public class PassengerServiceImpl implements PassengerService {
         Long userId = Long.valueOf(context.getAccountId());
         passengerMapper.batchDelete(ids, userId);
 
-        cacheClient.autoClearAggCache(TicketRedisConstants.RAIL_PASSENGER_LIST_USER_PREFIX + userId);
+        cacheClient.autoClearAggCache(UserRedisConstants.RAIL_PASSENGER_LIST_USER_PREFIX + userId);
     }
 
     /**

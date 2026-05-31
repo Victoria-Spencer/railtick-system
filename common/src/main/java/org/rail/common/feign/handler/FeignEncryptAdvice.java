@@ -82,8 +82,10 @@ public class FeignEncryptAdvice implements ResponseBodyAdvice<Object> {
             Object copyBody = deepCopy(body);
             encryptSensitiveFields(copyBody);
             return copyBody;
+        } catch (SensitiveDataException e) {
+            throw e;
         } catch (Exception e) {
-            throw new SensitiveDataException("Feign响应体加密失败", e);
+            throw new RuntimeException("响应体处理失败", e);
         }
     }
 

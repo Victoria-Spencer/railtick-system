@@ -1,4 +1,4 @@
-package org.rail.common.business.constant;
+package org.rail.common.core.constant;
 
 public final class RedisCommonConstants {
 

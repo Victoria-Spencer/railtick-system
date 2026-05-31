@@ -10,19 +10,18 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang.StringUtils;
 import org.rail.api.constant.OrderTypeConstants;
 import org.rail.api.constant.SeatIntervalStatusConstants;
-import org.rail.common.business.constant.AggRedisConstants;
-import org.rail.common.business.constant.SeatRedisConstants;
-import org.rail.common.business.constant.TrainRedisConstants;
+import org.rail.ticketservice.constant.redis.SeatRedisConstants;
+import org.rail.ticketservice.constant.redis.TrainRedisConstants;
 import org.rail.common.core.exception.BizException;
 import org.rail.common.core.exception.SeatLockFailedException;
 import org.rail.common.core.util.*;
 import org.rail.common.core.util.thread.ThreadLocalUtils;
 import org.rail.common.redis.api.ICacheClient;
-import org.rail.common.business.constant.RedisCommonConstants;
 import org.rail.common.redis.result.AggBatchResult;
 import org.rail.common.redis.result.AggCacheResult;
 import org.rail.api.dto.*;
 import org.rail.ticketservice.constant.SeatStatusConstants;
+import org.rail.ticketservice.constant.redis.TicketRedisConstants;
 import org.rail.ticketservice.mapper.*;
 import org.rail.ticketservice.model.dto.*;
 import org.rail.ticketservice.model.entity.SeatIntervalOccupy;
@@ -116,7 +115,7 @@ public class TicketServiceImpl implements TicketService {
     private List<SeatClassVO> batchQuerySeatClassCache(List<SeatQueryDTO> seatQueryDTOList, Map<Long, List<SeatQueryDTO>> trainId2DtosMap) {
         Function<SeatQueryDTO, String> keyGenerator = dto ->
                 String.format("%s%d:%d:%d",
-                        AggRedisConstants.RAIL_AGG_SEAT_CLASS,
+                        TicketRedisConstants.RAIL_AGG_SEAT_CLASS,
                         dto.getTrainId(),
                         dto.getStartSequence(),
                         dto.getEndSequence());
@@ -128,7 +127,7 @@ public class TicketServiceImpl implements TicketService {
                 seatQueryDTOList,
                 typeRef,
                 missDtos -> querySeatClassDb(missDtos, keyGenerator, trainId2DtosMap),
-                AggRedisConstants.RAIL_AGG_SEAT_CLASS_CACHE_TTL_SECONDS,
+                TicketRedisConstants.RAIL_AGG_SEAT_CLASS_CACHE_TTL_SECONDS,
                 TimeUnit.SECONDS
         );
     }
@@ -329,7 +328,7 @@ public class TicketServiceImpl implements TicketService {
                 // 缓存未命中时，查库
                 dto -> queryTrainDetailDb(departureDate, depCode, arrCode),
                 ticketQueryDTO,
-                AggRedisConstants.RAIL_TRAIN_BASE_CACHE_TTL_HOURS,
+                TicketRedisConstants.RAIL_TRAIN_BASE_CACHE_TTL_HOURS,
                 TimeUnit.HOURS
         );
     }
@@ -399,7 +398,7 @@ public class TicketServiceImpl implements TicketService {
         String safeArrCode = arrCode == null ? "_" : arrCode;
         // 构建key：格式统一为「前缀:日期:出发站:到达站」
         return String.format("%s%s:%s:%s",
-                AggRedisConstants.RAIL_AGG_TRAIN_BASE_INFO_PREFIX,
+                TicketRedisConstants.RAIL_AGG_TRAIN_BASE_INFO_PREFIX,
                 departureDate,
                 safeDepCode,
                 safeArrCode);

@@ -3,7 +3,10 @@ package org.rail.api.dto;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import lombok.Builder;
 import lombok.Data;
+import lombok.experimental.Accessors;
+
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -11,6 +14,7 @@ import java.util.List;
  * 批量新增座位区间占用
  */
 @Data
+@Accessors(chain = true)
 public class BatchSeatIntervalInsertDTO {
 
     // ===================== 公共字段（所有座位相同）=====================

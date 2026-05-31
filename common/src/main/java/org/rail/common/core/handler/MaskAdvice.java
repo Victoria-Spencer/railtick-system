@@ -77,8 +77,10 @@ public class MaskAdvice implements ResponseBodyAdvice<Object> {
             // 脱敏副本
             maskField(copyBody);
             return copyBody;
+        } catch (SensitiveDataException e) {
+            throw e;
         } catch (Exception e) {
-            throw new SensitiveDataException("前端响应体脱敏失败", e);
+            throw new RuntimeException("响应体处理失败", e);
         }
     }
 

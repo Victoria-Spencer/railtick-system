@@ -2,7 +2,6 @@ package org.rail.orderservice.mapper;
 
 import org.apache.ibatis.annotations.*;
 import org.rail.orderservice.model.dto.OrderDbQueryDTO;
-import org.rail.orderservice.model.dto.OrderPageQueryDTO;
 import org.rail.orderservice.model.dto.SelfTicketPageDTO;
 import org.rail.orderservice.model.entity.Order;
 import org.rail.orderservice.model.entity.OrderDetails;
@@ -108,8 +107,8 @@ public interface OrderMapper {
      * 更新订单状态为已经取消
      * @param orderSn 订单编号
      */
-    @Update("update `order` set status = 2 where order_sn = #{orderSn}")
-    void updateOrderByOrderSn(String orderSn);
+    @Update("update `order` set status = #{status} where order_sn = #{orderSn}")
+    void updateOrder(String orderSn, Integer status);
 
     /**
      * 根据预订单id删除预订单明细

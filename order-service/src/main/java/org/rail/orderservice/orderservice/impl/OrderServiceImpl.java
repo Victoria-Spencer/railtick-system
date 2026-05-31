@@ -9,15 +9,14 @@ import cn.hutool.core.util.StrUtil;
 import org.rail.api.client.TicketFeignClient;
 import org.rail.api.client.UserFeignClient;
 import org.rail.api.constant.OrderTypeConstants;
-import org.rail.common.business.constant.AggRedisConstants;
-import org.rail.common.business.constant.OrderRedisConstants;
+import org.rail.orderservice.constant.OrderRedisConstants;
 import org.rail.common.core.context.RequestContext;
 import org.rail.common.core.context.RequestContextHolder;
 import org.rail.common.core.exception.*;
 import org.rail.common.core.util.LogUtils;
 import org.rail.common.core.util.SnowflakeIdGenerator;
 import org.rail.common.redis.api.ICacheClient;
-import org.rail.common.business.constant.RedisCommonConstants;
+import org.rail.common.core.constant.RedisCommonConstants;
 import org.rail.common.redis.result.AggCacheResult;
 import org.rail.common.core.model.result.PageResult;
 import org.rail.common.core.model.result.Result;
@@ -27,6 +26,9 @@ import org.rail.orderservice.constant.PreOrderStatusConstants;
 import org.rail.api.constant.SeatIntervalStatusConstants;
 import org.rail.orderservice.mapper.OrderMapper;
 import org.rail.orderservice.model.bo.PreOrderContext;
+import org.rail.orderservice.mq.producer.OrderCreateProducer;
+import org.rail.orderservice.mq.producer.OrderDelayProducer;
+import org.rail.orderservice.mq.producer.PreOrderDelayProducer;
 import org.rail.orderservice.orderservice.OrderService;
 import org.rail.orderservice.model.dto.*;
 import org.rail.orderservice.model.entity.Order;
@@ -64,6 +66,12 @@ public class OrderServiceImpl implements OrderService {
     private ICacheClient cacheClient;
     @Autowired
     private RedissonClient redissonClient;
+    @Autowired
+    private PreOrderDelayProducer preOrderDelayProducer;
+    @Autowired
+    private OrderCreateProducer orderCreateProducer;
+    @Autowired
+    private OrderDelayProducer orderDelayProducer;
 
     /**
      * 1.创建预订单，临时锁定座位
@@ -92,10 +100,10 @@ public class OrderServiceImpl implements OrderService {
         if (context == null || context.getAccountId() == null) {
             throw new BizException("请先登录");
         }
-        String userId = context.getAccountId();
-        createPreOrderDTO.setUserId(Long.valueOf(userId));
+        long userId = Long.parseLong(context.getAccountId());
+        createPreOrderDTO.setUserId(userId);
         Long trainId = createPreOrderDTO.getTrainId();
-        String preOrderKey = buildPreOrderKey(Long.valueOf(userId), trainId);
+        String preOrderKey = buildPreOrderKey(userId, trainId);
 
         PreOrderContext ctx = preparePreOrderContext(createPreOrderDTO, preOrderKey);
 
@@ -118,7 +126,7 @@ public class OrderServiceImpl implements OrderService {
                 preOrderSn = createNewPreOrder(ctx);
             }
 
-            sendDelayReleaseMsg(userId, trainId);
+            preOrderDelayProducer.sendPreOrderDelayMsg(userId, trainId, preOrderSn);
             return preOrderSn;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -128,17 +136,6 @@ public class OrderServiceImpl implements OrderService {
                 lock.unlock();
             }
         }
-    }
-
-
-    /**
-     *   TODO 延迟消息队列：发送延迟消息到队列，消息内容包含 userId + trainId
-     *    整的逻辑：发送 PreOrderDelayMessage 到队列 →
-     *    消息处理器根据 key 从 Redis 获取占用记录 → 如果记录存在且过期，进行座位解锁处理（删除占用记录 + 更新Bitmap）
-     */
-    private void sendDelayReleaseMsg(String userId, Long trainId) {
-        // TODO 实现：发送延迟MQ消息(userId + trainId)
-        //  消费者：校验订单过期时间 → 过期则释放座位，否则不处理
     }
 
     /**
@@ -359,10 +356,7 @@ public class OrderServiceImpl implements OrderService {
             String preOrderKey = buildPreOrderKey(userId, trainId);
             PreOrder preOrder = cacheClient.get(preOrderKey);
             if (ObjectUtil.isNull(preOrder)) {
-                preOrder = orderMapper.getByPreOrderSn(preOrderSn);
-                if (ObjectUtil.isNull(preOrder)) {
-                    throw new OrderNotFoundException("预订单不存在或已过期！");
-                }
+                throw new OrderNotFoundException("预订单不存在或已过期！");
             }
 
             if (!PreOrderStatusConstants.VALID.equals(preOrder.getStatus())) {
@@ -377,6 +371,16 @@ public class OrderServiceImpl implements OrderService {
             // 处理订单明细 & 座位分配
             orderDetailsList = handleOrderDetails(createOrderDTO, preOrder, order);
 
+            try {
+                orderCreateProducer.sendOrderCreateMsg(order, orderDetailsList);
+                orderDelayProducer.sendOrderDelayMsg(order.getOrderSn());
+            } catch (Exception e) {
+                // MQ发送失败
+                throw new BizException("订单创建失败，请重试");
+            }
+
+            String convertFlagKey = OrderRedisConstants.RAIL_PRE_ORDER_CONVERTED + preOrderSn;
+            cacheClient.setIfAbsent(convertFlagKey, "converted", RedisCommonConstants.RAIL_DEFAULT_TTL, TimeUnit.MINUTES);
             // 彻底删除预订单缓存
             cacheClient.delete(preOrderKey);
             cacheClient.delete(buildPreOrderDetailsSetKey(preOrder.getId()));
@@ -634,7 +638,7 @@ public class OrderServiceImpl implements OrderService {
             throw new IllegalArgumentException("订单状态不能为空");
         }
         return String.format("%suserId:%d:orderStatus:%s",
-                AggRedisConstants.RAIL_AGG_ORDER_USER_ALL_PREFIX,
+                OrderRedisConstants.RAIL_AGG_ORDER_USER_ALL_PREFIX,
                 userId,
                 orderStatus
         );
@@ -734,7 +738,7 @@ public class OrderServiceImpl implements OrderService {
      */
     private String buildSelfTicketUserAllKey(Long userId) {
         return String.format("%suserId:%d",
-                AggRedisConstants.RAIL_AGG_SELF_TICKET_USER_ALL_PREFIX,
+                OrderRedisConstants.RAIL_AGG_SELF_TICKET_USER_ALL_PREFIX,
                 userId
         );
     }
@@ -765,7 +769,7 @@ public class OrderServiceImpl implements OrderService {
 
         // 组装所有依赖的单表Key
         List<String> selfTicketKeys = selfTicketPageVOList.stream()
-                .map(selfTicketPageVO -> AggRedisConstants.RAIL_SELF_TICKET_PREFIX + userId)
+                .map(selfTicketPageVO -> OrderRedisConstants.RAIL_SELF_TICKET_PREFIX + userId)
                 .toList();
         List<String> dependSingleKeys = new ArrayList<>(selfTicketKeys);
 
@@ -778,7 +782,7 @@ public class OrderServiceImpl implements OrderService {
      */
     @Override
     public void cancelOrder(String orderSn) {
-        orderMapper.updateOrderByOrderSn(orderSn);
+        orderMapper.updateOrder(orderSn, OrderPaymentStatusConstants.CANCELED);
         // 自动清理订单及相关聚合key
         String orderKey = buildOrderKey(orderSn);
         cacheClient.autoClearAggCache(orderKey);
@@ -797,6 +801,8 @@ public class OrderServiceImpl implements OrderService {
         PreOrder preOrder = BeanUtil.copyProperties(createPreOrderDTO, PreOrder.class);
         preOrder.setId(preOrderId);
         preOrder.setPreOrderSn(preOrderSn);
+        preOrder.setDepartureCode(createPreOrderDTO.getDepartureCode());
+        preOrder.setArrivalCode(createPreOrderDTO.getArrivalCode());
         preOrder.setExpireTime(calculateExpireTime());
         preOrder.setCreateTime(LocalDateTime.now());
         preOrder.setStatus(PreOrderStatusConstants.VALID);

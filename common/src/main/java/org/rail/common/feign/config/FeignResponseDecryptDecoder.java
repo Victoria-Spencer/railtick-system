@@ -48,12 +48,8 @@ public class FeignResponseDecryptDecoder implements Decoder {
             return null;
         }
 
-        try {
-            decryptFields(body);
-            return body;
-        } catch (Exception e) {
-            throw new SensitiveDataException("Feign响应体解密失败", e);
-        }
+        decryptFields(body);
+        return body;
     }
 
     /**

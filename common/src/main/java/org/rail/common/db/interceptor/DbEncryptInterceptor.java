@@ -55,13 +55,9 @@ public class DbEncryptInterceptor implements Interceptor {
             return invocation.proceed();
         }
 
-        try {
-            // MyBatis 临时创建的一次性对象，不污染业务逻辑
-            encryptSensitiveFields(paramObj);
-            return invocation.proceed();
-        } catch (Exception e) {
-            throw new SensitiveDataException("数据库参数加密失败", e);
-        }
+        // MyBatis 临时创建的一次性对象，不污染业务逻辑
+        encryptSensitiveFields(paramObj);
+        return invocation.proceed();
     }
 
     /**

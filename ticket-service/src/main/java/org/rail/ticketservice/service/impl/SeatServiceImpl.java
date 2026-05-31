@@ -3,7 +3,7 @@ package org.rail.ticketservice.service.impl;
 import cn.hutool.core.util.StrUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.rail.api.constant.OrderTypeConstants;
-import org.rail.common.business.constant.SeatRedisConstants;
+import org.rail.ticketservice.constant.redis.SeatRedisConstants;
 import org.rail.common.core.exception.BizException;
 import org.rail.common.redis.exception.CacheInitException;
 import org.rail.ticketservice.model.dto.SequenceDTO;

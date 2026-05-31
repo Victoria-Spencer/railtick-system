@@ -53,12 +53,8 @@ public class DbDecryptInterceptor implements Interceptor {
             return result;
         }
 
-        try {
-            decryptSensitiveFields(result);
-            return result;
-        } catch (Exception e) {
-            throw new SensitiveDataException("数据库结果集解密失败", e);
-        }
+        decryptSensitiveFields(result);
+        return result;
     }
 
     /**

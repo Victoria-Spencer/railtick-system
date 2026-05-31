@@ -15,6 +15,8 @@ public class PreOrder {
     private String preOrderSn;
     private Long userId;
     private Long trainId;
+    private String departureCode;
+    private String arrivalCode;
     private BigDecimal totalAmount;
     private LocalDateTime expireTime;
     // 状态：0-有效 1-已过期 2-已转为正式订单

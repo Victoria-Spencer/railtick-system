@@ -1,6 +1,6 @@
 package org.rail.common.redis.config;
 
-import org.rail.common.business.constant.RedisCommonConstants;
+import org.rail.common.core.constant.RedisCommonConstants;
 import org.redisson.api.RBloomFilter;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Value;
