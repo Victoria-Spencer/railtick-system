@@ -19,6 +19,7 @@ import org.rail.common.core.util.thread.ThreadLocalUtils;
 import org.rail.common.redis.api.ICacheClient;
 import org.rail.ticketservice.model.dto.TrainStopStationCacheDTO;
 import org.rail.ticketservice.model.entity.Station;
+import org.rail.ticketservice.mq.producer.SeatOccupySyncProducer;
 import org.rail.ticketservice.task.StationLocalCacheTask;
 import org.rail.ticketservice.task.TrainStopStationLocalCacheTask;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -36,6 +37,8 @@ class TicketServiceImplUpdateSeatStatusTest {
     @InjectMocks
     private TicketServiceImpl ticketService;
 
+    @Mock
+    private SeatOccupySyncProducer seatOccupySyncProducer;
     @Mock
     private ICacheClient cacheClient;
     @Mock
@@ -87,12 +90,11 @@ class TicketServiceImplUpdateSeatStatusTest {
                 eq(OrderTypeConstants.PREORDER),
                 eq(SeatIntervalStatusConstants.LOCKED)
         )).thenReturn(1L);
-        doNothing().when(cacheClient).hPutAllWholeExpire(anyString(), anyMap(), anyLong(), any());
 
         // 执行+验证
         assertDoesNotThrow(() -> ticketService.updateSeatStatus(batchDTO));
         verify(cacheClient).executeLuaFile(anyString(), anyList(), anyInt(), anyInt(), anyInt(), anyInt());
-        verify(cacheClient).hPutAllWholeExpire(anyString(), anyMap(), anyLong(), any());
+        verify(seatOccupySyncProducer, times(1)).sendSeatOccupySyncMsg(anyList());
     }
 
     /**
@@ -112,9 +114,8 @@ class TicketServiceImplUpdateSeatStatusTest {
                 eq(SeatIntervalStatusConstants.LOCKED)
         )).thenReturn(0L);
 
-        SeatLockFailedException ex = assertThrows(SeatLockFailedException.class,
+        assertThrows(SeatLockFailedException.class,
                 () -> ticketService.updateSeatStatus(batchDTO));
-        // 无锁定座位不回滚
         verify(cacheClient, never()).setRangeBits(anyString(), anyInt(), anyInt(), anyBoolean());
     }
 
@@ -134,10 +135,9 @@ class TicketServiceImplUpdateSeatStatusTest {
                 eq(OrderTypeConstants.PREORDER),
                 eq(SeatIntervalStatusConstants.LOCKED)
         )).thenReturn(1L);
-        doThrow(new RuntimeException("Redis写入失败"))
-                .when(cacheClient).hPutAllWholeExpire(anyString(), anyMap(), anyLong(), any());
 
-        SeatLockFailedException ex = assertThrows(SeatLockFailedException.class,
+        doThrow(new RuntimeException("Redis Hash写入失败")).when(cacheClient).hPutAll(anyString(), anyMap());
+        assertThrows(SeatLockFailedException.class,
                 () -> ticketService.updateSeatStatus(batchDTO));
         // 有锁定座位，回滚
         verify(cacheClient).setRangeBits(anyString(), eq(2L), eq(5L), eq(false));
@@ -153,7 +153,6 @@ class TicketServiceImplUpdateSeatStatusTest {
 
         assertThrows(IllegalArgumentException.class, () -> ticketService.updateSeatStatus(batchDTO));
         verify(cacheClient, never()).executeLuaFile(anyString(), anyList(), anyInt(), anyInt(), anyInt(), anyInt());
-        verify(cacheClient, never()).hPutAllWholeExpire(anyString(), anyMap(), anyLong(), any());
     }
 
     /**

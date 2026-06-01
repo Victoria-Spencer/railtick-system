@@ -7,10 +7,10 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * RabbitMQ 延迟队列配置
+ * 订单服务 RabbitMQ 独立配置
  */
 @Configuration
-public class RabbitMQConfig {
+public class OrderRabbitMQConfig {
 
     /**
      * 预订单延迟队列

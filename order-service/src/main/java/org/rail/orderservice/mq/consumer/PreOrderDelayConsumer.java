@@ -11,7 +11,7 @@ import org.rail.common.core.exception.MqException;
 import org.rail.common.core.exception.OpenFeignException;
 import org.rail.common.core.model.result.Result;
 import org.rail.common.redis.api.ICacheClient;
-import org.rail.orderservice.mq.config.RabbitMQConfig;
+import org.rail.orderservice.mq.config.OrderRabbitMQConfig;
 import org.rail.orderservice.mq.message.PreOrderDelayMessage;
 import org.rail.orderservice.model.entity.PreOrder;
 import org.rail.orderservice.model.entity.PreOrderDetails;
@@ -37,7 +37,7 @@ public class PreOrderDelayConsumer {
 
     private static final String LOCK_KEY_PREFIX = OrderRedisConstants.RAIL_LOCK_PRE_ORDER_DELAY_PREFIX;
 
-    @RabbitListener(queues = RabbitMQConfig.PRE_ORDER_QUEUE)
+    @RabbitListener(queues = OrderRabbitMQConfig.PRE_ORDER_QUEUE)
     public void consume(PreOrderDelayMessage message) {
         Long userId = message.getUserId();
         Long trainId = message.getTrainId();

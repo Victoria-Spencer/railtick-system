@@ -4,7 +4,7 @@ import cn.hutool.core.bean.BeanUtil;
 import lombok.RequiredArgsConstructor;
 import org.rail.common.core.model.message.OperationLogMessage;
 import org.rail.common.core.util.LogUtils;
-import org.rail.logservice.config.RabbitMQConfig;
+import org.rail.logservice.config.LogRabbitMQConfig;
 import org.rail.logservice.entity.SysOperationLog;
 import org.rail.logservice.mapper.SysOperationLogMapper;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -26,7 +26,7 @@ public class OperationLogConsumer  {
     /**
      * 监听日志事件，消费日志数据并入库
      */
-    @RabbitListener(queues = RabbitMQConfig.QUEUE)
+    @RabbitListener(queues = LogRabbitMQConfig.QUEUE)
     public void consumeLog(OperationLogMessage message) {
         long start = System.currentTimeMillis();
         StackTraceElement stackTrace = Thread.currentThread().getStackTrace()[1];

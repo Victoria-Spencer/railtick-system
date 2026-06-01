@@ -15,7 +15,7 @@ import org.rail.orderservice.constant.OrderPaymentStatusConstants;
 import org.rail.orderservice.mapper.OrderMapper;
 import org.rail.orderservice.model.entity.Order;
 import org.rail.orderservice.model.entity.OrderDetails;
-import org.rail.orderservice.mq.config.RabbitMQConfig;
+import org.rail.orderservice.mq.config.OrderRabbitMQConfig;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -24,6 +24,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 @Component
@@ -40,7 +41,7 @@ public class OrderDelayConsumer {
 
     private static final String LOCK_KEY_PREFIX = OrderRedisConstants.RAIL_LOCK_ORDER_DELAY_PREFIX;
 
-    @RabbitListener(queues = RabbitMQConfig.ORDER_DELAY_QUEUE)
+    @RabbitListener(queues = OrderRabbitMQConfig.ORDER_DELAY_QUEUE)
     public void consume(String orderSn) {
         String convertFlagKey = OrderRedisConstants.RAIL_ORDER_CONVERTED + orderSn;
 
@@ -66,7 +67,8 @@ public class OrderDelayConsumer {
             }
 
             String detailsKey = buildOrderDetailsKey(order.getId());
-            List<OrderDetails> detailsList = new ArrayList<>(cacheClient.getSetMembers(detailsKey));
+            Map<String, OrderDetails> detailsMap = cacheClient.hEntries(detailsKey);
+            List<OrderDetails> detailsList = new ArrayList<>(detailsMap.values());
 
             // 取消订单
             orderMapper.updateOrder(orderSn, OrderPaymentStatusConstants.CANCELED);

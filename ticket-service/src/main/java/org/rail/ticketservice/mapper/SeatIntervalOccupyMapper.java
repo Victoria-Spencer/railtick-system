@@ -1,6 +1,7 @@
 package org.rail.ticketservice.mapper;
 
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Select;
 import org.rail.api.dto.UpdateSeatStatusDTO;
 import org.rail.ticketservice.model.dto.IntervalOccupyDTO;
 import org.rail.ticketservice.model.entity.SeatIntervalOccupy;
@@ -28,6 +29,9 @@ public interface SeatIntervalOccupyMapper {
      * @return 包含有效座位区间占用记录的列表
      */
     List<SeatIntervalOccupy> selectValidAll();
+
+    @Select("SELECT COUNT(*) FROM seat_interval_occupy WHERE lock_id = #{lockId}")
+    Integer countByLockId(Long lockId);
 
     /**
      * 批量更新座位区间占用记录

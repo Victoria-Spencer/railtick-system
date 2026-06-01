@@ -1,6 +1,7 @@
 package org.rail.common.core.config;
 
 import jakarta.annotation.PreDestroy;
+import org.rail.common.core.util.LogUtils;
 import org.rail.common.core.util.thread.RequestContextTaskDecorator;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -11,16 +12,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 @Configuration
 public class ThreadPoolConfig {
-
-    // ====================== 缓存专用线程池配置 ======================
-    @Value("${thread.pool.cache.core-size:5}")
-    private Integer CACHE_CORE_SIZE;
-    @Value("${thread.pool.cache.max-size:10}")
-    private Integer CACHE_MAX_SIZE;
-    @Value("${thread.pool.cache.queue-size:100}")
-    private Integer CACHE_QUEUE_SIZE;
-    @Value("${thread.pool.cache.keep-alive:60}")
-    private Long CACHE_KEEP_ALIVE;
 
     // ====================== 核心业务线程池配置 ======================
     @Value("${thread.pool.business.core-size:10}")
@@ -42,95 +33,91 @@ public class ThreadPoolConfig {
     @Value("${thread.pool.low.keep-alive:60}")
     private Long LOW_KEEP_ALIVE;
 
-    private ExecutorService cacheRebuildExecutor;
+    // 全局静态线程计数器
+    private static final AtomicInteger BUSINESS_THREAD_COUNTER = new AtomicInteger(1);
+    private static final AtomicInteger LOW_THREAD_COUNTER = new AtomicInteger(1);
+
+    private final RequestContextTaskDecorator ctxTaskDecorator;
     private ExecutorService businessAsyncExecutor;
     private ExecutorService lowPriorityExecutor;
 
-    // ====================== 1. 缓存重建线程池（核心任务，不丢任务）======================
-    @Bean
-    public ExecutorService cacheRebuildExecutor() {
-        ThreadFactory threadFactory = r -> {
-            Thread t = new Thread(r, "cache-rebuild-" + new AtomicInteger(1).getAndIncrement());
-            t.setDaemon(true);
-            return t;
-        };
-        cacheRebuildExecutor = new ThreadPoolExecutor(
-                CACHE_CORE_SIZE, CACHE_MAX_SIZE, CACHE_KEEP_ALIVE, TimeUnit.SECONDS,
-                new ArrayBlockingQueue<>(CACHE_QUEUE_SIZE),
-                threadFactory,
-                new ThreadPoolExecutor.CallerRunsPolicy() // 拒绝策略：调用者执行
-        );
-        return cacheRebuildExecutor;
+    public ThreadPoolConfig(RequestContextTaskDecorator ctxTaskDecorator) {
+        this.ctxTaskDecorator = ctxTaskDecorator;
     }
 
-    // ====================== 2. 核心业务线程池（核心任务，不丢任务）======================
+
+    /**
+     * 核心业务线程池（核心任务，不丢任务）
+     */
     @Bean
     public ExecutorService businessAsyncExecutor() {
         ThreadFactory threadFactory = r -> {
-            Thread t = new Thread(r, "business-async-" + new AtomicInteger(1).getAndIncrement());
+            Thread t = new Thread(r, "business-async-" + BUSINESS_THREAD_COUNTER.getAndIncrement());
             t.setDaemon(true);
             return t;
         };
-        businessAsyncExecutor = new ThreadPoolExecutor(
+        this.businessAsyncExecutor = new ThreadPoolExecutor(
                 BUSINESS_CORE_SIZE, BUSINESS_MAX_SIZE, BUSINESS_KEEP_ALIVE, TimeUnit.SECONDS,
                 new ArrayBlockingQueue<>(BUSINESS_QUEUE_SIZE),
                 threadFactory,
-                new ThreadPoolExecutor.CallerRunsPolicy() // 拒绝策略：调用者执行
+                new ThreadPoolExecutor.CallerRunsPolicy()
         );
-        return businessAsyncExecutor;
+        return this.businessAsyncExecutor;
     }
 
-    // ====================== 3. 低优先级线程池（非核心，可丢弃）======================
+    /**
+     * 低优先级线程池（非核心，可丢弃）
+     */
     @Bean
     public ExecutorService lowPriorityExecutor() {
         ThreadFactory threadFactory = r -> {
-            Thread t = new Thread(r, "low-priority-" + new AtomicInteger(1).getAndIncrement());
+            Thread t = new Thread(r, "low-priority-" + LOW_THREAD_COUNTER.getAndIncrement());
             t.setDaemon(true);
             return t;
         };
-        lowPriorityExecutor = new ThreadPoolExecutor(
+        this.lowPriorityExecutor = new ThreadPoolExecutor(
                 LOW_CORE_SIZE, LOW_MAX_SIZE, LOW_KEEP_ALIVE, TimeUnit.SECONDS,
                 new ArrayBlockingQueue<>(LOW_QUEUE_SIZE),
                 threadFactory,
-                new ThreadPoolExecutor.DiscardPolicy() // 拒绝策略：静默丢弃
+                new ThreadPoolExecutor.DiscardPolicy()
         );
-        return lowPriorityExecutor;
-    }
-
-    // ====================== 统一提交任务（自动包装上下文）======================
-    /**
-     * 执行异步任务（不支持返回值，自动传递上下文）
-     */
-    public static void execute(ExecutorService executor, Runnable task) {
-        executor.execute(RequestContextTaskDecorator.decorate(task));
+        return this.lowPriorityExecutor;
     }
 
     /**
      * 执行异步任务（不支持返回值，自动传递上下文）
      */
-    public static void submit(ExecutorService executor, Runnable task) {
-        executor.submit(RequestContextTaskDecorator.decorate(task));
+    public void execute(ExecutorService executor, Runnable task) {
+        executor.execute(ctxTaskDecorator.decorate(task));
+    }
+
+    /**
+     * 执行异步任务（不支持返回值，自动传递上下文）
+     */
+    public void submit(ExecutorService executor, Runnable task) {
+        executor.submit(ctxTaskDecorator.decorate(task));
     }
 
     /**
      * 提交异步任务（支持返回值，自动传递上下文）
      */
-    public static <T> Future<T> submit(ExecutorService executor, Callable<T> task) {
-        return executor.submit(RequestContextTaskDecorator.decorate(task));
+    public <T> Future<T> submit(ExecutorService executor, Callable<T> task) {
+        return executor.submit(ctxTaskDecorator.decorate(task));
     }
 
     /**
      * 提交无返回值任务 + 自定义固定返回值 (Runnable + T result)
      */
-    public static <T> Future<T> submit(ExecutorService executor, Runnable task, T result) {
-        return executor.submit(RequestContextTaskDecorator.decorate(task), result);
+    public <T> Future<T> submit(ExecutorService executor, Runnable task, T result) {
+        return executor.submit(ctxTaskDecorator.decorate(task), result);
     }
 
-    // ====================== 优雅关闭 ======================
+    /**
+     * 优雅关闭
+     */
     @PreDestroy
     public void destroy() {
-        System.out.println("Spring 容器关闭，开始优雅关闭所有线程池...");
-        shutdownThreadPool(cacheRebuildExecutor, "cacheRebuildExecutor");
+        LogUtils.info("Spring 容器关闭，开始优雅关闭所有线程池...");
         shutdownThreadPool(businessAsyncExecutor, "businessAsyncExecutor");
         shutdownThreadPool(lowPriorityExecutor, "lowPriorityExecutor");
     }
@@ -140,13 +127,13 @@ public class ThreadPoolConfig {
         try {
             executor.shutdown();
             if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
-                System.err.println(poolName + " 超时未关闭，强制关闭");
+                LogUtils.info(poolName + " 超时未关闭，强制关闭");
                 executor.shutdownNow();
             } else {
-                System.out.println(poolName + " 优雅关闭成功");
+                LogUtils.info(poolName + " 优雅关闭成功");
             }
         } catch (InterruptedException e) {
-            System.err.println(poolName + " 关闭被中断，强制关闭");
+            LogUtils.info(poolName + " 关闭被中断，强制关闭");
             executor.shutdownNow();
             Thread.currentThread().interrupt();
         }

@@ -9,7 +9,6 @@ import cn.hutool.core.util.StrUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang.StringUtils;
 import org.rail.api.constant.OrderTypeConstants;
-import org.rail.api.constant.SeatIntervalStatusConstants;
 import org.rail.ticketservice.constant.redis.SeatRedisConstants;
 import org.rail.ticketservice.constant.redis.TrainRedisConstants;
 import org.rail.common.core.exception.BizException;
@@ -28,6 +27,7 @@ import org.rail.ticketservice.model.entity.SeatIntervalOccupy;
 import org.rail.ticketservice.model.entity.Station;
 import org.rail.ticketservice.model.entity.Train;
 import org.rail.ticketservice.model.vo.*;
+import org.rail.ticketservice.mq.producer.SeatOccupySyncProducer;
 import org.rail.ticketservice.service.SeatService;
 import org.rail.ticketservice.service.TicketService;
 import org.rail.ticketservice.task.StationLocalCacheTask;
@@ -67,6 +67,8 @@ public class TicketServiceImpl implements TicketService {
     private TrainStopStationLocalCacheTask trainStopCacheTask;
     @Autowired
     private SeatService seatService;
+    @Autowired
+    private SeatOccupySyncProducer seatOccupySyncProducer;
 
     @Value("${order.pre.expire-minutes : 15}")
     private Integer preOrderExpireMinutes;
@@ -1027,20 +1029,16 @@ public class TicketServiceImpl implements TicketService {
     private void batchCacheSeatOccupy(List<SeatIntervalOccupy> occupyList, List<Long> seatIdList, SequenceDTO seqs, Long trainId) {
         if(CollectionUtils.isEmpty(occupyList)) return;
 
-        String recordKey = buildSeatOccupyHashKey(trainId);
-        Map<String, Object> batchHashMap = new HashMap<>();
-
-        boolean isLockedBatch = SeatIntervalStatusConstants.LOCKED.equals(occupyList.getFirst().getStatus());
+        Long batchLockId = SnowflakeIdGenerator.nextId();
 
         for (int i = 0; i < occupyList.size(); i++) {
             SeatIntervalOccupy occupy = occupyList.get(i);
             Long seatId = seatIdList.get(i);
-            String lockId = String.valueOf(SnowflakeIdGenerator.nextId());
 
             // 设置其它属性
-            fillSeatOccupyCommonFields(seqs, occupy, seatId, lockId);
+            fillSeatOccupyCommonFields(seqs, occupy, seatId, batchLockId);
 
-            // 1. 更新Bitmap占用标记
+            // 更新Bitmap占用标记
             String tempBitmapKey = buildSeatBitmapKey(OrderTypeConstants.PREORDER, trainId, seatId);
             String formalBitmapKey = buildSeatBitmapKey(OrderTypeConstants.ORDER, trainId, seatId);
             Long result = cacheClient.executeLuaFile(
@@ -1053,7 +1051,7 @@ public class TicketServiceImpl implements TicketService {
             );
 
             if (result == null || result == 0) {
-                throw new SeatLockFailedException("锁冲突，lockId:" + lockId);
+                throw new SeatLockFailedException("锁冲突，lockId:" + batchLockId);
             }
 
             SeatBusinessVO vo = SeatBusinessVO.builder()
@@ -1061,40 +1059,22 @@ public class TicketServiceImpl implements TicketService {
                     .id(seatId)
                     .build();
             ThreadLocalUtils.addToList("lockedSuccessSeats", vo);
-
-            // 2. 存储占用元数据
-            String field = buildSeatLockFieldKey(seatId, lockId);
-            batchHashMap.put(field, occupy);
         }
 
-        if (isLockedBatch) {
-            cacheClient.hPutAllWholeExpire(recordKey, batchHashMap, SeatRedisConstants.RAIL_SEAT_OCCUPY_LOCK_EXPIRE_MINUTES, TimeUnit.MINUTES);
-        } else {
-            cacheClient.hPutAllWholeExpire(recordKey, batchHashMap, SeatRedisConstants.RAIL_SEAT_OCCUPY_FORMAL_EXPIRE_MINUTES, TimeUnit.MINUTES);
-        }
-        // 批量落库消息
-        sendBatchSyncDbMsg(occupyList);
+        // 异步落库占用记录
+        seatOccupySyncProducer.sendSeatOccupySyncMsg(occupyList);
     }
 
     /**
      * 填充座位占用记录的公共属性
      */
-    private void fillSeatOccupyCommonFields(SequenceDTO seqs, SeatIntervalOccupy occupy, Long seatId, String lockId) {
+    private void fillSeatOccupyCommonFields(SequenceDTO seqs, SeatIntervalOccupy occupy, Long seatId, Long lockId) {
         occupy.setId(SnowflakeIdGenerator.nextId());
         occupy.setSeatId(seatId);
         occupy.setStartSequence(seqs.getStartSequence());
         occupy.setEndSequence(seqs.getEndSequence());
         occupy.setCreateTime(LocalDateTime.now());
         occupy.setLockId(lockId);
-    }
-
-    /**
-     * TODO 普通队列消息：批量落库 + 批量删除Hash
-     *  触发时机：正式订单占用（立即发送）+预订单占用（延迟发送）
-     */
-    private void sendBatchSyncDbMsg(List<SeatIntervalOccupy> occupyList) {
-        // TODO 实现：发送批量MQ消息
-        //  消费者：批量入库 → 批量删除Redis Hash字段
     }
 
     /**
@@ -1159,23 +1139,6 @@ public class TicketServiceImpl implements TicketService {
             throw new BizException("站点顺序异常：出发站序列不能大于等于到达站序列");
         }
     }
-
-    /**
-     * 构建座位占用记录的Hash Key
-     */
-    private String buildSeatOccupyHashKey(Long trainId) {
-        return String.format("%strainId:%d",
-                SeatRedisConstants.RAIL_SEAT_OCCUPY_RECORD_PREFIX,
-                trainId);
-    }
-
-    /**
-     * 构建座位锁唯一Field
-     */
-    private String buildSeatLockFieldKey(Long seatId, String lockId) {
-        return String.format("SeatId:%d:LockId:%s", seatId, lockId);
-    }
-
 
     /**
      * 构建Bitmap缓存Key

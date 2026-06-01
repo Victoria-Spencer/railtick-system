@@ -1,20 +1,27 @@
 package org.rail.common.core.util.thread;
 
+import org.jetbrains.annotations.NotNull;
 import org.rail.common.core.context.RequestContext;
 import org.rail.common.core.context.RequestContextHolder;
+import org.springframework.core.task.TaskDecorator;
+import org.springframework.stereotype.Component;
 
 import java.util.concurrent.Callable;
 
 /**
  * 线程池上下文装饰器：传递 RequestContext，解决 ThreadLocal 跨线程丢失
+ * 实现 Spring TaskDecorator 接口，适配 MQ 线程池
  */
-public class RequestContextTaskDecorator {
+@Component
+public class RequestContextTaskDecorator implements TaskDecorator {
 
     /**
      * 装饰 Runnable 任务，传递 RequestContext
      * 无返回值任务
      */
-    public static Runnable decorate(Runnable runnable) {
+    @Override
+    @NotNull
+    public Runnable decorate(@NotNull Runnable runnable) {
         // 父线程：获取并拷贝上下文
         RequestContext originalContext = RequestContextHolder.getRequestContext();
         final RequestContext copyContext = buildCopyContext(originalContext);
@@ -37,7 +44,7 @@ public class RequestContextTaskDecorator {
      * 装饰 Callable 任务，传递 RequestContext
      * 有返回值任务
      */
-    public static <T> Callable<T> decorate(Callable<T> callable) {
+    public <T> Callable<T> decorate(Callable<T> callable) {
         RequestContext originalContext = RequestContextHolder.getRequestContext();
         final RequestContext copyContext = buildCopyContext(originalContext);
 
@@ -56,7 +63,7 @@ public class RequestContextTaskDecorator {
     /**
      * 构建 RequestContext 副本
      */
-    private static RequestContext buildCopyContext(RequestContext original) {
+    private RequestContext buildCopyContext(RequestContext original) {
         if (original == null) {
             return null;
         }

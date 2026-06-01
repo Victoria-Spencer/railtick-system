@@ -1,7 +1,7 @@
 package org.rail.orderservice.mq.producer;
 
 import org.rail.orderservice.constant.OrderRedisConstants;
-import org.rail.orderservice.mq.config.RabbitMQConfig;
+import org.rail.orderservice.mq.config.OrderRabbitMQConfig;
 import org.rail.orderservice.mq.message.PreOrderDelayMessage;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,10 +27,10 @@ public class PreOrderDelayProducer {
         message.setTrainId(trainId);
         message.setPreOrderSn(preOrderSn);
 
-        long delayTime = OrderRedisConstants.PRE_ORDER_DELAY_TIME_MILLIS;;
+        int delayTime = OrderRedisConstants.PRE_ORDER_DELAY_TIME_MILLIS;
         rabbitTemplate.convertAndSend(
-                RabbitMQConfig.PRE_ORDER_DELAY_EXCHANGE,
-                RabbitMQConfig.PRE_ORDER_ROUTING_KEY,
+                OrderRabbitMQConfig.PRE_ORDER_DELAY_EXCHANGE,
+                OrderRabbitMQConfig.PRE_ORDER_ROUTING_KEY,
                 message,
                 msg -> {
                     msg.getMessageProperties().getHeaders().put("x-delay", delayTime);

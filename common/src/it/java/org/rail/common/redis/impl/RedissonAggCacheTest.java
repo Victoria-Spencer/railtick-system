@@ -154,7 +154,7 @@ public class RedissonAggCacheTest {
         String aggKey = "test:agg:page:1001";
         List<String> dependKeys = List.of("test:order:page:1001", "test:user:page:1001");
 
-        Function<Long, PageResult<String>> emptyPageFunc = id -> new PageResult<>(0L, Collections.emptyList(), 10);
+        Function<Long, PageResult<String>> emptyPageFunc = id -> new PageResult<>(0L, Collections.emptyList(), 1, 10);
 
         PageResult<String> result = redisAggCache.queryAggCacheWithNullCache(
                 aggKey, dependKeys, PAGE_TYPE_REF, emptyPageFunc, TEST_ID, TEST_TIME, TEST_TIME_UNIT

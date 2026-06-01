@@ -19,7 +19,7 @@ public class SeatIntervalOccupy {
     private Integer status;
     private LocalDateTime createTime;
     private LocalDateTime expireTime;
-    private String lockId;
+    private Long lockId;
 
     // 仅用于接收关联查询出的 train_id，数据库表不存在
     private Long trainId;

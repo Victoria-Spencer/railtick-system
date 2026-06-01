@@ -16,6 +16,7 @@ import org.rail.common.core.util.thread.ThreadLocalUtils;
 import org.rail.common.redis.api.ICacheClient;
 import org.rail.ticketservice.model.entity.Station;
 import org.rail.ticketservice.model.vo.SeatBusinessVO;
+import org.rail.ticketservice.mq.producer.SeatOccupySyncProducer;
 import org.rail.ticketservice.service.SeatService;
 import org.rail.ticketservice.task.StationLocalCacheTask;
 import org.rail.ticketservice.task.TrainStopStationLocalCacheTask;
@@ -44,6 +45,8 @@ class TicketServiceImplGetAvailableSeatTest {
     private MockedStatic<SnowflakeIdGenerator> snowflakeMock;
     @Mock
     private ICacheClient cacheClient;
+    @Mock
+    private SeatOccupySyncProducer seatOccupySyncProducer;
 
     private final Long TRAIN_ID = 1L;
     private final Integer SEAT_TYPE = 2; // 二等座
@@ -100,7 +103,7 @@ class TicketServiceImplGetAvailableSeatTest {
                 anyInt(),
                 anyInt()
         )).thenReturn(1L);
-        doNothing().when(cacheClient).hPutAllWholeExpire(anyString(), anyMap(), anyLong(), any());
+        doNothing().when(cacheClient).hPutAll(anyString(), anyMap());
         when(trainStopCacheTask.getTrainTerminalSeq(anyLong())).thenReturn(5);
 
         List<AvailableSeatRemoteDTO> result = ticketService.getAvailableSeats(queryDTO);
@@ -117,7 +120,8 @@ class TicketServiceImplGetAvailableSeatTest {
                 eq(OrderTypeConstants.PREORDER),        // 断言订单类型=预订单
                 eq(SeatIntervalStatusConstants.LOCKED)  // 断言锁座状态=锁定
         );
-        verify(cacheClient, times(1)).hPutAllWholeExpire(anyString(), anyMap(), anyLong(), any());
+        verify(cacheClient, times(1)).hPutAll(anyString(), anyMap());
+        verify(seatOccupySyncProducer, times(1)).sendSeatOccupySyncMsg(anyList());
     }
 
     /**
@@ -155,7 +159,7 @@ class TicketServiceImplGetAvailableSeatTest {
                 anyInt(),
                 anyInt()
         )).thenReturn(1L);
-        doNothing().when(cacheClient).hPutAllWholeExpire(anyString(), anyMap(), anyLong(), any());
+        doNothing().when(cacheClient).hPutAll(anyString(), anyMap());
         when(trainStopCacheTask.getTrainTerminalSeq(anyLong())).thenReturn(5);
 
         // 执行业务方法
@@ -172,7 +176,8 @@ class TicketServiceImplGetAvailableSeatTest {
                 eq(OrderTypeConstants.PREORDER),
                 eq(SeatIntervalStatusConstants.LOCKED)
         );
-        verify(cacheClient, times(1)).hPutAllWholeExpire(anyString(), anyMap(), anyLong(), any());
+        verify(cacheClient, times(1)).hPutAll(anyString(), anyMap());
+        verify(seatOccupySyncProducer, times(1)).sendSeatOccupySyncMsg(anyList());
     }
 
     /**

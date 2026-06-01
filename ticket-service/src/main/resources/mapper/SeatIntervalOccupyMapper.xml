@@ -93,18 +93,21 @@
     <insert id="batchInsertSIOOccupyRecords"
             parameterType="java.util.List">
         INSERT INTO seat_interval_occupy (
-          seat_id,
-          start_sequence,
-          end_sequence,
-          order_id,
-          order_type,
-          status,
-          create_time,
-          expire_time
+              id,
+              seat_id,
+              start_sequence,
+              end_sequence,
+              order_id,
+              order_type,
+              status,
+              create_time,
+              expire_time,
+              lock_id
         )
         VALUES
         <foreach collection="list" item="item" separator=",">
             (
+                #{item.id},
                 #{item.seatId},
                 #{item.startSequence},
                 #{item.endSequence},
@@ -112,7 +115,8 @@
                 #{item.orderType},
                 #{item.status},
                 #{item.createTime},
-                #{item.expireTime}
+                #{item.expireTime},
+                #{item.lockId}
             )
         </foreach>
     </insert>

@@ -4,8 +4,11 @@ import org.springframework.amqp.core.*;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+/**
+ * 日志服务 RabbitMQ 独立配置
+ */
 @Configuration
-public class RabbitMQConfig {
+public class LogRabbitMQConfig {
 
     public static final String EXCHANGE = "operation.log.exchange";
     public static final String QUEUE = "operation.log.queue";

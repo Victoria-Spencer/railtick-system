@@ -20,7 +20,8 @@ public final class OrderRedisConstants {
 
     // ====================== 延迟队列配置 ======================
     /** 预订单超时延迟时间：15分钟（毫秒） */
-    public static final long PRE_ORDER_DELAY_TIME_MILLIS = 15 * 60 * 1000L;
+//    public static final int PRE_ORDER_DELAY_TIME_MILLIS = 15 * 60 * 1000;
+    public static final int PRE_ORDER_DELAY_TIME_MILLIS = 150000;
 
     // ====================== 聚合缓存 ======================
     public static final String RAIL_AGG_ORDER_USER_ALL_PREFIX = "rail:agg:order_user_all"; // 订单用户信息全量缓存

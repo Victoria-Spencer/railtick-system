@@ -4,7 +4,7 @@ import org.rail.common.core.exception.MqException;
 import org.rail.orderservice.mapper.OrderMapper;
 import org.rail.orderservice.model.entity.Order;
 import org.rail.orderservice.model.entity.OrderDetails;
-import org.rail.orderservice.mq.config.RabbitMQConfig;
+import org.rail.orderservice.mq.config.OrderRabbitMQConfig;
 import org.rail.orderservice.mq.message.OrderCreateMessage;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,7 +20,7 @@ public class OrderCreateConsumer {
     private OrderMapper orderMapper;
 
     @Transactional
-    @RabbitListener(queues = RabbitMQConfig.ORDER_CREATE_QUEUE)
+    @RabbitListener(queues = OrderRabbitMQConfig.ORDER_CREATE_QUEUE)
     public void consume(OrderCreateMessage message) {
         Order order = message.getOrder();
         List<OrderDetails> detailsList = message.getOrderDetailsList();

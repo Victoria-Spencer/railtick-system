@@ -6,6 +6,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.io.Serial;
 import java.io.Serializable;
 
 /**
@@ -17,6 +18,9 @@ import java.io.Serializable;
 @AllArgsConstructor
 @Builder
 public class RequestContext implements Serializable {
+
+    @Serial
+    private static final long serialVersionUID = 1L;
 
     /** 请求开始时间戳（计算接口耗时） */
     private long startTime;
