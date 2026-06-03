@@ -8,6 +8,7 @@ import org.rail.common.redis.exception.CacheException;
 import org.rail.common.redis.result.RedisData;
 import org.redisson.api.*;
 import org.redisson.client.codec.ByteArrayCodec;
+import org.redisson.client.codec.StringCodec;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -369,6 +370,29 @@ public class RedissonCache implements RedisCache {
         try {
             RBitSet bitSet = redissonClient.getBitSet(key);
             return bitSet.cardinality();
+        } catch (Exception e) {
+            throw new CacheException("Bitmap统计位数失败", e);
+        }
+    }
+
+    /**
+     * 统计Bitmap指定区间 [startOffset, endOffset） 内bit=1的数量
+     */
+    @Override
+    public long bitCount(String key, long startOffset, long endOffset) {
+        if (StrUtil.isBlank(key) || startOffset < 0 || endOffset < startOffset) {
+            return -1;
+        }
+
+        String lua = "local cnt=0 for i=tonumber(ARGV[1]), tonumber(ARGV[2]) do if redis.call('GETBIT',KEYS[1],i)==1 then cnt=cnt+1 end end return cnt";
+
+        try {
+            return executeLuaScript(
+                    lua,
+                    Collections.singletonList(key),
+                    startOffset,
+                    endOffset - 1
+            );
         } catch (Exception e) {
             throw new CacheException("Bitmap统计位数失败", e);
         }
@@ -755,16 +779,17 @@ public class RedissonCache implements RedisCache {
     // ================================= Lua 脚本操作 ==================================
     @Override
     public <T> T executeLuaFile(String luaFilePath, List<Object> keys, Object... args) {
-        if (StrUtil.isBlank(luaFilePath) || CollectionUtil.isEmpty(keys)) {
+        if (StrUtil.isBlank(luaFilePath)) {
             throw new CacheException("Lua 脚本执行参数异常");
         }
+        keys = keys == null ? Collections.emptyList() : keys;
         try {
             String scriptContent = loadScriptFromClasspath(luaFilePath);
             String sha1 = getScriptSha(scriptContent);
-            return redissonClient.getScript().evalSha(
+            return redissonClient.getScript(StringCodec.INSTANCE).evalSha(
                     RScript.Mode.READ_WRITE,
                     sha1,
-                    RScript.ReturnType.INTEGER,
+                    RScript.ReturnType.VALUE,
                     keys,
                     args
             );
@@ -775,14 +800,15 @@ public class RedissonCache implements RedisCache {
 
     @Override
     public <T> T executeLuaScript(String luaScript, List<Object> keys, Object... args) {
-        if (StrUtil.isBlank(luaScript) || CollectionUtil.isEmpty(keys)) {
+        if (StrUtil.isBlank(luaScript)) {
             throw new CacheException("Lua 脚本执行参数异常");
         }
+        keys = keys == null ? Collections.emptyList() : keys;
         try {
-            return redissonClient.getScript().eval(
+            return redissonClient.getScript(StringCodec.INSTANCE).eval(
                     RScript.Mode.READ_WRITE,
                     luaScript,
-                    RScript.ReturnType.INTEGER,
+                    RScript.ReturnType.VALUE,
                     keys,
                     args
             );
@@ -795,8 +821,11 @@ public class RedissonCache implements RedisCache {
      * 从 classpath 加载 Lua 脚本文件
      */
     private String loadScriptFromClasspath(String filePath) {
-        try (InputStream is = getClass().getClassLoader().getResourceAsStream(filePath);
-             BufferedReader br = new BufferedReader(new InputStreamReader(is))) {
+        try (InputStream is = getClass().getClassLoader().getResourceAsStream(filePath)) {
+            if (is == null) {
+                throw new CacheException("Lua 脚本文件不存在：" + filePath);
+            }
+            BufferedReader br = new BufferedReader(new InputStreamReader(is));
             return br.lines().collect(Collectors.joining("\n"));
         } catch (IOException e) {
             throw new CacheException("加载 Lua 脚本文件失败：" + filePath, e);

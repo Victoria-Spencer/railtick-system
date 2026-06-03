@@ -50,6 +50,8 @@ public interface ICacheClient {
 
     long bitCount(String key);
 
+    long bitCount(String key, long startOffset, long endOffset);
+
     void batchSetBits(String key, Collection<Long> offsets, boolean value);
 
     void setRangeBits(String key, long startOffset, long endOffset, boolean value);

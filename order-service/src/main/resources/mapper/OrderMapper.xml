@@ -80,12 +80,13 @@
         </foreach>
     </update>-->
 
-    <insert id="insertOrder" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+    <insert id="insertOrder">
         INSERT INTO
-            `order`(id, user_id, train_id, order_sn, pre_order_sn,
-                    total_amount, create_time, update_time)
-            VALUES (#{id}, #{userId}, #{trainId}, #{orderSn},
-                    #{preOrderSn}, #{totalAmount}, #{createTime}, #{updateTime})
+            `order`(id, user_id, train_id, order_sn, pre_order_sn, status,
+                    total_amount, create_time, update_time, expire_time)
+            VALUES (#{id}, #{userId}, #{trainId}, #{orderSn},#{preOrderSn},
+                    #{status}, #{totalAmount}, #{createTime},
+                    #{updateTime}, #{expireTime})
     </insert>
 
     <insert id="batchInsertOrderDetails"

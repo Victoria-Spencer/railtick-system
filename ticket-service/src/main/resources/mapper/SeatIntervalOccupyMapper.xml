@@ -69,7 +69,7 @@
     <select id="selectValidAll" resultType="org.rail.ticketservice.model.entity.SeatIntervalOccupy">
         SELECT
             sio.id, sio.seat_id, tsc.train_id, sio.start_sequence,
-            sio.end_sequence, sio.order_id, sio.order_type, sio.status,
+            sio.end_sequence, sio.order_id, sio.status,
             sio.create_time, sio.expire_time
         FROM seat_interval_occupy sio
         INNER JOIN seat s
@@ -77,17 +77,21 @@
         INNER JOIN train_seat_class tsc
             ON tsc.id = s.train_seat_class_id
         WHERE
-          -- 过滤有效状态：锁定中/已售出
-          sio.status IN (0, 1)
-          -- 过滤过期
-          AND
-            (
-                (sio.status = 1 AND sio.expire_time IS NULL)
-                    OR
-                (sio.status = 0 AND sio.expire_time > NOW())
-            )
-          -- 过滤非法区间
-          AND sio.start_sequence &lt; sio.end_sequence
+        (
+            (sio.status IN (0,1) AND sio.expire_time IS NOT NULL)
+            OR
+            (sio.status NOT IN (0,1) AND sio.expire_time IS NULL)
+        )
+        -- 业务筛选有效占用：0=预订单锁，1=正式订单锁，2=已售出
+        AND (
+            (sio.status = 0 AND sio.expire_time > NOW())
+            OR
+            (sio.status = 1 AND sio.expire_time > NOW())
+            OR
+            (sio.status = 2 AND sio.expire_time IS NULL)
+        )
+        -- 区间合法约束
+        AND sio.start_sequence &lt; sio.end_sequence
     </select>
 
     <insert id="batchInsertSIOOccupyRecords"
@@ -98,7 +102,6 @@
               start_sequence,
               end_sequence,
               order_id,
-              order_type,
               status,
               create_time,
               expire_time,
@@ -112,7 +115,6 @@
                 #{item.startSequence},
                 #{item.endSequence},
                 #{item.orderId},
-                #{item.orderType},
                 #{item.status},
                 #{item.createTime},
                 #{item.expireTime},

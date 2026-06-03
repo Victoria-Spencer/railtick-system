@@ -33,6 +33,7 @@ public class TicketController {
         return ticketService.queryPlannedTicket(plannedTicketQueryDTO);
     }
 
+    @OperationLog(value = "获取可用座位", saveParam = true)
     @PostMapping("/seats/available")
     public List<AvailableSeatRemoteDTO> getAvailableSeats(@RequestBody @Validated RandomSeatQueryDTO randomSeatQueryDTO) {
         return ticketService.getAvailableSeats(randomSeatQueryDTO);

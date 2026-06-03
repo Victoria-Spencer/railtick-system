@@ -13,15 +13,15 @@ public final class OrderRedisConstants {
     public static final String RAIL_LOCK_PRE_ORDER_CREATE_PREFIX = "rail:lock:pre:order:create:";
     /** 创建正式订单锁前缀（预订单号维度）：rail:lock:order:create:preOrderSn:{preOrderSn} */
     public static final String RAIL_LOCK_ORDER_CREATE_PREFIX = "rail:lock:order:create:";
-    /** 正式订单延迟队列 分布式锁前缀 */
-    public static final String RAIL_LOCK_ORDER_DELAY_PREFIX = "rail:lock:order:delay:";
+    /** 正式订单锁 分布式锁前缀 */
+    public static final String RAIL_LOCK_ORDER_PREFIX = "rail:lock:order:";
     /** 预订单延迟队列 分布式锁前缀 */
     public static final String RAIL_LOCK_PRE_ORDER_DELAY_PREFIX = "rail:lock:order:pre:delay:";
 
     // ====================== 延迟队列配置 ======================
-    /** 预订单超时延迟时间：15分钟（毫秒） */
-//    public static final int PRE_ORDER_DELAY_TIME_MILLIS = 15 * 60 * 1000;
-    public static final int PRE_ORDER_DELAY_TIME_MILLIS = 150000;
+    /** 预订单超时延迟时间：16分钟（毫秒） */
+    public static final int PRE_ORDER_DELAY_TIME_MILLIS = 15 * 60 * 1000;
+//    public static final int PRE_ORDER_DELAY_TIME_MILLIS = 150000;
 
     // ====================== 聚合缓存 ======================
     public static final String RAIL_AGG_ORDER_USER_ALL_PREFIX = "rail:agg:order_user_all"; // 订单用户信息全量缓存
@@ -35,10 +35,8 @@ public final class OrderRedisConstants {
     // ====================== 预订单 ======================
     public static final String RAIL_PRE_ORDER_PREFIX = "rail:pre:order:";
     public static final String RAIL_PRE_ORDER_DETAILS_PREFIX = "rail:pre:order:details:"; // + preOrderId
-    public static final String RAIL_PRE_ORDER_CONVERTED = "rail:pre:order:converted:";
 
     // ====================== 正式订单 ======================
     public static final String RAIL_ORDER_PREFIX = "rail:order:"; // + orderSn
     public static final String RAIL_ORDER_DETAILS_PREFIX = "rail:order:details:"; // + orderId
-    public static  final String RAIL_ORDER_CONVERTED = "rail:order:converted:";
 }

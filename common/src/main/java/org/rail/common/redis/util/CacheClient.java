@@ -189,6 +189,14 @@ public class CacheClient implements ICacheClient {
     }
 
     /**
+     * 统计Bitmap指定区间 [startOffset, endOffset） 内bit=1的数量
+     */
+    @Override
+    public long bitCount(String key, long startOffset, long endOffset) {
+        return redisCache.bitCount(key, startOffset, endOffset);
+    }
+
+    /**
      * 批量设置Bitmap多个偏移量为指定值
      */
     @Override

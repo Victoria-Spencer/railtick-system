@@ -9,7 +9,6 @@ import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.rail.api.constant.OrderTypeConstants;
 import org.rail.api.constant.SeatIntervalStatusConstants;
 import org.rail.api.dto.BatchSeatIntervalInsertDTO;
 import org.rail.api.dto.SeatBaseDTO;
@@ -22,7 +21,6 @@ import org.rail.ticketservice.model.entity.Station;
 import org.rail.ticketservice.mq.producer.SeatOccupySyncProducer;
 import org.rail.ticketservice.task.StationLocalCacheTask;
 import org.rail.ticketservice.task.TrainStopStationLocalCacheTask;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 import java.util.Map;
@@ -61,8 +59,6 @@ class TicketServiceImplUpdateSeatStatusTest {
         snowflakeMock = Mockito.mockStatic(SnowflakeIdGenerator.class);
         snowflakeMock.when(SnowflakeIdGenerator::nextId).thenReturn(123456789L);
 
-        ReflectionTestUtils.setField(ticketService, "preOrderExpireMinutes", 15);
-
         ThreadLocalUtils.removeAll();
     }
 
@@ -87,13 +83,12 @@ class TicketServiceImplUpdateSeatStatusTest {
                 anyList(),
                 eq(DEP_SEQUENCE),
                 eq(ARR_SEQUENCE),
-                eq(OrderTypeConstants.PREORDER),
-                eq(SeatIntervalStatusConstants.LOCKED)
+                eq(SeatIntervalStatusConstants.PRE_LOCKED)
         )).thenReturn(1L);
 
         // 执行+验证
         assertDoesNotThrow(() -> ticketService.updateSeatStatus(batchDTO));
-        verify(cacheClient).executeLuaFile(anyString(), anyList(), anyInt(), anyInt(), anyInt(), anyInt());
+        verify(cacheClient).executeLuaFile(anyString(), anyList(), anyInt(), anyInt(), anyInt());
         verify(seatOccupySyncProducer, times(1)).sendSeatOccupySyncMsg(anyList());
     }
 
@@ -110,8 +105,7 @@ class TicketServiceImplUpdateSeatStatusTest {
                 anyList(),
                 eq(DEP_SEQUENCE),
                 eq(ARR_SEQUENCE),
-                eq(OrderTypeConstants.PREORDER),
-                eq(SeatIntervalStatusConstants.LOCKED)
+                eq(SeatIntervalStatusConstants.PRE_LOCKED)
         )).thenReturn(0L);
 
         assertThrows(SeatLockFailedException.class,
@@ -132,15 +126,21 @@ class TicketServiceImplUpdateSeatStatusTest {
                 anyList(),
                 eq(DEP_SEQUENCE),
                 eq(ARR_SEQUENCE),
-                eq(OrderTypeConstants.PREORDER),
-                eq(SeatIntervalStatusConstants.LOCKED)
+                eq(SeatIntervalStatusConstants.PRE_LOCKED)
         )).thenReturn(1L);
 
         doThrow(new RuntimeException("Redis Hash写入失败")).when(cacheClient).hPutAll(anyString(), anyMap());
         assertThrows(SeatLockFailedException.class,
                 () -> ticketService.updateSeatStatus(batchDTO));
+
         // 有锁定座位，回滚
-        verify(cacheClient).setRangeBits(anyString(), eq(2L), eq(5L), eq(false));
+        verify(cacheClient, times(1)).executeLuaFile(
+                eq("lua/seatRollback.lua"),  // 回滚脚本
+                anyList(),
+                eq(DEP_SEQUENCE),
+                eq(ARR_SEQUENCE),
+                eq(0)  // 预订单回滚类型
+        );
     }
 
     /**
@@ -152,7 +152,7 @@ class TicketServiceImplUpdateSeatStatusTest {
         batchDTO.setSeatList(null);
 
         assertThrows(IllegalArgumentException.class, () -> ticketService.updateSeatStatus(batchDTO));
-        verify(cacheClient, never()).executeLuaFile(anyString(), anyList(), anyInt(), anyInt(), anyInt(), anyInt());
+        verify(cacheClient, never()).executeLuaFile(anyString(), anyList(), anyInt(), anyInt(), anyInt());
     }
 
     /**
@@ -163,8 +163,7 @@ class TicketServiceImplUpdateSeatStatusTest {
         batchDTO.setTrainId(TRAIN_ID);
         batchDTO.setDepartureCode(DEP_CODE);
         batchDTO.setArrivalCode(ARR_CODE);
-        batchDTO.setOrderType(OrderTypeConstants.PREORDER);
-        batchDTO.setStatus(SeatIntervalStatusConstants.LOCKED);
+        batchDTO.setStatus(SeatIntervalStatusConstants.PRE_LOCKED);
         batchDTO.setSeatList(List.of(buildSeatBaseDTO()));
         return batchDTO;
     }

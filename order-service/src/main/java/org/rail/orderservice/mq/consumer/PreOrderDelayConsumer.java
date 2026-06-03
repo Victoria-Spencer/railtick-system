@@ -2,7 +2,6 @@ package org.rail.orderservice.mq.consumer;
 
 import cn.hutool.core.util.ObjectUtil;
 import org.rail.api.client.TicketFeignClient;
-import org.rail.api.constant.OrderTypeConstants;
 import org.rail.api.constant.SeatIntervalStatusConstants;
 import org.rail.api.dto.BatchSeatIntervalInsertDTO;
 import org.rail.api.dto.SeatBaseDTO;
@@ -42,21 +41,14 @@ public class PreOrderDelayConsumer {
         Long userId = message.getUserId();
         Long trainId = message.getTrainId();
         String preOrderSn = message.getPreOrderSn();
-        String convertFlagKey = OrderRedisConstants.RAIL_PRE_ORDER_CONVERTED + preOrderSn;
 
         String preOrderKey = buildPreOrderKey(userId, trainId);
-        String lockKey = LOCK_KEY_PREFIX + userId + ":" + trainId;
+        String lockKey = LOCK_KEY_PREFIX + userId + ":" + trainId + ":" + preOrderSn;
         RLock lock = redissonClient.getLock(lockKey);
 
         try {
             // 防重复消费
             if (!lock.tryLock(0, 30, TimeUnit.SECONDS)) {
-                return;
-            }
-
-            // 已转化为正式订单 → 直接跳过
-            if (cacheClient.exists(convertFlagKey)) {
-                cacheClient.delete(convertFlagKey);
                 return;
             }
 
@@ -111,7 +103,6 @@ public class PreOrderDelayConsumer {
         BatchSeatIntervalInsertDTO batchSeatDTO = new BatchSeatIntervalInsertDTO()
                 .setTrainId(oldPreOrder.getTrainId())
                 .setOrderId(oldPreOrder.getId())
-                .setOrderType(OrderTypeConstants.PREORDER)
                 .setDepartureCode(oldPreOrder.getDepartureCode())
                 .setStatus(SeatIntervalStatusConstants.RELEASED)
                 .setArrivalCode(oldPreOrder.getArrivalCode())

@@ -8,11 +8,14 @@ public final class SeatRedisConstants {
 
     private SeatRedisConstants() {}
 
-    // ====================== 分布式锁 ======================
     public static final String RAIL_LOCK_SEAT_CACHE_INIT = "rail:lock:seat:cache:init";
 
-    // ====================== 座位状态缓存（Bitmap + Hash）======================
-    public static final String RAIL_BITMAP_SEAT_FORMAL_PREFIX = "rail:bitmap:seat:formal:"; // 正式售出座位Bitmap + trainId
-    public static final String RAIL_BITMAP_SEAT_TEMP_LOCK_PREFIX = "rail:bitmap:seat:temp_lock:"; // 临时锁座Bitmap + trainId
+    // 双位图组合状态
+    /** 座位平级位图1（对应Lua脚本 bitmap1） + trainId + seatId */
+    public static final String RAIL_BITMAP_SEAT_SLOT1_PREFIX = "rail:bitmap:seat:slot1:";
+    /** 座位平级位图2（对应Lua脚本 bitmap2） + trainId + seatId */
+    public static final String RAIL_BITMAP_SEAT_SLOT2_PREFIX = "rail:bitmap:seat:slot2:";
+
+    // 座位信息
     public static final String RAIL_HASH_SEAT_INFO_PREFIX = "rail:hash:seat:info:"; // 座位信息Hash + trainId
 }

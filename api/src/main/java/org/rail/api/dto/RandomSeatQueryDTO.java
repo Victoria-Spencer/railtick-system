@@ -7,6 +7,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Data
@@ -20,6 +21,12 @@ public class RandomSeatQueryDTO {
 
     @NotNull(message = "订单ID不能为空")
     private Long orderId;
+
+    @NotNull(message = "状态不能为空")
+    private Integer status;
+
+    @NotNull(message = "座位锁定过期时间不能为空")
+    private LocalDateTime expireTime;
 
     @NotNull(message = "席别类型不能为空")
     private Integer seatType;
@@ -35,10 +42,4 @@ public class RandomSeatQueryDTO {
 
     // 用户偏好的座位序号（A/B/C/D/F）（非必须）
     private List<String> preferredSeatSymbols;
-
-    @NotNull(message = "订单类型不能为空")
-    private Integer orderType;
-
-    @NotNull(message = "状态不能为空")
-    private Integer status;
 }

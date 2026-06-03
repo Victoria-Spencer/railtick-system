@@ -49,7 +49,7 @@ public class OrderController {
     }
 
     @OperationLog(value = "取消订单", saveParam = true)
-    @DeleteMapping("/order/cancel")
+    @PutMapping("/order/cancel")
     public void cancel(@RequestParam @NotBlank(message = "订单编号不能为空") String orderSn) {
         orderService.cancelOrder(orderSn);
     }

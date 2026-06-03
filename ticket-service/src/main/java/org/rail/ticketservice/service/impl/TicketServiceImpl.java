@@ -8,7 +8,7 @@ import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang.StringUtils;
-import org.rail.api.constant.OrderTypeConstants;
+import org.rail.api.constant.SeatIntervalStatusConstants;
 import org.rail.ticketservice.constant.redis.SeatRedisConstants;
 import org.rail.ticketservice.constant.redis.TrainRedisConstants;
 import org.rail.common.core.exception.BizException;
@@ -33,7 +33,6 @@ import org.rail.ticketservice.service.TicketService;
 import org.rail.ticketservice.task.StationLocalCacheTask;
 import org.rail.ticketservice.task.TrainStopStationLocalCacheTask;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 
@@ -69,9 +68,6 @@ public class TicketServiceImpl implements TicketService {
     private SeatService seatService;
     @Autowired
     private SeatOccupySyncProducer seatOccupySyncProducer;
-
-    @Value("${order.pre.expire-minutes : 15}")
-    private Integer preOrderExpireMinutes;
 
     /**
      * 查询购票列表（新增分层次缓存）
@@ -477,9 +473,8 @@ public class TicketServiceImpl implements TicketService {
                 || StrUtil.isBlank(queryDTO.getDepartureCode())
                 || StrUtil.isBlank(queryDTO.getArrivalCode())
                 || ObjectUtil.isEmpty(queryDTO.getOrderId())
-                || ObjectUtil.isEmpty(queryDTO.getOrderType())
                 || ObjectUtil.isEmpty(queryDTO.getStatus())) {
-            throw new IllegalArgumentException("随机选座参数校验失败：车次ID、席别类型、乘客数量、出发站编码、到达站编码、订单ID、订单类型、状态为必填项且乘客数量必须大于0");
+            throw new IllegalArgumentException("随机选座参数校验失败：车次ID、席别类型、乘客数量、出发站编码、到达站编码、订单ID、状态为必填项且乘客数量必须大于0");
         }
 
         Long trainId = queryDTO.getTrainId();
@@ -552,13 +547,12 @@ public class TicketServiceImpl implements TicketService {
      */
     private void rollbackSeatLock(BatchSeatIntervalInsertDTO batchDTO) {
         List<SeatBusinessVO> lockedSeats = ThreadLocalUtils.getList("lockedSuccessSeats");
-        Integer orderType = batchDTO.getOrderType();
+        Integer status = batchDTO.getStatus();
 
-        // 1. 基础参数校验
         if (CollectionUtils.isEmpty(lockedSeats)) return;
 
         if (StrUtil.hasBlank(batchDTO.getDepartureCode(), batchDTO.getArrivalCode())
-                || Objects.isNull(orderType)) {
+                || Objects.isNull(status)) {
             log.warn("座位回滚参数不合法，跳过回滚");
             return;
         }
@@ -569,12 +563,26 @@ public class TicketServiceImpl implements TicketService {
             SequenceDTO seqs = getStationSequence(trainId, batchDTO.getDepartureCode(), batchDTO.getArrivalCode());
             int startSeq = seqs.getStartSequence();
             int endSeq = seqs.getEndSequence();
+            int rollbackType = SeatIntervalStatusConstants.PRE_LOCKED.equals(status) ? 0 : 1;
 
             for (SeatBusinessVO seat : lockedSeats) {
                 Long seatId = seat.getId();
 
-                String bitmapKey = buildSeatBitmapKey(orderType, trainId, seatId);
-                cacheClient.setRangeBits(bitmapKey, startSeq, endSeq, false);
+                String slot1Key = buildSeatSlot1Key(trainId, seatId);
+                String slot2Key = buildSeatSlot2Key(trainId, seatId);
+
+                Long rollResult = cacheClient.executeLuaFile(
+                        "lua/seatRollback.lua",
+                        Arrays.asList(slot1Key, slot2Key),
+                        startSeq,
+                        endSeq,
+                        rollbackType
+                );
+
+                if (rollResult == null || rollResult == 0) {
+                    log.error("座位回滚失败, trainId:{}, seatId:{}, 回滚类型:{}，请人工兜底处理",
+                            trainId, seatId, rollbackType);
+                }
             }
         } catch (Exception ex) {
             log.error("回滚解锁座位失败，trainId：{}", trainId, ex);
@@ -813,12 +821,11 @@ public class TicketServiceImpl implements TicketService {
     public void updateSeatStatus(BatchSeatIntervalInsertDTO batchDTO) {
         if (ObjectUtil.isEmpty(batchDTO)
                 || ObjectUtil.isEmpty(batchDTO.getTrainId())
-                || ObjectUtil.isEmpty(batchDTO.getOrderType())
                 || ObjectUtil.isEmpty(batchDTO.getStatus())
                 || StrUtil.isBlank(batchDTO.getDepartureCode())
                 || StrUtil.isBlank(batchDTO.getArrivalCode())
                 || CollectionUtils.isEmpty(batchDTO.getSeatList())) {
-            throw new IllegalArgumentException("更新座位状态参数校验失败：车次ID、订单类型、状态、出发站编码、到达站编码、座位列表为必填项");
+            throw new IllegalArgumentException("更新座位状态参数校验失败：车次ID、状态、出发站编码、到达站编码、座位列表为必填项");
         }
 
         try {
@@ -910,23 +917,18 @@ public class TicketServiceImpl implements TicketService {
     private Integer calculateSeatStatusFromRedis(Long trainId, Long seatId) {
         Integer terminalSeq = getTrainTerminalSeqFromCache(trainId);
         int minOffset = 1;
-        int maxOffset = terminalSeq - 1;
+        int maxOffset = terminalSeq;
 
-        // 读取该座位的正式订单Bitmap（永久占用）
-        String formalKey = SeatRedisConstants.RAIL_BITMAP_SEAT_FORMAL_PREFIX + "trainId:" + trainId + ":seatId:" + seatId;
-        // 读取该座位的预订单Bitmap（临时占用）
-        String tempKey = SeatRedisConstants.RAIL_BITMAP_SEAT_TEMP_LOCK_PREFIX + "trainId:" + trainId + ":seatId:" + seatId;
+        String slot1Key = buildSeatSlot1Key(trainId, seatId);
+        String slot2Key = buildSeatSlot2Key(trainId, seatId);
 
-        byte[] formalBytes = cacheClient.get(formalKey, byte[].class);
-        byte[] tempBytes = cacheClient.get(tempKey, byte[].class);
+        long formalOccupied = cacheClient.bitCount(slot1Key, minOffset, maxOffset);
+        long tempOccupied = cacheClient.bitCount(slot2Key, minOffset, maxOffset);
+        long totalOccupied = formalOccupied + tempOccupied;
 
-        byte[] mergedBytes = mergeBytesOr(formalBytes, tempBytes);
-
-        long occupiedCount = countBitsInRange(mergedBytes, minOffset, maxOffset);
-
-        if (occupiedCount == 0) {
+        if (totalOccupied == 0) {
             return SeatStatusConstants.AVAILABLE;
-        } else if (occupiedCount == terminalSeq - 1) {
+        } else if (totalOccupied == terminalSeq - 1) {
             return SeatStatusConstants.FULLY_OCCUPIED;
         } else {
             return SeatStatusConstants.PARTIALLY_OCCUPIED;
@@ -941,55 +943,6 @@ public class TicketServiceImpl implements TicketService {
     }
 
     /**
-     * 统计 Bitmap 字节数组中 [startOffset, endOffset] 范围内 bit=1 的数量
-     * 兼容Redis大端存储
-     */
-    private long countBitsInRange(byte[] bytes, int startOffset, int endOffset) {
-        if (bytes == null || bytes.length == 0 || startOffset > endOffset) {
-            return 0;
-        }
-
-        long count = 0;
-        for (int offset = startOffset; offset <= endOffset; offset++) {
-            if (getBit(bytes, offset)) {
-                count++;
-            }
-        }
-        return count;
-    }
-
-    /**
-     * 获取指定offset的位值
-     */
-    private boolean getBit(byte[] bytes, int offset) {
-        if (offset < 0) return false;
-        int byteIdx = offset / 8;
-        int bitPos = 7 - (offset % 8); // 大端存储：最高位优先
-
-        if (byteIdx >= bytes.length) return false;
-        return (bytes[byteIdx] & (1 << bitPos)) != 0;
-    }
-
-    /**
-     * 两个字节数组 按位或 合并
-     * null 视为全0字节数组
-     */
-    private byte[] mergeBytesOr(byte[] a, byte[] b) {
-        if (a == null) return b == null ? new byte[0] : b;
-        if (b == null) return a;
-
-        int maxLen = Math.max(a.length, b.length);
-        byte[] result = new byte[maxLen];
-
-        for (int i = 0; i < maxLen; i++) {
-            byte b1 = i < a.length ? a[i] : 0;
-            byte b2 = i < b.length ? b[i] : 0;
-            result[i] = (byte) (b1 | b2);
-        }
-        return result;
-    }
-
-    /**
      * 操作座位区间占用记录（新增/更新），并同步到Redis Bitmap和占用记录缓存
      */
     private void operateSeatIntervalOccupy(BatchSeatIntervalInsertDTO batchDTO) {
@@ -1000,9 +953,6 @@ public class TicketServiceImpl implements TicketService {
         SequenceDTO seqs = getStationSequence(trainId, batchDTO.getDepartureCode(), batchDTO.getArrivalCode());
         List<Long> seatIdList = getSeatIdListBySeatNos(seatList, trainId);
 
-        LocalDateTime expireTime = generateExpireTime(batchDTO.getOrderType());
-        batchDTO.setExpireTime(expireTime);
-
         List<SeatIntervalOccupy> occupyList = BeanConvertUtil.copyWithCommonField(
                 batchDTO,
                 batchDTO.getSeatList(),
@@ -1010,17 +960,6 @@ public class TicketServiceImpl implements TicketService {
         );
 
         batchCacheSeatOccupy(occupyList, seatIdList, seqs, trainId);
-    }
-
-    /**
-     * 根据订单类型生成过期时间
-     */
-    private LocalDateTime generateExpireTime(Integer orderType) {
-        if (OrderTypeConstants.PREORDER.equals(orderType)) {
-            return LocalDateTime.now().plusMinutes(preOrderExpireMinutes);
-        } else {
-            return null;
-        }
     }
 
     /**
@@ -1039,14 +978,13 @@ public class TicketServiceImpl implements TicketService {
             fillSeatOccupyCommonFields(seqs, occupy, seatId, batchLockId);
 
             // 更新Bitmap占用标记
-            String tempBitmapKey = buildSeatBitmapKey(OrderTypeConstants.PREORDER, trainId, seatId);
-            String formalBitmapKey = buildSeatBitmapKey(OrderTypeConstants.ORDER, trainId, seatId);
+            String slot1Key = buildSeatSlot1Key(trainId, seatId);
+            String slot2Key = buildSeatSlot2Key(trainId, seatId);
             Long result = cacheClient.executeLuaFile(
                     "lua/seatLock.lua",
-                    Arrays.asList(tempBitmapKey, formalBitmapKey),
+                    Arrays.asList(slot1Key, slot2Key),
                     seqs.getStartSequence(),
                     seqs.getEndSequence(),
-                    occupy.getOrderType(),
                     occupy.getStatus()
             );
 
@@ -1141,17 +1079,19 @@ public class TicketServiceImpl implements TicketService {
     }
 
     /**
-     * 构建Bitmap缓存Key
+     * 构建bitmap1缓存Key
      */
-    private String buildSeatBitmapKey(Integer orderType, Long trainId, Long seatId) {
-        String prefix = OrderTypeConstants.PREORDER.equals(orderType)
-                ? SeatRedisConstants.RAIL_BITMAP_SEAT_TEMP_LOCK_PREFIX
-                : SeatRedisConstants.RAIL_BITMAP_SEAT_FORMAL_PREFIX;
-
+    private String buildSeatSlot1Key(Long trainId, Long seatId) {
         return String.format("%strainId:%d:seatId:%d",
-                prefix,
-                trainId,
-                seatId);
+                SeatRedisConstants.RAIL_BITMAP_SEAT_SLOT1_PREFIX, trainId, seatId);
+    }
+
+    /**
+     * 构建bitmap2缓存Key
+     */
+    private String buildSeatSlot2Key(Long trainId, Long seatId) {
+        return String.format("%strainId:%d:seatId:%d",
+                SeatRedisConstants.RAIL_BITMAP_SEAT_SLOT2_PREFIX, trainId, seatId);
     }
 
     /**
@@ -1169,7 +1109,7 @@ public class TicketServiceImpl implements TicketService {
         // 批量构建反向映射Field ：SeatNoReverse:车厢号:座位号
         List<String> reverseFields = seatList.stream()
                 .filter(seat -> StrUtil.isNotBlank(seat.getCarriageNumber()) && StrUtil.isNotBlank(seat.getSeatNo()))
-                .map(seat -> buildSeatReverseFieldKey(seat.getCarriageNumber(), seat.getSeatNo()))
+                .map(seat -> buildSeatReverseFieldKey(trainId, seat.getCarriageNumber(), seat.getSeatNo()))
                 .collect(Collectors.toList());
 
         List<String> seatUniqueDescList = seatList.stream()
@@ -1184,10 +1124,10 @@ public class TicketServiceImpl implements TicketService {
     /**
      * 构建座位反向映射的全局唯一键
      */
-    private String buildSeatReverseFieldKey(String carriageNumber, String seatNo) {
+    private String buildSeatReverseFieldKey(Long trainId, String carriageNumber, String seatNo) {
         String safeCarriage = StrUtil.trimToEmpty(carriageNumber);
         String safeSeatNo = StrUtil.trimToEmpty(seatNo);
-        return String.format("SeatNoReverse:%s:%s", safeCarriage, safeSeatNo);
+        return String.format("SeatNoReverse:%d:%s:%s", trainId, safeCarriage, safeSeatNo);
     }
 
     /**

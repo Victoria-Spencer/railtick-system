@@ -9,6 +9,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.rail.common.redis.core.RedisCache;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -149,6 +150,29 @@ public class RedissonCacheTest {
         assertFalse(redisCache.exists(key4));
     }
 
+    /**
+     * 验证 区间bitCount(startOffset, endOffset) 左闭右开规则
+     * 严格适配Lua脚本实现
+     */
+    @Test
+    void testBitmapBitCountRange() {
+        String key = "test:bitmap:range:count";
+        // 设置位：1、2、3、4 为1（共4位）
+        redisCache.setRangeBits(key, 1, 5, true);
+        // 设置位：6 为1
+        redisCache.setBit(key, 6, true);
+
+        // 测试1：[1,5) → 4个1
+        assertEquals(4, redisCache.bitCount(key, 1, 5));
+        // 测试2：[1,6) → 4个1（位4为0）
+        assertEquals(4, redisCache.bitCount(key, 1, 6));
+        // 测试3：[5,7) → 1个1（位6为1）
+        assertEquals(1, redisCache.bitCount(key, 5, 7));
+        // 测试4：非法区间 → 返回0
+        assertEquals(-1, redisCache.bitCount(key, 10, 5));
+        assertEquals(-1, redisCache.bitCount(key, -1, 5));
+    }
+
     // ======================== Hash 类型 ========================
     @Test
     void testHashOperate() {
@@ -201,9 +225,65 @@ public class RedissonCacheTest {
 
     // ======================== Lua 脚本 ========================
     @Test
-    void testLuaExecute() {
+    void testLuaScriptDirectExecute() {
         assertDoesNotThrow(() -> {
             redisCache.executeLuaScript("return 1", List.of("test:lua:script"));
         });
+    }
+
+    @Test
+    void testLuaNumericParamWithInt() {
+        // int类型
+        int numParam = 888;
+
+        Long retCode = redisCache.executeLuaFile(
+                "lua/numeric_param_test.lua",
+                Collections.emptyList(),
+                numParam
+        );
+
+        assertEquals(889, retCode);
+    }
+
+    @Test
+    void testLuaNumericParamWithLong() {
+        // long
+        long numParam = 888L;
+
+        Long retCode = redisCache.executeLuaFile(
+                "lua/numeric_param_test.lua",
+                Collections.emptyList(),
+                numParam
+        );
+
+        assertEquals(889, retCode);
+    }
+
+    @Test
+    void testLuaStringParamWithNormalValue() {
+        String strParam = "hello-redis";
+
+        Long retCode = redisCache.executeLuaFile(
+                "lua/string_test.lua",
+                Collections.emptyList(),
+                strParam
+        );
+
+        // hello-redis 长度 = 11
+        assertEquals(11, retCode);
+    }
+
+    @Test
+    void testLuaStringParamWithEmptyValue() {
+        String strParam = "";
+
+        Long retCode = redisCache.executeLuaFile(
+                "lua/string_test.lua",
+                Collections.emptyList(),
+                strParam
+        );
+
+        // 空字符串 → 返回0
+        assertEquals(0, retCode);
     }
 }

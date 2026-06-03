@@ -107,13 +107,13 @@ public interface OrderMapper {
      * 更新订单状态为已经取消
      * @param orderSn 订单编号
      */
-    @Update("update `order` set status = #{status} where order_sn = #{orderSn}")
-    void updateOrder(String orderSn, Integer status);
+    @Update("UPDATE `order` SET status = #{status}, expire_time = NULL, update_time = NOW() WHERE order_sn = #{orderSn}")
+    void updateOrder(@Param("orderSn") String orderSn, @Param("status") Integer status);
 
     /**
      * 根据预订单id删除预订单明细
      * @param id 预订单id
      */
-    @Delete("delete from pre_order_details where pre_order_id = #{id}")
-    void deletePreOrderDetailsByPreOrderId(Long id);
+    @Delete("DELETE FROM pre_order_details WHERE pre_order_id = #{id}")
+    void deletePreOrderDetailsByPreOrderId(@Param("id") Long id);
 }

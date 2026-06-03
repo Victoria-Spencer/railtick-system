@@ -4,7 +4,7 @@ public final class RedisCommonConstants {
 
     private RedisCommonConstants() {}
 
-    public static final Long RAIL_DEFAULT_TTL = 15L;
+    public static final Long RAIL_DEFAULT_TTL = 16L;
 
     // ================ 聚合缓存对应的布隆过滤器类型 =================
     public static final String BLOOM_FILTER_PREFIX = "bloom:filter:";  // 布隆过滤器前缀

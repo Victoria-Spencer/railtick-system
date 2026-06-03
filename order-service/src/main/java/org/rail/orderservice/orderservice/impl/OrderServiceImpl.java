@@ -8,7 +8,6 @@ import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
 import org.rail.api.client.TicketFeignClient;
 import org.rail.api.client.UserFeignClient;
-import org.rail.api.constant.OrderTypeConstants;
 import org.rail.orderservice.constant.OrderRedisConstants;
 import org.rail.common.core.context.RequestContext;
 import org.rail.common.core.context.RequestContextHolder;
@@ -25,6 +24,7 @@ import org.rail.orderservice.constant.OrderPaymentStatusConstants;
 import org.rail.orderservice.constant.PreOrderStatusConstants;
 import org.rail.api.constant.SeatIntervalStatusConstants;
 import org.rail.orderservice.mapper.OrderMapper;
+import org.rail.orderservice.model.bo.OrderContext;
 import org.rail.orderservice.model.bo.PreOrderContext;
 import org.rail.orderservice.mq.producer.OrderCreateProducer;
 import org.rail.orderservice.mq.producer.OrderDelayProducer;
@@ -55,9 +55,8 @@ public class OrderServiceImpl implements OrderService {
 
     @Autowired
     private OrderMapper orderMapper;
-    // 从配置文件注入预订单有效期（分钟）
-    @Value("${order.pre.expire-minutes : 15}") // 默认15分钟
-    private Integer preOrderExpireMinutes;
+    @Value("${order.expire-minutes : 15}") // 默认15分钟
+    private Integer orderExpireMinutes;
     @Autowired
     private UserFeignClient userFeignClient;
     @Autowired
@@ -177,6 +176,7 @@ public class OrderServiceImpl implements OrderService {
         PreOrderContext ctx = new PreOrderContext();
         ctx.setReqDTO(createPreOrderDTO);
         ctx.setPassengerList(passengerResult.getData());
+        ctx.setExpireTime(calculateExpireTime());
         return ctx;
     }
 
@@ -193,7 +193,7 @@ public class OrderServiceImpl implements OrderService {
      */
     private String updateExistPreOrder(PreOrderContext ctx, PreOrder preOrder) {
         // 更新预订单主记录（重置过期时间、状态）
-        updatePreOrderMainInfo(ctx.getReqDTO(), preOrder);
+        updatePreOrderMainInfo(ctx, preOrder);
 
         // 插入新明细
         insertNewPreOrderDetails(ctx, preOrder.getId());
@@ -212,15 +212,15 @@ public class OrderServiceImpl implements OrderService {
     /**
      * 更新预订单主表信息
      */
-    private void updatePreOrderMainInfo(CreatePreOrderDTO createPreOrderDTO, PreOrder preOrder) {
-        BigDecimal newTotalAmount = calculateTotalAmount(createPreOrderDTO.getPassengerOrderDetailDTOList());
+    private void updatePreOrderMainInfo(PreOrderContext ctx, PreOrder preOrder) {
+        CreatePreOrderDTO reqDTO = ctx.getReqDTO();
+        BigDecimal newTotalAmount = calculateTotalAmount(reqDTO.getPassengerOrderDetailDTOList());
         preOrder.setTotalAmount(newTotalAmount);
-        preOrder.setExpireTime(calculateExpireTime());
+        preOrder.setExpireTime(ctx.getExpireTime());
         preOrder.setStatus(PreOrderStatusConstants.VALID);
 
         String preOrderKey = buildPreOrderKey(preOrder.getUserId(), preOrder.getTrainId());
         cacheClient.set(preOrderKey, preOrder, RedisCommonConstants.RAIL_DEFAULT_TTL, TimeUnit.MINUTES);
-//        orderMapper.updatePreOrder(preOrder);
     }
 
     /**
@@ -353,23 +353,14 @@ public class OrderServiceImpl implements OrderService {
                 return existVo;
             }
 
-            String preOrderKey = buildPreOrderKey(userId, trainId);
-            PreOrder preOrder = cacheClient.get(preOrderKey);
-            if (ObjectUtil.isNull(preOrder)) {
-                throw new OrderNotFoundException("预订单不存在或已过期！");
-            }
+            PreOrder preOrder = getAndValidatePreOrder(userId, trainId);
 
-            if (!PreOrderStatusConstants.VALID.equals(preOrder.getStatus())) {
-                throw new BizException("预订单状态无效，无法创建正式订单");
-            }
-            if (preOrder.getExpireTime().isBefore(LocalDateTime.now())) {
-                throw new BizException("预订单已过期，请重新下单");
-            }
+            OrderContext ctx = buildOrderContext(createOrderDTO, preOrder);
 
             // 创建订单主表
-            order = createOrderMain(preOrder);
+            order = createOrderMain(ctx);
             // 处理订单明细 & 座位分配
-            orderDetailsList = handleOrderDetails(createOrderDTO, preOrder, order);
+            orderDetailsList = handleOrderDetails(ctx, order);
 
             try {
                 orderCreateProducer.sendOrderCreateMsg(order, orderDetailsList);
@@ -379,8 +370,9 @@ public class OrderServiceImpl implements OrderService {
                 throw new BizException("订单创建失败，请重试");
             }
 
-            String convertFlagKey = OrderRedisConstants.RAIL_PRE_ORDER_CONVERTED + preOrderSn;
-            cacheClient.setIfAbsent(convertFlagKey, "converted", RedisCommonConstants.RAIL_DEFAULT_TTL, TimeUnit.MINUTES);
+            syncSeatStatusToOrder(ctx.getExpireTime(), order, orderDetailsList);
+
+            String preOrderKey = buildPreOrderKey(userId, trainId);
             // 彻底删除预订单缓存
             cacheClient.delete(preOrderKey);
             cacheClient.delete(buildPreOrderDetailsSetKey(preOrder.getId()));
@@ -399,6 +391,72 @@ public class OrderServiceImpl implements OrderService {
             }
         }
     }
+
+    /**
+     * 获取并校验预订单（缓存获取 + 状态校验 + 过期校验）
+     */
+    private PreOrder getAndValidatePreOrder(Long userId, Long trainId) {
+        String preOrderKey = buildPreOrderKey(userId, trainId);
+        PreOrder preOrder = cacheClient.get(preOrderKey);
+        if (ObjectUtil.isNull(preOrder)) {
+            throw new OrderNotFoundException("预订单不存在或已过期！");
+        }
+
+        if (!PreOrderStatusConstants.VALID.equals(preOrder.getStatus())) {
+            throw new BizException("预订单状态无效，无法创建正式订单");
+        }
+        if (preOrder.getExpireTime().isBefore(LocalDateTime.now())) {
+            throw new BizException("预订单已过期，请重新下单");
+        }
+        return preOrder;
+    }
+
+    /**
+     * 构建订单上下文（统一封装请求、预订单、过期时间）
+     */
+    private OrderContext buildOrderContext(CreateOrderDTO createOrderDTO, PreOrder preOrder) {
+        OrderContext orderContext = new OrderContext();
+        orderContext.setReqDTO(createOrderDTO);
+        orderContext.setPreOrder(preOrder);
+        // 统一计算过期时间
+        orderContext.setExpireTime(calculateExpireTime());
+        return orderContext;
+    }
+
+    /**
+     * 同步座位状态：预订单临时锁 → 订单临时锁
+     * 双位图状态：01(预订单) → 10(订单)
+     */
+    private void syncSeatStatusToOrder(LocalDateTime expireTime, Order order, List<OrderDetails> orderDetailsList) {
+        if (CollectionUtil.isEmpty(orderDetailsList)) {
+            return;
+        }
+        // 构建座位确认DTO
+        BatchSeatIntervalInsertDTO confirmDto = new BatchSeatIntervalInsertDTO()
+                .setTrainId(order.getTrainId())
+                .setOrderId(order.getId())
+                .setStatus(SeatIntervalStatusConstants.ORDER_LOCKED)
+                .setDepartureCode(orderDetailsList.getFirst().getDepartureCode())
+                .setArrivalCode(orderDetailsList.getFirst().getArrivalCode())
+                .setExpireTime(expireTime);
+
+        // 组装座位信息
+        List<SeatBaseDTO> seatList = orderDetailsList.stream().map(detail -> {
+            SeatBaseDTO seat = new SeatBaseDTO();
+            seat.setSeatType(detail.getSeatType());
+            seat.setCarriageNumber(detail.getCarriageNumber());
+            seat.setSeatNo(detail.getSeatNo());
+            return seat;
+        }).toList();
+        confirmDto.setSeatList(seatList);
+
+        // 调用票务接口，正式确认座位
+        Result<Void> confirmResult = ticketFeignClient.updateSeatStatus(confirmDto);
+        if (!confirmResult.isSuccess()) {
+            throw new BizException("座位确认失败，请重试");
+        }
+    }
+
 
     /**
      * 订单创建异常时的统一清理方法
@@ -433,7 +491,9 @@ public class OrderServiceImpl implements OrderService {
     /**
      * 处理订单明细和座位逻辑
      */
-    private List<OrderDetails> handleOrderDetails(CreateOrderDTO createOrderDTO, PreOrder preOrder, Order order) {
+    private List<OrderDetails> handleOrderDetails(OrderContext ctx, Order order) {
+        CreateOrderDTO reqDTO = ctx.getReqDTO();
+        PreOrder preOrder = ctx.getPreOrder();
         String preOrderDetailsKey = buildPreOrderDetailsSetKey(preOrder.getId());
         List<PreOrderDetails> preDetailsList = new ArrayList<>(this.cacheClient.getSetMembers(preOrderDetailsKey));
         // 拷贝订单明细
@@ -453,14 +513,14 @@ public class OrderServiceImpl implements OrderService {
             details.setOrderId(order.getId());
             details.setRefundStatus(false);
 
-            details.setDeparture(createOrderDTO.getDeparture());
-            details.setArrival(createOrderDTO.getArrival());
-            details.setDepartureCode(createOrderDTO.getDepartureCode());
-            details.setArrivalCode(createOrderDTO.getArrivalCode());
-            details.setRidingDate(createOrderDTO.getRidingDate());
-            details.setTrainId(createOrderDTO.getTrainId());
-            details.setDepartureTime(createOrderDTO.getDepartureTime());
-            details.setArrivalTime(createOrderDTO.getArrivalTime());
+            details.setDeparture(reqDTO.getDeparture());
+            details.setArrival(reqDTO.getArrival());
+            details.setDepartureCode(reqDTO.getDepartureCode());
+            details.setArrivalCode(reqDTO.getArrivalCode());
+            details.setRidingDate(reqDTO.getRidingDate());
+            details.setTrainId(reqDTO.getTrainId());
+            details.setDepartureTime(reqDTO.getDepartureTime());
+            details.setArrivalTime(reqDTO.getArrivalTime());
 
             detailsMap.put(details.getId().toString(), details);
         }
@@ -486,13 +546,16 @@ public class OrderServiceImpl implements OrderService {
     /**
      * 创建订单主表记录
      */
-    private Order createOrderMain(PreOrder preOrder) {
+    private Order createOrderMain(OrderContext ctx) {
+        PreOrder preOrder = ctx.getPreOrder();
+
         Order order = BeanUtil.copyProperties(preOrder, Order.class);
         order.setId(SnowflakeIdGenerator.nextId());
         order.setStatus(OrderPaymentStatusConstants.PENDING_PAYMENT);
         order.setOrderSn(OrderSnUtil.generateOrderSn());
         order.setCreateTime(LocalDateTime.now());
         order.setUpdateTime(LocalDateTime.now());
+        order.setExpireTime(ctx.getExpireTime());
 
         String orderKey = buildOrderKey(order.getOrderSn());
         cacheClient.setIfAbsent(orderKey, order, RedisCommonConstants.RAIL_DEFAULT_TTL, TimeUnit.MINUTES);
@@ -777,15 +840,86 @@ public class OrderServiceImpl implements OrderService {
     }
 
     /**
-     * 取消车票订单
+     * 取消订单
      * @param orderSn 订单号
      */
     @Override
     public void cancelOrder(String orderSn) {
-        orderMapper.updateOrder(orderSn, OrderPaymentStatusConstants.CANCELED);
-        // 自动清理订单及相关聚合key
-        String orderKey = buildOrderKey(orderSn);
+        // 分布式锁：防重复消费
+        String lockKey = OrderRedisConstants.RAIL_LOCK_ORDER_PREFIX + orderSn;
+        RLock lock = redissonClient.getLock(lockKey);
+
+        try {
+            if (!lock.tryLock(0, 30, TimeUnit.SECONDS)) {
+                return;
+            }
+
+            String orderKey = buildOrderKey(orderSn);
+            Order order = cacheClient.get(orderKey, Order.class);
+            if (ObjectUtil.isNull(order)) {
+                // 订单不存在 = 已支付/已处理，直接拦截
+                return;
+            }
+
+            String detailsKey = buildOrderDetailsHashKey(order.getId());
+            Map<String, OrderDetails> detailsMap = cacheClient.hEntries(detailsKey);
+            List<OrderDetails> detailsList = new ArrayList<>(detailsMap.values());
+
+            // 取消订单
+            orderMapper.updateOrder(orderSn, OrderPaymentStatusConstants.CANCELED);
+
+            if (ObjectUtil.isNotEmpty(detailsList)) {
+                BatchSeatIntervalInsertDTO batchSeatDTO = buildSeatReleaseDto(order, detailsList);
+                Result<Void> feignResult = ticketFeignClient.updateSeatStatus(batchSeatDTO);
+                if (!feignResult.isSuccess()) {
+                    throw new OpenFeignException("订单超时释放座位失败：" + feignResult.getMessage());
+                }
+            }
+
+            clearOrderCache(orderKey, detailsKey);
+
+        } catch (Exception e) {
+            throw new BizException("订单取消失败", e);
+        } finally {
+            if (lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
+        }
+    }
+
+    /**
+     * 清理订单所有缓存
+     */
+    private void clearOrderCache(String orderKey, String detailsKey) {
+        cacheClient.delete(orderKey);
+        cacheClient.delete(detailsKey);
         cacheClient.autoClearAggCache(orderKey);
+    }
+
+    /**
+     * 构建座位释放DTO
+     */
+    private BatchSeatIntervalInsertDTO buildSeatReleaseDto(Order order, List<OrderDetails> detailsList) {
+        OrderDetails listFirst = detailsList.getFirst();
+
+        BatchSeatIntervalInsertDTO batchSeatDTO = new BatchSeatIntervalInsertDTO();
+        // 公共字段赋值
+        batchSeatDTO.setTrainId(order.getTrainId());
+        batchSeatDTO.setOrderId(order.getId());
+        batchSeatDTO.setDepartureCode(listFirst.getDepartureCode());
+        batchSeatDTO.setArrivalCode(listFirst.getArrivalCode());
+        batchSeatDTO.setStatus(SeatIntervalStatusConstants.RELEASED);
+        batchSeatDTO.setSeatList(new ArrayList<>());
+
+        // 组装座位信息
+        for (OrderDetails detail : detailsList) {
+            SeatBaseDTO seatBaseDTO = new SeatBaseDTO();
+            seatBaseDTO.setSeatType(detail.getSeatType());
+            seatBaseDTO.setCarriageNumber(detail.getCarriageNumber());
+            seatBaseDTO.setSeatNo(detail.getSeatNo());
+            batchSeatDTO.getSeatList().add(seatBaseDTO);
+        }
+        return batchSeatDTO;
     }
 
     /**
@@ -803,7 +937,7 @@ public class OrderServiceImpl implements OrderService {
         preOrder.setPreOrderSn(preOrderSn);
         preOrder.setDepartureCode(createPreOrderDTO.getDepartureCode());
         preOrder.setArrivalCode(createPreOrderDTO.getArrivalCode());
-        preOrder.setExpireTime(calculateExpireTime());
+        preOrder.setExpireTime(ctx.getExpireTime());
         preOrder.setCreateTime(LocalDateTime.now());
         preOrder.setStatus(PreOrderStatusConstants.VALID);
         preOrder.setTotalAmount(totalAmount);
@@ -869,13 +1003,13 @@ public class OrderServiceImpl implements OrderService {
         RandomSeatQueryDTO queryDTO = RandomSeatQueryDTO.builder()
                 .trainId(reqDTO.getTrainId())
                 .orderId(preOrderId)
+                .status(SeatIntervalStatusConstants.PRE_LOCKED)
+                .expireTime(ctx.getExpireTime())
                 .seatType(seatType)
                 .departureCode(reqDTO.getDepartureCode())
                 .arrivalCode(reqDTO.getArrivalCode())
                 .passengerCount(need)
                 .preferredSeatSymbols(reqDTO.getPreferredSeatSymbols())
-                .orderType(OrderTypeConstants.PREORDER)
-                .status(SeatIntervalStatusConstants.LOCKED)
                 .build();
 
         return doGetAvailableSeat(queryDTO, need);
@@ -895,7 +1029,6 @@ public class OrderServiceImpl implements OrderService {
         // 设置 公共字段 ，所有座位完全一致，只赋值1次
         batchSeatDTO.setTrainId(createPreOrderDTO.getTrainId());
         batchSeatDTO.setOrderId(preOrderId);
-        batchSeatDTO.setOrderType(OrderTypeConstants.PREORDER);
         batchSeatDTO.setDepartureCode(createPreOrderDTO.getDepartureCode());
         batchSeatDTO.setArrivalCode(createPreOrderDTO.getArrivalCode());
         batchSeatDTO.setStatus(SeatIntervalStatusConstants.RELEASED);
@@ -918,7 +1051,7 @@ public class OrderServiceImpl implements OrderService {
      */
     private LocalDateTime calculateExpireTime() {
         LocalDateTime now = LocalDateTime.now();
-        int minutes = (preOrderExpireMinutes != null) ? preOrderExpireMinutes : 15;
+        int minutes = (orderExpireMinutes != null) ? orderExpireMinutes : 15;
         return now.plusMinutes(minutes);
     }
 }

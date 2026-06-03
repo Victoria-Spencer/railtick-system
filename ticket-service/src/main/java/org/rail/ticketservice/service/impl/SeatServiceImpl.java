@@ -2,7 +2,6 @@ package org.rail.ticketservice.service.impl;
 
 import cn.hutool.core.util.StrUtil;
 import lombok.extern.slf4j.Slf4j;
-import org.rail.api.constant.OrderTypeConstants;
 import org.rail.ticketservice.constant.redis.SeatRedisConstants;
 import org.rail.common.core.exception.BizException;
 import org.rail.common.redis.exception.CacheInitException;
@@ -125,7 +124,7 @@ public class SeatServiceImpl implements SeatService {
 
 
         // ============================= 反向映射 =============================
-        String reverseField = buildSeatReverseFieldKey(seat.getCarriageNumber(), seat.getSeatNo());
+        String reverseField = buildSeatReverseFieldKey(seat.getTrainId(), seat.getCarriageNumber(), seat.getSeatNo());
         fieldMap.put(reverseField, seat.getId());
 
         return fieldMap;
@@ -170,10 +169,10 @@ public class SeatServiceImpl implements SeatService {
     /**
      * 构建座位反向映射的全局唯一键
      */
-    private String buildSeatReverseFieldKey(String carriageNumber, String seatNo) {
+    private String buildSeatReverseFieldKey(Long trainId, String carriageNumber, String seatNo) {
         String safeCarriage = StrUtil.trimToEmpty(carriageNumber);
         String safeSeatNo = StrUtil.trimToEmpty(seatNo);
-        return String.format("SeatNoReverse:%s:%s", safeCarriage, safeSeatNo);
+        return String.format("SeatNoReverse:%d:%s:%s", trainId, safeCarriage, safeSeatNo);
     }
 
     /**
@@ -189,13 +188,13 @@ public class SeatServiceImpl implements SeatService {
      */
     @Override
     public void initAllSeatOccupancyBitmap() {
-        List<SeatIntervalOccupy> occupancyList = seatIntervalOccupyMapper.selectValidAll();
+        List<SeatIntervalOccupy> occupyList = seatIntervalOccupyMapper.selectValidAll();
 
-        for (SeatIntervalOccupy occupancy : occupancyList) {
-            initSeatOccupancyFromDb(occupancy);
+        for (SeatIntervalOccupy occupy : occupyList) {
+            initSeatOccupancy(occupy);
         }
 
-        log.info("列车座位占用Bitmap缓存初始化完成，总记录数：{}", occupancyList.size());
+        log.info("列车座位占用Bitmap缓存初始化完成，总记录数：{}", occupyList.size());
     }
 
     /**
@@ -217,7 +216,7 @@ public class SeatServiceImpl implements SeatService {
 
         List<Long> allSeatIds = getAllSeatIdsByTrainId(trainId);
         if (allSeatIds.isEmpty()) {
-            return null;
+            return Collections.emptyList();
         }
 
         List<Long> freeSeatIdList = new ArrayList<>();
@@ -275,11 +274,12 @@ public class SeatServiceImpl implements SeatService {
      * 判断座位在指定区间内是否空闲
      */
     private boolean isSeatFreeInRange(Long trainId, Long seatId, int startSeq, int endSeq) {
-        String tempBitmapKey = buildSeatBitmapKey(OrderTypeConstants.PREORDER, trainId, seatId);
-        String formalBitmapKey = buildSeatBitmapKey(OrderTypeConstants.ORDER, trainId, seatId);
+        String slot1Key = buildSeatSlot1Key(trainId, seatId);
+        String slot2Key = buildSeatSlot2Key(trainId, seatId);
 
-        return cacheClient.isRangeAllZero(tempBitmapKey, startSeq, endSeq)
-                && cacheClient.isRangeAllZero(formalBitmapKey, startSeq, endSeq);
+        // 组合状态 00 = 空闲
+        return cacheClient.isRangeAllZero(slot1Key, startSeq, endSeq)
+                && cacheClient.isRangeAllZero(slot2Key, startSeq, endSeq);
     }
 
     /**
@@ -369,29 +369,54 @@ public class SeatServiceImpl implements SeatService {
     /**
      * 单条座位占用记录初始化Bitmap
      */
-    private void initSeatOccupancyFromDb(SeatIntervalOccupy occupancy) {
-        validateSeatOccupancy(occupancy);
+    private void initSeatOccupancy(SeatIntervalOccupy occupy) {
+        validateSeatOccupancy(occupy);
 
-        String key = buildSeatBitmapKey(occupancy.getOrderType(), occupancy.getTrainId(), occupancy.getSeatId());
-        try {
-            cacheClient.setRangeBits(key, occupancy.getStartSequence(), occupancy.getEndSequence(), true);
-        } catch (Exception e) {
-            throw new CacheInitException("初始化座位占用Bitmap失败，key：" + key, e);
+        // 构建双平级位图KEY
+        String slot1Key = buildSeatSlot1Key(occupy.getTrainId(), occupy.getSeatId());
+        String slot2Key = buildSeatSlot2Key(occupy.getTrainId(), occupy.getSeatId());
+
+        Long result = cacheClient.executeLuaFile(
+                "lua/seatInit.lua",
+                Arrays.asList(slot1Key, slot2Key),
+                occupy.getStartSequence(),
+                occupy.getEndSequence(),
+                occupy.getStatus()
+        );
+
+        if (result == 0) {
+            throw new CacheInitException("初始化座位占用Bitmap失败，trainId=" + occupy.getTrainId() + ", seatId=" + occupy.getSeatId());
         }
+    }
+
+    /**
+     * 构建bitmap1缓存Key
+     */
+    private String buildSeatSlot1Key(Long trainId, Long seatId) {
+        return String.format("%strainId:%d:seatId:%d",
+                SeatRedisConstants.RAIL_BITMAP_SEAT_SLOT1_PREFIX, trainId, seatId);
+    }
+
+    /**
+     * 构建bitmap2缓存Key
+     */
+    private String buildSeatSlot2Key(Long trainId, Long seatId) {
+        return String.format("%strainId:%d:seatId:%d",
+                SeatRedisConstants.RAIL_BITMAP_SEAT_SLOT2_PREFIX, trainId, seatId);
     }
 
     /**
      * 座位占用记录参数+合法性校验
      */
-    private void validateSeatOccupancy(SeatIntervalOccupy occupancy) {
+    private void validateSeatOccupancy(SeatIntervalOccupy occupy) {
         // 空对象校验
-        if (occupancy == null) {
+        if (occupy == null) {
             throw new CacheInitException("座位占用记录不能为空");
         }
 
-        Integer startSequence = occupancy.getStartSequence();
-        Integer endSequence = occupancy.getEndSequence();
-        Long trainId = occupancy.getTrainId();
+        Integer startSequence = occupy.getStartSequence();
+        Integer endSequence = occupy.getEndSequence();
+        Long trainId = occupy.getTrainId();
 
         // 核心参数非空校验
         if (startSequence == null || endSequence == null || trainId == null) {
@@ -420,19 +445,5 @@ public class SeatServiceImpl implements SeatService {
                     String.format("车次[%s]座位区间超出最大限制长度", trainId)
             );
         }
-    }
-
-    /**
-     * 构建Bitmap缓存Key
-     */
-    private String buildSeatBitmapKey(Integer orderType, Long trainId, Long seatId) {
-        String prefix = OrderTypeConstants.PREORDER.equals(orderType)
-                ? SeatRedisConstants.RAIL_BITMAP_SEAT_TEMP_LOCK_PREFIX
-                : SeatRedisConstants.RAIL_BITMAP_SEAT_FORMAL_PREFIX;
-
-        return String.format("%strainId:%d:seatId:%d",
-                prefix,
-                trainId,
-                seatId);
     }
 }

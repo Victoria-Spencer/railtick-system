@@ -13,7 +13,6 @@ import org.rail.ticketservice.mapper.*;
 import org.rail.ticketservice.model.dto.*;
 import org.rail.ticketservice.model.entity.Train;
 import org.rail.ticketservice.model.vo.*;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -46,7 +45,6 @@ public class TicketServiceImplQueryPlannedTicketTest {
      */
     @BeforeEach
     void setUp() {
-        ReflectionTestUtils.setField(ticketService, "preOrderExpireMinutes", 15);
         ThreadLocalUtils.removeAll();
     }
 

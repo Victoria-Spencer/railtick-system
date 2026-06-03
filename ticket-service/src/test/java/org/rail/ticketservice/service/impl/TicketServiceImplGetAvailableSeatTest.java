@@ -6,7 +6,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.rail.api.constant.OrderTypeConstants;
 import org.rail.api.constant.SeatIntervalStatusConstants;
 import org.rail.api.dto.AvailableSeatRemoteDTO;
 import org.rail.api.dto.RandomSeatQueryDTO;
@@ -20,7 +19,6 @@ import org.rail.ticketservice.mq.producer.SeatOccupySyncProducer;
 import org.rail.ticketservice.service.SeatService;
 import org.rail.ticketservice.task.StationLocalCacheTask;
 import org.rail.ticketservice.task.TrainStopStationLocalCacheTask;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 import java.util.Map;
@@ -56,15 +54,13 @@ class TicketServiceImplGetAvailableSeatTest {
     private final Integer DEP_SEQ = 2;
     private final Integer ARR_SEQ = 5;
     private final List<String> PREFERRED_SEATS = List.of("A", "B"); // 偏好座位
-    private final Integer ORDER_TYPE = OrderTypeConstants.PREORDER;
-    private final Integer STATUS = SeatIntervalStatusConstants.LOCKED;
+    private final Integer STATUS = SeatIntervalStatusConstants.PRE_LOCKED;
     private final Long ORDER_ID = 10086L;
 
     @BeforeEach
     void setUp() {
         snowflakeMock = Mockito.mockStatic(SnowflakeIdGenerator.class);
         snowflakeMock.when(SnowflakeIdGenerator::nextId).thenReturn(123456789L);
-        ReflectionTestUtils.setField(ticketService, "preOrderExpireMinutes", 15);
 
         ThreadLocalUtils.removeAll();
     }
@@ -100,7 +96,6 @@ class TicketServiceImplGetAvailableSeatTest {
                 anyList(),
                 anyInt(),
                 anyInt(),
-                anyInt(),
                 anyInt()
         )).thenReturn(1L);
         doNothing().when(cacheClient).hPutAll(anyString(), anyMap());
@@ -117,8 +112,7 @@ class TicketServiceImplGetAvailableSeatTest {
                 anyList(),                              // 断言传入了bitmap key列表
                 eq(DEP_SEQ),                            // 断言开始站点序列=2（和mock一致）
                 eq(ARR_SEQ),                            // 断言结束站点序列=5（和mock一致）
-                eq(OrderTypeConstants.PREORDER),        // 断言订单类型=预订单
-                eq(SeatIntervalStatusConstants.LOCKED)  // 断言锁座状态=锁定
+                eq(SeatIntervalStatusConstants.PRE_LOCKED)  // 断言锁座状态=锁定
         );
         verify(cacheClient, times(1)).hPutAll(anyString(), anyMap());
         verify(seatOccupySyncProducer, times(1)).sendSeatOccupySyncMsg(anyList());
@@ -156,7 +150,6 @@ class TicketServiceImplGetAvailableSeatTest {
                 anyList(),
                 anyInt(),
                 anyInt(),
-                anyInt(),
                 anyInt()
         )).thenReturn(1L);
         doNothing().when(cacheClient).hPutAll(anyString(), anyMap());
@@ -173,8 +166,7 @@ class TicketServiceImplGetAvailableSeatTest {
                 anyList(),
                 eq(DEP_SEQ),
                 eq(ARR_SEQ),
-                eq(OrderTypeConstants.PREORDER),
-                eq(SeatIntervalStatusConstants.LOCKED)
+                eq(SeatIntervalStatusConstants.PRE_LOCKED)
         );
         verify(cacheClient, times(1)).hPutAll(anyString(), anyMap());
         verify(seatOccupySyncProducer, times(1)).sendSeatOccupySyncMsg(anyList());
@@ -200,7 +192,6 @@ class TicketServiceImplGetAvailableSeatTest {
                 anyList(),
                 anyInt(),
                 anyInt(),
-                anyInt(),
                 anyInt()
         )).thenReturn(0L);
 
@@ -213,8 +204,7 @@ class TicketServiceImplGetAvailableSeatTest {
                 anyList(),
                 eq(DEP_SEQ),
                 eq(ARR_SEQ),
-                eq(OrderTypeConstants.PREORDER),
-                eq(SeatIntervalStatusConstants.LOCKED)
+                eq(SeatIntervalStatusConstants.PRE_LOCKED)
         );
         // 验证重试机制：getFreeSeatIdsByBitmap被调用了3次（对应循环3次）
         verify(seatService, times(3)).getFreeSeatIdsByBitmap(anyLong(), anyString(), anyString());
@@ -246,7 +236,6 @@ class TicketServiceImplGetAvailableSeatTest {
         dto.setPassengerCount(PASSENGER_COUNT);
         dto.setDepartureCode(DEP_CODE);
         dto.setArrivalCode(ARR_CODE);
-        dto.setOrderType(ORDER_TYPE);
         dto.setStatus(STATUS);
         dto.setOrderId(ORDER_ID);
         return dto;

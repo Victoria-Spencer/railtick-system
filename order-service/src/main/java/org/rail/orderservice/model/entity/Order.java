@@ -24,4 +24,6 @@ public class Order {
     private LocalDateTime payTime;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
+    // 订单支付过期时间
+    private LocalDateTime expireTime;
 }

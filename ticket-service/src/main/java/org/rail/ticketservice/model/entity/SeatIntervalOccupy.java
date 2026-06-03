@@ -13,9 +13,7 @@ public class SeatIntervalOccupy {
     private Integer endSequence;
     // ID（预订单或正式订单）
     private Long orderId;
-    // 订单类型（0：预订单，1：正式订单）
-    private Integer orderType;
-    // 占用状态（0：锁定中，1：已售出，2：已释放）
+    // 占用状态（0：预定单临时锁定，1：正式订单临时锁定，2：已售出，3：已释放）
     private Integer status;
     private LocalDateTime createTime;
     private LocalDateTime expireTime;

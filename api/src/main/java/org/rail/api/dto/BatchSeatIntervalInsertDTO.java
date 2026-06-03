@@ -3,7 +3,6 @@ package org.rail.api.dto;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
-import lombok.Builder;
 import lombok.Data;
 import lombok.experimental.Accessors;
 
@@ -23,9 +22,6 @@ public class BatchSeatIntervalInsertDTO {
 
     @NotNull(message = "订单ID不能为空")
     private Long orderId;
-
-    @NotNull(message = "订单类型不能为空")
-    private Integer orderType;
 
     @NotNull(message = "状态不能为空")
     private Integer status;
