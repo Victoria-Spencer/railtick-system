@@ -22,7 +22,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
- * 列车经停站本地缓存任务
+ * 列车经停站本地缓存任务（初始化+定时刷新）
  */
 @Slf4j
 @Component

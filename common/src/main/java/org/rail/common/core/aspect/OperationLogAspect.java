@@ -17,6 +17,7 @@ import org.rail.common.core.model.event.OperationLogEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
@@ -25,7 +26,7 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * 操作日志切面
+ * 业务操作日志切面
  * 职责：仅收集 → 发布事件
  * 无任何第三方中间件依赖
  */
@@ -51,6 +52,11 @@ public class OperationLogAspect {
     public Object around(ProceedingJoinPoint joinPoint) throws Throwable {
         long startTime = System.currentTimeMillis();
 
+        Class<?> targetClass = joinPoint.getTarget().getClass();
+        if (!targetClass.isAnnotationPresent(Service.class)) {
+            return joinPoint.proceed();
+        }
+
         HttpServletRequest request = getRequest();
         OperationLog annotation = getAnnotation(joinPoint);
         RequestContext context = RequestContextHolder.getRequestContext();
@@ -60,8 +66,8 @@ public class OperationLogAspect {
         String requestUrl = request != null ? request.getRequestURI() : "/non-http";
         String requestIp = (context == null || context.getCallerIp().isBlank()) ? "unknown" : context.getCallerIp();
         String requestParam = annotation.saveParam() ? getRequestParam(joinPoint) : "";
-        Long userId = (context != null && context.getAccountId() != null) ? Long.parseLong(context.getAccountId()) : -1L;
-        String userName = (context != null) ? context.getUsername() : "匿名用户";
+        Long userId = (context != null && context.getUserId() != null) ? Long.parseLong(context.getUserId()) : -1L;
+        String username = (context != null) ? context.getUsername() : "匿名用户";
         boolean operateStatus = true;
         String errorMsg = null;
 
@@ -79,7 +85,7 @@ public class OperationLogAspect {
                 // 发布操作日志事件（异步处理，不阻塞主线程）
                 OperationLogEvent event = new OperationLogEvent(
                         userId,
-                        userName,
+                        username,
                         operation,
                         requestMethod,
                         requestUrl,

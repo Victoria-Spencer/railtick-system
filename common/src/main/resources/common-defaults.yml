@@ -66,7 +66,6 @@ request:
       - /api/ticket-service/ticket/query
       - /api/ticket-service/stations/page
       - /error
-      -
 
 # 敏感数据配置化白名单
 sensitive:
@@ -79,3 +78,8 @@ sensitive:
   # 前端展示：需要自动脱敏的字段
   mask-sensitive-fields:
     - idCard
+
+# jwt令牌配置
+jwt:
+  secret: abcdefghijklmnopqrstuvwxyz1234567890ABCDEFG
+  expiration: 720000

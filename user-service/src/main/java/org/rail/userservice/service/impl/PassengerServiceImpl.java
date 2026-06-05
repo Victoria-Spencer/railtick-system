@@ -4,6 +4,7 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.lang.TypeReference;
 import com.github.pagehelper.PageHelper;
 import org.rail.api.dto.PassengerRemoteDTO;
+import org.rail.common.core.annotation.OperationLog;
 import org.rail.userservice.constant.UserRedisConstants;
 import org.rail.common.core.context.RequestContext;
 import org.rail.common.core.context.RequestContextHolder;
@@ -62,10 +63,10 @@ public class PassengerServiceImpl implements PassengerService {
     @Override
     public List<PsgrVO> list() {
         RequestContext context = RequestContextHolder.getRequestContext();
-        if (context == null|| context.getAccountId() == null) {
+        if (context == null|| context.getUserId() == null) {
             return new ArrayList<>();
         }
-        Long userId = Long.valueOf(context.getAccountId());
+        Long userId = Long.valueOf(context.getUserId());
 
         TypeReference<List<Passenger>> typeRef = new TypeReference<>() {};
         List<Passenger> passengerList = cacheClient.queryWithMutex(
@@ -97,10 +98,10 @@ public class PassengerServiceImpl implements PassengerService {
 
         // 权限校验
         RequestContext context = RequestContextHolder.getRequestContext();
-        if (context == null|| context.getAccountId() == null) {
+        if (context == null|| context.getUserId() == null) {
             throw new BizException("未获取到用户信息");
         }
-        Long currentUserId = Long.valueOf(context.getAccountId());
+        Long currentUserId = Long.valueOf(context.getUserId());
         if (!passenger.getUserId().equals(currentUserId)) {
             throw new BizException("无权限访问该乘车人信息");
         }
@@ -113,14 +114,15 @@ public class PassengerServiceImpl implements PassengerService {
      * @param dto 乘车人信息
      */
     @Override
+    @OperationLog(value = "添加乘客信息", saveParam = true)
     public void save(PsgrDTO dto) {
         Passenger passenger = BeanUtil.copyProperties(dto, Passenger.class);
 
         RequestContext context = RequestContextHolder.getRequestContext();
-        if (context == null|| context.getAccountId() == null) {
+        if (context == null|| context.getUserId() == null) {
             throw new BizException("未获取到用户信息");
         }
-        Long userId = Long.valueOf(context.getAccountId());
+        Long userId = Long.valueOf(context.getUserId());
         passenger.setUserId(userId);
 
         // 设置审核状态
@@ -141,16 +143,17 @@ public class PassengerServiceImpl implements PassengerService {
             singleKeyPrefix = RedisConstants.RAIL_PASSENGER_LIST_USER_PREFIX
     )*/
     @Override
+    @OperationLog(value = "修改乘客信息", saveParam = true)
     public void update(PsgrUpdateDTO psgrUpdateDTO) {
         Passenger passenger = BeanUtil.copyProperties(psgrUpdateDTO, Passenger.class);
         passenger.setUpdateTime(LocalDateTime.now());
         passengerMapper.updateById(passenger);
 
         RequestContext context = RequestContextHolder.getRequestContext();
-        if (context == null || context.getAccountId() == null) {
+        if (context == null || context.getUserId() == null) {
             throw new BizException("未获取到用户信息");
         }
-        String userId = context.getAccountId();
+        String userId = context.getUserId();
         cacheClient.autoClearAggCache(UserRedisConstants.RAIL_PASSENGER_LIST_USER_PREFIX + userId);
     }
 
@@ -163,12 +166,13 @@ public class PassengerServiceImpl implements PassengerService {
             singleKeyPrefix = RedisConstants.RAIL_PASSENGER_LIST_USER_PREFIX
     )*/
     @Override
+    @OperationLog(value = "删除乘客信息", saveParam = true)
     public void deleteByIds(List<Long> ids) {
         RequestContext context = RequestContextHolder.getRequestContext();
-        if (context == null || context.getAccountId() == null) {
+        if (context == null || context.getUserId() == null) {
             throw new BizException("未获取到用户信息");
         }
-        Long userId = Long.valueOf(context.getAccountId());
+        Long userId = Long.valueOf(context.getUserId());
         passengerMapper.batchDelete(ids, userId);
 
         cacheClient.autoClearAggCache(UserRedisConstants.RAIL_PASSENGER_LIST_USER_PREFIX + userId);

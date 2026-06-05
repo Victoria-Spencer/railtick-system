@@ -3,7 +3,6 @@ package org.rail.userservice.controller;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import org.rail.api.dto.PassengerRemoteDTO;
-import org.rail.common.core.annotation.OperationLog;
 import org.rail.common.core.model.result.PageResult;
 import org.rail.userservice.model.dto.PsgrDTO;
 import org.rail.userservice.model.dto.PsgrPageQueryDTO;
@@ -39,19 +38,16 @@ public class PassengerController {
         return passengerService.getById(id);
     }
 
-    @OperationLog(value = "添加乘客信息", saveParam = true)
     @PostMapping("/save")
     public void save(@RequestBody @Validated PsgrDTO passengerDTO) {
         passengerService.save(passengerDTO);
     }
 
-    @OperationLog(value = "修改乘客信息", saveParam = true)
     @PutMapping("/update")
     public void update(@RequestBody @Validated PsgrUpdateDTO psgrUpdateDTO) {
         passengerService.update(psgrUpdateDTO);
     }
 
-    @OperationLog(value = "删除乘客信息", saveParam = true)
     @DeleteMapping("/delete")
     public void delete(@RequestParam @NotEmpty(message = "乘客ID列表不能为空") List<Long> ids) {
         passengerService.deleteByIds(ids);

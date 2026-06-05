@@ -1,7 +1,10 @@
 package org.rail.gatewayservice.filters;
 
+import org.rail.common.core.constant.RequestHeaderConstants;
+import org.rail.common.core.exception.UnauthorizedException;
+import org.rail.common.core.model.UserAuthInfo;
+import org.rail.common.core.util.security.JwtTokenUtil;
 import org.rail.gatewayservice.config.GatewayAuthProperties;
-import org.rail.gatewayservice.util.JwtTokenUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
@@ -20,12 +23,6 @@ import java.util.List;
 @Component
 public class AuthGlobalFilter implements GlobalFilter, Ordered {
 
-    private static final String USER_ID_HEADER = "user-id";
-    private static final String TOKEN_HEADER = "token";
-    private static final String X_REAL_IP_HEADER = "X-Real-IP";
-    private static final String X_FORWARDED_FOR_HEADER = "X-Forwarded-For";
-    private static final String REPEAT_TOKEN_HEADER = "Repeat-Token";
-
     @Autowired
     private GatewayAuthProperties gatewayAuthProperties;
 
@@ -36,15 +33,15 @@ public class AuthGlobalFilter implements GlobalFilter, Ordered {
         ServerHttpRequest request = exchange.getRequest();
 
         String clientIp = getClientRealIp(request);
-        String repeatToken = request.getHeaders().getFirst(REPEAT_TOKEN_HEADER);
+        String repeatToken = request.getHeaders().getFirst(RequestHeaderConstants.REPEAT_TOKEN_HEADER);
 
         // 构建请求头：统一透传 IP + 防重Token
         ServerHttpRequest.Builder requestBuilder = request.mutate()
-                .header(X_REAL_IP_HEADER, clientIp)
-                .header(X_FORWARDED_FOR_HEADER, clientIp);
+                .header(RequestHeaderConstants.X_REAL_IP_HEADER, clientIp)
+                .header(RequestHeaderConstants.X_FORWARDED_FOR_HEADER, clientIp);
 
         if (repeatToken != null && !repeatToken.isBlank()) {
-            requestBuilder.header(REPEAT_TOKEN_HEADER, repeatToken);
+            requestBuilder.header(RequestHeaderConstants.REPEAT_TOKEN_HEADER, repeatToken);
         }
 
         // 白名单直接放行
@@ -54,21 +51,23 @@ public class AuthGlobalFilter implements GlobalFilter, Ordered {
         }
 
         // 从请求头中获取token
-        String token = exchange.getRequest().getHeaders().getFirst(TOKEN_HEADER);
+        String token = exchange.getRequest().getHeaders().getFirst(RequestHeaderConstants.TOKEN_HEADER);
 
         if (token != null && token.startsWith("Bearer ")) {
             token = token.substring(7);
         }
 
-        String userId = JwtTokenUtil.parseToken(token).toString();
-        if (userId.isEmpty()) {
+        UserAuthInfo authInfo;
+        try {
+            authInfo = JwtTokenUtil.parseToken(token);
+        } catch (UnauthorizedException e) {
             ServerHttpResponse response = exchange.getResponse();
             response.setStatusCode(HttpStatus.UNAUTHORIZED);
             return response.setComplete();
         }
 
-        // 将userId存入请求头中
-        requestBuilder.header(USER_ID_HEADER, userId);
+        requestBuilder.header(RequestHeaderConstants.USER_ID_HEADER, authInfo.getUserId().toString());
+        requestBuilder.header(RequestHeaderConstants.USER_NAME_HEADER, authInfo.getUsername());
 
         ServerWebExchange newExchange = exchange.mutate()
                 .request(requestBuilder.build())
@@ -81,7 +80,7 @@ public class AuthGlobalFilter implements GlobalFilter, Ordered {
      * 获取客户端真实IP地址（支持多级代理）
      */
     private String getClientRealIp(ServerHttpRequest request) {
-        List<String> xForwardedFor = request.getHeaders().get(X_FORWARDED_FOR_HEADER);
+        List<String> xForwardedFor = request.getHeaders().get(RequestHeaderConstants.X_FORWARDED_FOR_HEADER);
         if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
             String ip = xForwardedFor.getFirst();
             if (ip.contains(",")) {
@@ -92,7 +91,7 @@ public class AuthGlobalFilter implements GlobalFilter, Ordered {
             }
         }
 
-        String realIp = request.getHeaders().getFirst(X_REAL_IP_HEADER);
+        String realIp = request.getHeaders().getFirst(RequestHeaderConstants.X_REAL_IP_HEADER);
         if (realIp != null && !realIp.isBlank() && !"unknown".equalsIgnoreCase(realIp)) {
             return realIp.trim();
         }

@@ -2,6 +2,7 @@ package org.rail.common.mq.config;
 
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
+import org.rail.common.core.constant.RequestHeaderConstants;
 import org.rail.common.core.context.RequestContext;
 import org.rail.common.core.context.RequestContextHolder;
 import org.springframework.amqp.core.AcknowledgeMode;
@@ -47,12 +48,12 @@ public class RabbitMQConfig {
             RequestContext context = RequestContextHolder.getRequestContext();
             if (Objects.nonNull(context)) {
                 // 全字段存入消息头
-                message.getMessageProperties().setHeader("START_TIME", context.getStartTime());
-                message.getMessageProperties().setHeader("REQUEST_ID", context.getRequestId());
-                message.getMessageProperties().setHeader("ACCOUNT_ID", context.getAccountId());
-                message.getMessageProperties().setHeader("USERNAME", context.getUsername());
-                message.getMessageProperties().setHeader("CALLER_IP", context.getCallerIp());
-                message.getMessageProperties().setHeader("SOURCE", context.getSource());
+                message.getMessageProperties().setHeader(RequestHeaderConstants.START_TIME_HEADER, context.getStartTime());
+                message.getMessageProperties().setHeader(RequestHeaderConstants.REQUEST_ID_HEADER, context.getRequestId());
+                message.getMessageProperties().setHeader(RequestHeaderConstants.USER_ID_HEADER, context.getUserId());
+                message.getMessageProperties().setHeader(RequestHeaderConstants.USER_NAME_HEADER, context.getUsername());
+                message.getMessageProperties().setHeader(RequestHeaderConstants.CALLER_IP_HEADER, context.getCallerIp());
+                message.getMessageProperties().setHeader(RequestHeaderConstants.SOURCE_HEADER, context.getSource());
             }
             return message;
         };
@@ -95,12 +96,12 @@ public class RabbitMQConfig {
             // 遍历方法参数，找到 RabbitMQ 原生 Message 对象
             for (Object arg : invocation.getArguments()) {
                 if (arg instanceof Message nativeMessage) {
-                    context.setStartTime(nativeMessage.getMessageProperties().getHeader("START_TIME"));
-                    context.setRequestId(nativeMessage.getMessageProperties().getHeader("REQUEST_ID"));
-                    context.setAccountId(nativeMessage.getMessageProperties().getHeader("ACCOUNT_ID"));
-                    context.setUsername(nativeMessage.getMessageProperties().getHeader("USERNAME"));
-                    context.setCallerIp(nativeMessage.getMessageProperties().getHeader("CALLER_IP"));
-                    context.setSource(nativeMessage.getMessageProperties().getHeader("SOURCE"));
+                    context.setStartTime(nativeMessage.getMessageProperties().getHeader(RequestHeaderConstants.START_TIME_HEADER));
+                    context.setRequestId(nativeMessage.getMessageProperties().getHeader(RequestHeaderConstants.REQUEST_ID_HEADER));
+                    context.setUserId(nativeMessage.getMessageProperties().getHeader(RequestHeaderConstants.USER_ID_HEADER));
+                    context.setUsername(nativeMessage.getMessageProperties().getHeader(RequestHeaderConstants.USER_NAME_HEADER));
+                    context.setCallerIp(nativeMessage.getMessageProperties().getHeader(RequestHeaderConstants.CALLER_IP_HEADER));
+                    context.setSource(nativeMessage.getMessageProperties().getHeader(RequestHeaderConstants.SOURCE_HEADER));
                     break;
                 }
             }

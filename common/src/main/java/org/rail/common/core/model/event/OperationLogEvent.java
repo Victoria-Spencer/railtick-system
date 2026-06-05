@@ -20,7 +20,7 @@ public class OperationLogEvent {
     private Long userId;
 
     /** 操作人账号 */
-    private String userName;
+    private String username;
 
     /** 操作描述 */
     private String operation;

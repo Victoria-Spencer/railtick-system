@@ -30,8 +30,8 @@ public class RequestContext implements Serializable {
     private String requestId;
 
     /** 用户id */
-    @JsonProperty("account_id")
-    private String accountId;
+    @JsonProperty("user_id")
+    private String userId;
 
     /** 用户名 */
     private String username;
@@ -40,7 +40,7 @@ public class RequestContext implements Serializable {
     @JsonProperty("caller_ip")
     private String callerIp;
 
-    /** 请求来源：web/app/mini（默认网页端） */
+    /** 请求来源：web/app/mini/system（默认网页端） */
     private String source = "web";
 
 }

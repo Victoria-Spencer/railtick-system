@@ -70,7 +70,7 @@ public class RequestContextTaskDecorator implements TaskDecorator {
         return RequestContext.builder()
                 .startTime(original.getStartTime())
                 .requestId(original.getRequestId())
-                .accountId(original.getAccountId())
+                .userId(original.getUserId())
                 .username(original.getUsername())
                 .callerIp(original.getCallerIp())
                 .source(original.getSource())

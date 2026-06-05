@@ -100,7 +100,7 @@ public class LogUtils {
 
 		if (context != null) {
 			builder.append(SIMPLE_LOG_SPLIT).append(context.getRequestId());
-			builder.append(SIMPLE_LOG_SPLIT).append(context.getAccountId());
+			builder.append(SIMPLE_LOG_SPLIT).append(context.getUserId());
 		} else {
 			builder.append(SIMPLE_LOG_SPLIT).append("");
 			builder.append(SIMPLE_LOG_SPLIT).append("");
@@ -147,7 +147,7 @@ public class LogUtils {
 		StringBuilder trace = new StringBuilder();
 		trace.append("trace").append(SIMPLE_LOG_SPLIT);
 		trace.append(context.getRequestId()).append(SIMPLE_LOG_SPLIT);
-		trace.append(context.getAccountId()).append(SIMPLE_LOG_SPLIT);
+		trace.append(context.getUserId()).append(SIMPLE_LOG_SPLIT);
 
 		trace.append(action).append(SIMPLE_LOG_SPLIT);
 		trace.append(resultCode).append(SIMPLE_LOG_SPLIT);

@@ -4,10 +4,10 @@ import feign.RequestInterceptor;
 import feign.codec.Decoder;
 import lombok.RequiredArgsConstructor;
 import org.rail.common.core.config.SensitiveProperties;
+import org.rail.common.core.constant.RequestHeaderConstants;
 import org.rail.common.core.context.RequestContext;
 import org.rail.common.core.context.RequestContextHolder;
 import org.rail.common.core.exception.OpenFeignException;
-import org.rail.common.feign.constant.FeignConstant;
 import org.springframework.boot.autoconfigure.http.HttpMessageConverters;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -31,13 +31,21 @@ public class FeignConfig {
                 throw new OpenFeignException("当前请求无上下文，无法发起远程调用");
             }
 
-            String userId = context.getAccountId();
+            String userId = context.getUserId();
             if (userId == null || userId.isBlank()) {
                 throw new OpenFeignException("当前用户未登录，无法发起远程调用");
             }
 
-            requestTemplate.header("user-id", userId);
-            requestTemplate.header("request-id", context.getRequestId());
+            String username = context.getUsername();
+            if (username == null || username.isBlank()) {
+                throw new OpenFeignException("当前用户未登录，无法发起远程调用");
+            }
+
+            requestTemplate.header(RequestHeaderConstants.USER_ID_HEADER, userId);
+            requestTemplate.header(RequestHeaderConstants.USER_NAME_HEADER, context.getUsername());
+            requestTemplate.header(RequestHeaderConstants.REQUEST_ID_HEADER, context.getRequestId());
+            requestTemplate.header(RequestHeaderConstants.START_TIME_HEADER, String.valueOf(context.getStartTime()));
+            requestTemplate.header(RequestHeaderConstants.X_REAL_IP_HEADER, context.getCallerIp());
         };
     }
 
@@ -47,7 +55,7 @@ public class FeignConfig {
     @Bean
     public RequestInterceptor feignCallHeaderInterceptor() {
         return requestTemplate ->
-                requestTemplate.header(FeignConstant.FEIGN_REQUEST_HEADER, "true");
+                requestTemplate.header(RequestHeaderConstants.FEIGN_REQUEST_HEADER, "true");
     }
 
     /**

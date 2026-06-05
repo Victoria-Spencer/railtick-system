@@ -4,9 +4,9 @@ import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.Nullable;
 import org.rail.common.core.config.SensitiveProperties;
+import org.rail.common.core.constant.RequestHeaderConstants;
 import org.rail.common.core.exception.SensitiveDataException;
 import org.rail.common.core.util.security.CryptoUtils;
-import org.rail.common.feign.constant.FeignConstant;
 import org.springframework.core.MethodParameter;
 import org.springframework.http.MediaType;
 import org.springframework.http.converter.HttpMessageConverter;
@@ -64,7 +64,7 @@ public class MaskAdvice implements ResponseBodyAdvice<Object> {
         }
 
         // Feign 远程调用 → 直接跳过脱敏
-        if (request != null && request.getHeaders().containsKey(FeignConstant.FEIGN_REQUEST_HEADER)) {
+        if (request != null && request.getHeaders().containsKey(RequestHeaderConstants.FEIGN_REQUEST_HEADER)) {
             return body;
         }
 

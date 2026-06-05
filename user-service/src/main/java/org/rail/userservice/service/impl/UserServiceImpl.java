@@ -3,9 +3,11 @@ package org.rail.userservice.service.impl;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.StrUtil;
 import org.rail.api.dto.UserIdCardDTO;
+import org.rail.common.core.annotation.OperationLog;
 import org.rail.common.core.context.RequestContext;
 import org.rail.common.core.context.RequestContextHolder;
 import org.rail.common.core.exception.BizException;
+import org.rail.common.core.util.security.JwtTokenUtil;
 import org.rail.common.core.util.security.PasswordCryptUtils;
 import org.rail.userservice.mapper.UserMapper;
 import org.rail.userservice.model.dto.UserLoginDTO;
@@ -16,7 +18,6 @@ import org.rail.userservice.model.vo.UserInfoVO;
 import org.rail.userservice.model.vo.UserUpdateVO;
 import org.rail.userservice.model.vo.UserVO;
 import org.rail.userservice.service.UserService;
-import org.rail.userservice.util.JwtTokenUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -52,7 +53,7 @@ public class UserServiceImpl implements UserService {
         }
 
         UserVO userVO = BeanUtil.copyProperties(user, UserVO.class);
-        String token = JwtTokenUtil.createToken(user.getId());
+        String token = JwtTokenUtil.createToken(user.getId(), user.getUsername());
         userVO.setAccessToken(token);
 
         return userVO;
@@ -72,6 +73,7 @@ public class UserServiceImpl implements UserService {
      * @return 注册成功的用户信息
      */
     @Override
+    @OperationLog(value = "用户注册", saveParam = true)
     public UserVO register(UserRegisterDTO userRegisterDTO) {
         User existingUser  = userMapper.findByUsernameOrMailOrPhone(userRegisterDTO.getUsername());
         if(existingUser != null) {
@@ -95,12 +97,13 @@ public class UserServiceImpl implements UserService {
      * @return 更新后的用户信息
      */
     @Override
+    @OperationLog(value = "修改用户信息", saveParam = true)
     public UserUpdateVO update(UserUpdateInfoDTO userUpdateInfoDTO) {
         RequestContext context = RequestContextHolder.getRequestContext();
-        if (context == null || context.getAccountId() == null) {
+        if (context == null || context.getUserId() == null) {
             throw new BizException("未获取到用户信息");
         }
-        long userId = Long.parseLong(context.getAccountId());
+        long userId = Long.parseLong(context.getUserId());
         userUpdateInfoDTO.setId(userId);
 
         User user = userMapper.getById(userId);
@@ -133,11 +136,11 @@ public class UserServiceImpl implements UserService {
     @Override
     public UserInfoVO query() {
         RequestContext context = RequestContextHolder.getRequestContext();
-        if (context == null || context.getAccountId() == null) {
+        if (context == null || context.getUserId() == null) {
             throw new BizException("未获取到用户信息");
         }
 
-        long userId = Long.parseLong(context.getAccountId());
+        long userId = Long.parseLong(context.getUserId());
         User user = userMapper.getById(userId);
 
         return BeanUtil.copyProperties(user, UserInfoVO.class);
@@ -148,13 +151,14 @@ public class UserServiceImpl implements UserService {
      * @return 证件类型和证件号
      */
     @Override
+    @OperationLog(value = "查询用户证件类型和证件件号", saveParam = true)
     public UserIdCardDTO getIdCardInfoById() {
         RequestContext context = RequestContextHolder.getRequestContext();
-        if (context == null || context.getAccountId() == null) {
+        if (context == null || context.getUserId() == null) {
             throw new BizException("未获取到用户信息");
         }
 
-        long userId = Long.parseLong(context.getAccountId());
+        long userId = Long.parseLong(context.getUserId());
         User user = userMapper.getById(userId);
 
         return BeanUtil.copyProperties(user, UserIdCardDTO.class);

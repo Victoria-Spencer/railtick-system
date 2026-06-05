@@ -9,6 +9,7 @@ import cn.hutool.core.util.StrUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang.StringUtils;
 import org.rail.api.constant.SeatIntervalStatusConstants;
+import org.rail.common.core.annotation.OperationLog;
 import org.rail.ticketservice.constant.redis.SeatRedisConstants;
 import org.rail.ticketservice.constant.redis.TrainRedisConstants;
 import org.rail.common.core.exception.BizException;
@@ -465,6 +466,7 @@ public class TicketServiceImpl implements TicketService {
      * @return 可用座位列表DTO
      */
     @Override
+    @OperationLog(value = "获取可用座位", saveParam = true)
     public List<AvailableSeatRemoteDTO> getAvailableSeats(RandomSeatQueryDTO queryDTO) {
         if (ObjectUtil.isEmpty(queryDTO)
                 || ObjectUtil.isEmpty(queryDTO.getTrainId())
@@ -818,6 +820,7 @@ public class TicketServiceImpl implements TicketService {
      * 更新座位占用区间，并同步新的座位状态
      */
     @Override
+    @OperationLog(value = "更新座位状态", saveParam = true)
     public void updateSeatStatus(BatchSeatIntervalInsertDTO batchDTO) {
         if (ObjectUtil.isEmpty(batchDTO)
                 || ObjectUtil.isEmpty(batchDTO.getTrainId())

@@ -1,7 +1,6 @@
 package org.rail.userservice.controller;
 
 import org.rail.api.dto.UserIdCardDTO;
-import org.rail.common.core.annotation.OperationLog;
 import org.rail.userservice.model.dto.UserLoginDTO;
 import org.rail.userservice.model.dto.UserRegisterDTO;
 import org.rail.userservice.model.dto.UserUpdateInfoDTO;
@@ -33,13 +32,11 @@ public class UserController {
         userService.logout();
     }
 
-    @OperationLog(value = "用户注册", saveParam = true)
     @PostMapping("/register")
     public UserVO register(@RequestBody  @Validated UserRegisterDTO userRegisterDTO) {
         return userService.register(userRegisterDTO);
     }
 
-    @OperationLog(value = "修改用户信息", saveParam = true)
     @PutMapping("/update")
     public UserUpdateVO update(@RequestBody  @Validated UserUpdateInfoDTO userUpdateInfoDTO) {
         return userService.update(userUpdateInfoDTO);
@@ -54,7 +51,6 @@ public class UserController {
     public void delete() {
     }
 
-    @OperationLog(value = "查询用户证件类型和证件件号", saveParam = true)
     @GetMapping("/user/id-card-info")
     public UserIdCardDTO getIdCardInfo() {
         return userService.getIdCardInfoById();

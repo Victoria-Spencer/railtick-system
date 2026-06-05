@@ -45,7 +45,3 @@ gateway:
       - /api/user-service/register
       - /api/ticket-service/ticket/query
       - /api/ticket-service/stations/page
-# jwt令牌配置
-jwt:
-  secret: abcdefghijklmnopqrstuvwxyz1234567890ABCDEFG
-  expiration: 720000

@@ -16,7 +16,7 @@ public class OperationLogMessage implements Serializable {
     private static final long serialVersionUID = 1L;
 
     private Long userId;
-    private String userName;
+    private String username;
     private String operation;
     private String requestMethod;
     private String requestUrl;

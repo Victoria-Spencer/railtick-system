@@ -8,6 +8,7 @@ import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
 import org.rail.api.client.TicketFeignClient;
 import org.rail.api.client.UserFeignClient;
+import org.rail.common.core.annotation.OperationLog;
 import org.rail.orderservice.constant.OrderRedisConstants;
 import org.rail.common.core.context.RequestContext;
 import org.rail.common.core.context.RequestContextHolder;
@@ -94,12 +95,13 @@ public class OrderServiceImpl implements OrderService {
     // 全局事务
     @Override
 //    @GlobalTransactional
+    @OperationLog(value = "创建预订单", saveParam = true)
     public String createPreOrder(CreatePreOrderDTO createPreOrderDTO) {
         RequestContext context = RequestContextHolder.getRequestContext();
-        if (context == null || context.getAccountId() == null) {
+        if (context == null || context.getUserId() == null) {
             throw new BizException("请先登录");
         }
-        long userId = Long.parseLong(context.getAccountId());
+        long userId = Long.parseLong(context.getUserId());
         createPreOrderDTO.setUserId(userId);
         Long trainId = createPreOrderDTO.getTrainId();
         String preOrderKey = buildPreOrderKey(userId, trainId);
@@ -317,13 +319,14 @@ public class OrderServiceImpl implements OrderService {
      */
     // 全局事务
     @Override
+    @OperationLog(value = "创建订单", saveParam = true)
 //    @GlobalTransactional
     public CreateOrderVO createOrder(CreateOrderDTO createOrderDTO) {
         RequestContext context = RequestContextHolder.getRequestContext();
         if (context == null) {
             throw new BizException("请先登录");
         }
-        Long userId = Long.valueOf(context.getAccountId());
+        Long userId = Long.valueOf(context.getUserId());
         Long trainId = createOrderDTO.getTrainId();
 
         String preOrderSn = createOrderDTO.getPreOrderSn();
@@ -604,10 +607,10 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public PageResult<OrderPageQueryVO> orderPageQuery(OrderPageQueryDTO orderPageQueryDTO) {
         RequestContext context = RequestContextHolder.getRequestContext();
-        if (context == null || context.getAccountId() == null) {
+        if (context == null || context.getUserId() == null) {
             throw new BizException("请先登录");
         }
-        Long userId = Long.valueOf(context.getAccountId());
+        Long userId = Long.valueOf(context.getUserId());
         Integer orderStatus = orderPageQueryDTO.getOrderStatus();
         orderPageQueryDTO.setUserId(userId);
 
@@ -737,10 +740,10 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public PageResult<SelfTicketPageVO> selfTicketPageQuery(FrontSelfTicketPageDTO frontSelfTicketPageDTO) {
         RequestContext context = RequestContextHolder.getRequestContext();
-        if (context == null || context.getAccountId() == null) {
+        if (context == null || context.getUserId() == null) {
             throw new BizException("请先登录");
         }
-        Long userId = Long.valueOf(context.getAccountId());
+        Long userId = Long.valueOf(context.getUserId());
         frontSelfTicketPageDTO.setUserId(userId);
 
         // 以userId为key，缓存全量本人车票数据
@@ -844,6 +847,7 @@ public class OrderServiceImpl implements OrderService {
      * @param orderSn 订单号
      */
     @Override
+    @OperationLog(value = "取消订单", saveParam = true)
     public void cancelOrder(String orderSn) {
         // 分布式锁：防重复消费
         String lockKey = OrderRedisConstants.RAIL_LOCK_ORDER_PREFIX + orderSn;

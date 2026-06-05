@@ -57,7 +57,3 @@ mybatis:
   mapper-locations: classpath:mapper/*.xml  # 扫描 resources/mapper 目录下的所有 XML 文件
   configuration:
     map-underscore-to-camel-case: true  # 开启下划线转驼峰
-# jwt令牌配置
-jwt:
-  secret: abcdefghijklmnopqrstuvwxyz1234567890ABCDEFG
-  expiration: 720000

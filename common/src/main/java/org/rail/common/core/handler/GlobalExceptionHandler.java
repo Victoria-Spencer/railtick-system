@@ -35,6 +35,7 @@ public class GlobalExceptionHandler{
             case BizException businessException -> "操作失败，请稍后重试";
             case SensitiveDataException sensitiveDataException -> "数据处理异常，请稍后重试";
             case MqException mqException -> "消息队列服务异常，请稍后重试";
+            case UnauthorizedException unauthorizedException -> "未授权访问，请先登录";
             default -> "业务处理失败，请稍后重试";
         };
 

@@ -1,8 +1,9 @@
-package org.rail.userservice.util;
+package org.rail.common.core.util.security;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
-import org.rail.userservice.exception.UnauthorizedException;
+import org.rail.common.core.exception.UnauthorizedException;
+import org.rail.common.core.model.UserAuthInfo;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -39,30 +40,32 @@ public class JwtTokenUtil {
     }
 
     /**
-     * 生成token（核心：将userId藏在token内部）
-     * @param userId 用户唯一标识（核心身份信息）
-     * @return 生成的JWT令牌
+     * 生成token（使用默认过期时间）
+     * @param userId 用户账号ID（用户唯一标识）
+     * @param username  用户名
+     * @return JWT令牌
      */
-    public static String createToken(Long userId) {
+    public static String createToken(Long userId, String username) {
         // 调用重载方法，使用默认过期时间
-        return createToken(userId, defaultExpiration);
+        return createToken(userId, username, defaultExpiration);
     }
 
     /**
      * 生成token（支持自定义过期时间）
-     * @param userId 用户唯一标识
+     * @param userId 用户账号ID
+     * @param username 用户名
      * @param expiration 过期时间（单位：秒）
      * @return 生成的JWT令牌
      */
-    public static String createToken(Long userId, long expiration) {
-        // 1. 构建负载（将userId藏在这里）
+    public static String createToken(Long userId, String username, long expiration) {
+        // 构建负载
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", userId); // 核心：用户标识藏在负载中
+        claims.put("username", username);
 
-        // 2. 生成token（包含负载、过期时间、签名）
+        // 生成token（包含负载、过期时间、签名）
         return Jwts.builder()
-                .setClaims(claims) // 负载：存放userId
-                .setSubject(userId.toString()) // 主题：也存userId（可选，方便快速提取）
+                .setClaims(claims) // 负载
                 .setIssuedAt(new Date()) // 签发时间
                 .setExpiration(new Date(System.currentTimeMillis() + expiration * 1000)) // 过期时间
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256) // 签名防篡改
@@ -75,29 +78,31 @@ public class JwtTokenUtil {
      * @return 解析出的用户唯一标识（userId）
      * @throws UnauthorizedException 校验失败时抛出（未登录/无效/过期）
      */
-    public static Long parseToken(String token) {
-        // 1. 校验token是否为空
+    public static UserAuthInfo parseToken(String token) {
+        // 校验token是否为空
         if (token == null || token.trim().isEmpty()) {
             throw new UnauthorizedException("未登录：token为空");
         }
 
         try {
-            // 2. 解析token（自动校验签名）
+            // 解析token（自动校验签名）
             Claims claims = Jwts.parserBuilder()
                     .setSigningKey(getSigningKey()) // 用密钥校验签名
                     .build()
                     .parseClaimsJws(token) // 解析token，签名无效会直接抛异常
                     .getBody();
 
-            // 3. 校验过期时间（JJWT会自动校验，若过期会抛ExpiredJwtException）
-            // （这里无需手动校验，异常处理见下方catch块）
+            Long userId = claims.get("userId", Long.class);
+            String username = claims.get("username", String.class);
 
-            // 4. 提取并返回userId（从负载中获取藏好的用户标识）
-            Object userIdObj = claims.get("userId");
-            if (userIdObj == null) {
-                throw new UnauthorizedException("无效的token：未包含用户信息");
+            if (userId == null || username == null) {
+                throw new UnauthorizedException("无效的token：用户信息不完整");
             }
-            return Long.valueOf(userIdObj.toString());
+
+            UserAuthInfo authInfo = new UserAuthInfo();
+            authInfo.setUserId(userId);
+            authInfo.setUsername(username);
+            return authInfo;
 
         } catch (ExpiredJwtException e) {
             // token已过期
@@ -109,13 +114,13 @@ public class JwtTokenUtil {
     }
 
     /**
-     * 仅校验token是否有效（不返回userId，用于快速判断）
+     * 仅校验token是否有效
      * @param token 待校验的令牌
      * @return true=有效，false=无效
      */
     public static boolean isValid(String token) {
         try {
-            parseToken(token); // 复用parseToken的校验逻辑
+            parseToken(token);
             return true;
         } catch (UnauthorizedException e) {
             return false;

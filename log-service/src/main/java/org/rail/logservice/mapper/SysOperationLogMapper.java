@@ -20,7 +20,7 @@ public interface SysOperationLogMapper {
             "request_ip, request_param, operate_status, error_msg, cost_time, create_time, " +
             "message_id, send_time, consume_time" +
             ") VALUES (" +
-            "#{userId}, #{userName}, #{operation}, #{requestMethod}, #{requestUrl}, " +
+            "#{userId}, #{username}, #{operation}, #{requestMethod}, #{requestUrl}, " +
             "#{requestIp}, #{requestParam}, #{operateStatus}, #{errorMsg}, #{costTime}, #{createTime}, " +
             "#{messageId}, #{sendTime}, #{consumeTime}" +
             ")"

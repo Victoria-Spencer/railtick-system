@@ -1,4 +1,4 @@
-package org.rail.userservice.exception;
+package org.rail.common.core.exception;
 
 import cn.hutool.http.HttpStatus;
 import org.rail.common.core.base.exception.BaseException;
