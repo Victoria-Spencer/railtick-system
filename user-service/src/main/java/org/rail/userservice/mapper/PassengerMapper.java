@@ -1,5 +1,6 @@
 package org.rail.userservice.mapper;
 
+import com.github.pagehelper.Page;
 import org.apache.ibatis.annotations.*;
 import org.rail.userservice.model.dto.PsgrPageQueryDTO;
 import org.rail.userservice.model.entity.Passenger;
@@ -13,7 +14,7 @@ public interface PassengerMapper {
      * @param psgrPageQueryDTO 分页查询参数
      * @return 分页结果
      */
-    List<Passenger> query(PsgrPageQueryDTO psgrPageQueryDTO);
+    Page<Passenger> query(PsgrPageQueryDTO psgrPageQueryDTO);
 
     /**
      * 根据用户id查询所有乘车人信息

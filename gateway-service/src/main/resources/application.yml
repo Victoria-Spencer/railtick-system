@@ -3,6 +3,10 @@ server:
 spring:
   application:
     name: gateway-service #网关服务名
+  config:
+    import:
+      # common-defaults.yml 来自 common 模块 jar 包，IDE 误报忽略即可
+      - classpath:common-defaults.yml
   cloud:
     # Nacos注册中心配置
     nacos:
@@ -36,12 +40,3 @@ spring:
               uri: lb://tool-service # 目标服务名（lb表示负载均衡）
               predicates:
                 - Path=/api/tool-service/** # 路由断言：匹配路径
-# 网关认证相关配置
-gateway:
-  auth:
-    # 免拦截路径列表，根据实际业务调整
-    exclude-paths:
-      - /api/user-service/v1/login
-      - /api/user-service/register
-      - /api/ticket-service/ticket/query
-      - /api/ticket-service/stations/page

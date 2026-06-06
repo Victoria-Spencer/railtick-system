@@ -19,11 +19,7 @@
 	<dependencies>
 		<dependency>
 			<groupId>org.rail</groupId>
-			<artifactId>common</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>mysql</groupId>
-			<artifactId>mysql-connector-java</artifactId>
+			<artifactId>common-web</artifactId>
 		</dependency>
 
 		<!-- 测试依赖 -->

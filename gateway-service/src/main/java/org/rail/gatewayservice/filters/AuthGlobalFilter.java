@@ -1,15 +1,20 @@
 package org.rail.gatewayservice.filters;
 
+import cn.hutool.json.JSONConfig;
+import cn.hutool.json.JSONUtil;
+import lombok.RequiredArgsConstructor;
+import org.rail.common.core.config.AuthProperties;
 import org.rail.common.core.constant.RequestHeaderConstants;
 import org.rail.common.core.exception.UnauthorizedException;
 import org.rail.common.core.model.UserAuthInfo;
+import org.rail.common.core.model.result.Result;
 import org.rail.common.core.util.security.JwtTokenUtil;
-import org.rail.gatewayservice.config.GatewayAuthProperties;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
-import org.springframework.http.HttpStatus;
+import org.springframework.core.io.buffer.DataBuffer;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.stereotype.Component;
@@ -18,13 +23,16 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
 import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.List;
 
 @Component
+@RequiredArgsConstructor
 public class AuthGlobalFilter implements GlobalFilter, Ordered {
 
-    @Autowired
-    private GatewayAuthProperties gatewayAuthProperties;
+    private final AuthProperties authProperties;
+    private final JSONConfig hutoolJsonConfig;
 
     private final AntPathMatcher pathMatcher = new AntPathMatcher();
 
@@ -62,12 +70,23 @@ public class AuthGlobalFilter implements GlobalFilter, Ordered {
             authInfo = JwtTokenUtil.parseToken(token);
         } catch (UnauthorizedException e) {
             ServerHttpResponse response = exchange.getResponse();
-            response.setStatusCode(HttpStatus.UNAUTHORIZED);
-            return response.setComplete();
+            response.setStatusCode(org.springframework.http.HttpStatus.UNAUTHORIZED);
+            response.getHeaders().set(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
+
+            Result<Object> result = Result.error(
+                    org.springframework.http.HttpStatus.UNAUTHORIZED.value(),
+                    "未授权访问，请先登录"
+            );
+            String json = JSONUtil.toJsonStr(result, hutoolJsonConfig);
+            DataBuffer buffer = response.bufferFactory().wrap(json.getBytes(StandardCharsets.UTF_8));
+            return response.writeWith(Mono.just(buffer));
         }
 
         requestBuilder.header(RequestHeaderConstants.USER_ID_HEADER, authInfo.getUserId().toString());
-        requestBuilder.header(RequestHeaderConstants.USER_NAME_HEADER, authInfo.getUsername());
+        // 中文用户名Base64编码，避免HTTP Header中文乱码
+        String usernameEncoded = Base64.getEncoder()
+                .encodeToString(authInfo.getUsername().getBytes(StandardCharsets.UTF_8));
+        requestBuilder.header(RequestHeaderConstants.USER_NAME_HEADER, usernameEncoded);
 
         ServerWebExchange newExchange = exchange.mutate()
                 .request(requestBuilder.build())
@@ -104,7 +123,7 @@ public class AuthGlobalFilter implements GlobalFilter, Ordered {
      * 判断当前路径是否在排除列表中（支持模糊匹配）
      */
     private boolean isExcludePath(String path) {
-        List<String> excludePaths = gatewayAuthProperties.getExcludePaths();
+        List<String> excludePaths = authProperties.getExcludePaths();
 
         // 排除列表为空
         if(excludePaths == null || excludePaths.isEmpty()) {

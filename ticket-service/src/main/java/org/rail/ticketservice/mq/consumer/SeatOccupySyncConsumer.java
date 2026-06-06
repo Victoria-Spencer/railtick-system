@@ -1,6 +1,6 @@
 package org.rail.ticketservice.mq.consumer;
 
-import org.rail.common.core.exception.MqException;
+import org.rail.common.mq.exception.MqException;
 import org.rail.ticketservice.mapper.SeatIntervalOccupyMapper;
 import org.rail.ticketservice.mq.config.TicketRabbitMQConfig;
 import org.rail.ticketservice.mq.message.SeatOccupySyncMessage;

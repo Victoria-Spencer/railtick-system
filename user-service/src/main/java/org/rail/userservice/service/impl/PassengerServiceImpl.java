@@ -2,6 +2,7 @@ package org.rail.userservice.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.lang.TypeReference;
+import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import org.rail.api.dto.PassengerRemoteDTO;
 import org.rail.common.core.annotation.OperationLog;
@@ -25,6 +26,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -47,13 +49,16 @@ public class PassengerServiceImpl implements PassengerService {
     public PageResult<PsgrVO> pageQuery(PsgrPageQueryDTO psgrPageQueryDTO) {
         psgrPageQueryDTO.setVerifyStatus(VerifyStatusConstants.UNREVIEWED);
         PageHelper.startPage(psgrPageQueryDTO.getPageNumber(), psgrPageQueryDTO.getPageSize());
-        List<Passenger> passengerList = passengerMapper.query(psgrPageQueryDTO);
+        try (Page<Passenger> passengerList = passengerMapper.query(psgrPageQueryDTO)) {
+            List<PsgrVO> voList = passengerList.stream()
+                    .map(passenger -> BeanUtil.copyProperties(passenger, PsgrVO.class))
+                    .collect(Collectors.toList());
 
-        List<PsgrVO> voList = passengerList.stream()
-                .map(passenger -> BeanUtil.copyProperties(passenger, PsgrVO.class))
-                .collect(Collectors.toList());
-
-        return new PageResult<>(voList);
+            long total = passengerList.getTotal();
+            int pageNumber = passengerList.getPageNum();
+            int pageSize = passengerList.getPageSize();
+            return new PageResult<>(total, voList, pageNumber, pageSize);
+        }
     }
 
     /**

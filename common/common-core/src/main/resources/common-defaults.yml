@@ -1,0 +1,84 @@
+#spring:
+#  data:
+#    redis:
+#      cluster:
+#        nodes:
+#          - 192.168.43.143:6379
+##          - 192.168.43.143:6379
+##          - 192.168.43.143:6379
+##          - 192.168.43.143:6379
+##          - 192.168.43.143:6379
+##          - 192.168.43.143:6379
+#        max-redirects: 3
+#        read-from-replicas: true
+#      timeout: PT5S          # 连接/读写超时时间（3.5.5推荐ISO-8601格式，PT5S=5秒）
+#      client-name: redis-cluster-client  # 客户端名称（可选，便于Redis监控识别）
+#      lettuce:
+#        pool:
+#          max-active: 16     # 最大连接数
+#          max-idle: 8        # 最大空闲连接
+#          min-idle: 4        # 最小空闲连接
+#          max-wait: PT2S     # 连接获取超时时间
+#        cluster:
+#          refresh:
+#            adaptive: true   # 自适应刷新集群拓扑
+#            period: PT30S    # 定时刷新拓扑周期
+
+spring:
+  data:
+    redis:
+      # ========== 单节点核心配置（替换原cluster节点） ==========
+      host: 192.168.43.143  # Redis服务器IP
+      port: 6379             # Redis端口（默认6379）
+#      password: ""           # Redis密码（无密码则留空/注释，可选）
+      database: 0            # 操作的数据库（默认0）
+      timeout: PT5S          # 连接/读写超时时间（3.5.5推荐ISO-8601格式）
+      client-name: redis-single-client  # 客户端名称
+      lettuce:
+        pool:
+          max-active: 16     # 最大连接数
+          max-idle: 8        # 最大空闲连接
+          min-idle: 4        # 最小空闲连接
+          max-wait: PT2S     # 连接获取超时时间
+    # ES 核心配置
+    elasticsearch:
+      rest:
+        uris: http://192.168.43.143:9200 # ES 地址+端口（默认9200）
+        # 若 ES 8.x 开启了用户名/密码认证，添加以下配置
+        # username: elastic
+        # password: 你的ES密码（安装时生成的）
+        connection-timeout: 10s # 连接超时
+        read-timeout: 30s # 读取超时
+  rabbitmq:
+    host: 192.168.43.143
+    port: 5672
+    username: allen
+    password: allen
+    virtual-host: /
+
+# 网关认证相关配置
+auth:
+  # 免拦截路径列表
+  exclude-paths:
+    - /api/user-service/v1/login
+    - /api/user-service/register
+    - /api/ticket-service/ticket/query
+    - /api/ticket-service/stations/page
+    - /error
+
+# 敏感数据配置化白名单
+sensitive:
+  # 数据库：需要自动 入库加密/查询解密 的字段
+  db-sensitive-fields:
+    - idCard
+  # 内网传输：Feign调用需要自动加解密的字段
+  transport-sensitive-fields:
+    - idCard
+  # 前端展示：需要自动脱敏的字段
+  mask-sensitive-fields:
+    - idCard
+
+# jwt令牌配置
+jwt:
+  secret: abcdefghijklmnopqrstuvwxyz1234567890ABCDEFG
+  expiration: 720000

@@ -5,8 +5,8 @@ import org.rail.api.client.TicketFeignClient;
 import org.rail.api.constant.SeatIntervalStatusConstants;
 import org.rail.api.dto.BatchSeatIntervalInsertDTO;
 import org.rail.api.dto.SeatBaseDTO;
+import org.rail.common.mq.exception.MqException;
 import org.rail.orderservice.constant.OrderRedisConstants;
-import org.rail.common.core.exception.MqException;
 import org.rail.common.core.exception.OpenFeignException;
 import org.rail.common.core.model.result.Result;
 import org.rail.common.redis.api.ICacheClient;
@@ -106,7 +106,6 @@ public class PreOrderDelayConsumer {
                 .setDepartureCode(oldPreOrder.getDepartureCode())
                 .setStatus(SeatIntervalStatusConstants.RELEASED)
                 .setArrivalCode(oldPreOrder.getArrivalCode())
-                .setExpireTime(oldPreOrder.getExpireTime())
                 .setSeatList(new ArrayList<>());
 
         for (PreOrderDetails oldDetail : oldDetails) {

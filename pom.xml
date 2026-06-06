@@ -18,7 +18,6 @@
     <description>父工程：管理所有子模块</description>
 
     <modules>
-        <module>common</module>
         <module>api</module>
         <module>gateway-service</module>
         <module>order-service</module>
@@ -27,6 +26,14 @@
         <module>user-service</module>
         <module>log-service</module>
         <module>tool-service</module>
+
+        <!-- common -->
+        <module>common/common-core</module>
+        <module>common/common-db</module>
+        <module>common/common-redis</module>
+        <module>common/common-feign</module>
+        <module>common/common-mq</module>
+        <module>common/common-web</module>
     </modules>
 
     <properties>
@@ -62,9 +69,35 @@
         <dependencies>
             <dependency>
                 <groupId>org.rail</groupId>
-                <artifactId>common</artifactId>
+                <artifactId>common-core</artifactId>
                 <version>${common.version}</version>
             </dependency>
+            <dependency>
+                <groupId>org.rail</groupId>
+                <artifactId>common-web</artifactId>
+                <version>${common.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.rail</groupId>
+                <artifactId>common-db</artifactId>
+                <version>${common.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.rail</groupId>
+                <artifactId>common-redis</artifactId>
+                <version>${common.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.rail</groupId>
+                <artifactId>common-feign</artifactId>
+                <version>${common.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.rail</groupId>
+                <artifactId>common-mq</artifactId>
+                <version>${common.version}</version>
+            </dependency>
+
             <dependency>
                 <groupId>org.rail</groupId>
                 <artifactId>api</artifactId>
@@ -249,14 +282,28 @@
                 </plugin>
 
 
-                <!-- 仅加载集成测试资源文件（it目录） -->
+                <!-- build-helper：集成测试源码/资源仅在集成测试阶段才加载 -->
                 <plugin>
                     <groupId>org.codehaus.mojo</groupId>
                     <artifactId>build-helper-maven-plugin</artifactId>
                     <executions>
+                        <!-- IT源码：仅integration-test阶段注册，mvn test不会加载 -->
+                        <execution>
+                            <id>add-it-source</id>
+                            <phase>integration-test</phase>
+                            <goals>
+                                <goal>add-test-source</goal>
+                            </goals>
+                            <configuration>
+                                <sources>
+                                    <source>src/it/java</source>
+                                </sources>
+                            </configuration>
+                        </execution>
+                        <!-- IT资源：仅integration-test阶段注册 -->
                         <execution>
                             <id>add-it-resources</id>
-                            <phase>generate-test-resources</phase>
+                            <phase>integration-test</phase>
                             <goals>
                                 <goal>add-test-resource</goal>
                             </goals>
@@ -271,17 +318,17 @@
                     </executions>
                 </plugin>
 
-                <!-- 单元测试配置：mvn test 只跑 src/test/java 下的测试，完全隔离it目录 -->
+                <!-- 单元测试：mvn test 只执行src/test/java -->
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-surefire-plugin</artifactId>
                     <configuration>
-                        <testSourceDirectory>src/test/java</testSourceDirectory>
                         <argLine>-Dfile.encoding=${project.build.sourceEncoding}</argLine>
+                        <!-- 无testSourceDirectory、无exclude，依靠生命周期隔离 -->
                     </configuration>
                 </plugin>
 
-                <!-- 集成测试：只跑 src/it/java 下的测试 -->
+                <!-- 集成测试：mvn verify 加载src/it/java并执行 -->
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-failsafe-plugin</artifactId>
@@ -293,8 +340,8 @@
                                 <goal>verify</goal>
                             </goals>
                             <configuration>
-                                <testSourceDirectory>src/it/java</testSourceDirectory>
                                 <argLine>-Dfile.encoding=${project.build.sourceEncoding}</argLine>
+                                <!-- 删掉testSourceDirectory、删掉includes，全靠build-helper动态注册目录 -->
                             </configuration>
                         </execution>
                     </executions>

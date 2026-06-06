@@ -16,7 +16,7 @@ public interface SysOperationLogMapper {
      * @return 影响行数
      */
     @Insert("INSERT INTO sys_operation_log (" +
-            "user_id, user_name, operation, request_method, request_url, " +
+            "user_id, username, operation, request_method, request_url, " +
             "request_ip, request_param, operate_status, error_msg, cost_time, create_time, " +
             "message_id, send_time, consume_time" +
             ") VALUES (" +

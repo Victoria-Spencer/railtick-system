@@ -1,6 +1,6 @@
 package org.rail.orderservice.mq.consumer;
 
-import org.rail.common.core.exception.MqException;
+import org.rail.common.mq.exception.MqException;
 import org.rail.orderservice.mq.config.OrderRabbitMQConfig;
 import org.rail.orderservice.orderservice.OrderService;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;

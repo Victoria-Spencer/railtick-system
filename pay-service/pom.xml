@@ -16,20 +16,9 @@
 
 	<!-- 依赖：直接引用父工程已管理的依赖，无需写version -->
 	<dependencies>
-		<!-- Web依赖（继承父工程版本） -->
 		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-web</artifactId>
-		</dependency>
-		<!-- 测试依赖 -->
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-test</artifactId>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>mysql</groupId>
-			<artifactId>mysql-connector-java</artifactId>
+			<groupId>org.rail</groupId>
+			<artifactId>common-web</artifactId>
 		</dependency>
 	</dependencies>
 

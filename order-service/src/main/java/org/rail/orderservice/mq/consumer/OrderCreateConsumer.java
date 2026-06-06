@@ -1,6 +1,6 @@
 package org.rail.orderservice.mq.consumer;
 
-import org.rail.common.core.exception.MqException;
+import org.rail.common.mq.exception.MqException;
 import org.rail.orderservice.mapper.OrderMapper;
 import org.rail.orderservice.model.entity.Order;
 import org.rail.orderservice.model.entity.OrderDetails;

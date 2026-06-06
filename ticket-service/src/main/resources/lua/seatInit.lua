@@ -19,17 +19,17 @@ if start < 0 or endSeq < 0 or start >= endSeq then return 0 end
 -- 状态映射
 local t, f
 if status == 0 then
+    -- 空闲状态 00
+    t, f = 0, 0
+elseif status == 1 then
     -- 预锁定 01
     t, f = 0, 1
-elseif status == 1 then
+elseif status == 2 then
     -- 正式锁定 10
     t, f = 1, 0
-elseif status == 2 then
+elseif status == 3 then
     -- 已支付 11
     t, f = 1, 1
-elseif status == 3 then
-    -- 释放 00
-    t, f = 0, 0
 else
     return 0
 end
