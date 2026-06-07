@@ -1,4 +1,4 @@
-package org.rail.orderservice.orderservice;
+package org.rail.orderservice.service;
 
 import org.rail.common.core.model.result.PageResult;
 import org.rail.orderservice.model.dto.CreateOrderDTO;

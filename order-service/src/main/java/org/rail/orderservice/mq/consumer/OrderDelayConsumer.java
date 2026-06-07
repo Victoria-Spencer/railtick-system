@@ -2,7 +2,7 @@ package org.rail.orderservice.mq.consumer;
 
 import org.rail.common.mq.exception.MqException;
 import org.rail.orderservice.mq.config.OrderRabbitMQConfig;
-import org.rail.orderservice.orderservice.OrderService;
+import org.rail.orderservice.service.OrderService;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;

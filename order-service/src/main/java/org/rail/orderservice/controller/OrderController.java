@@ -3,7 +3,7 @@ package org.rail.orderservice.controller;
 import jakarta.validation.constraints.NotBlank;
 import org.rail.common.core.annotation.CommonRepeatSubmit;
 import org.rail.common.core.model.result.PageResult;
-import org.rail.orderservice.orderservice.OrderService;
+import org.rail.orderservice.service.OrderService;
 import org.rail.orderservice.model.dto.CreateOrderDTO;
 import org.rail.orderservice.model.dto.CreatePreOrderDTO;
 import org.rail.orderservice.model.dto.FrontSelfTicketPageDTO;

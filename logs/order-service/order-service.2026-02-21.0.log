@@ -1003,7 +1003,7 @@ ip=192.168.113.1
 2026-02-21 21:39:08.505 [] [main] DEBUG o.r.c.bloomfilter.DistributedBloomFilterManager - 布隆过滤器已存在，无需重复初始化 | BizType:agg_cache:order
 2026-02-21 21:39:08.505 [] [main] INFO  org.rail.common.redis.util.CacheClient - 聚合缓存布隆过滤器初始化完成 | BizType:agg_cache:order
 2026-02-21 21:39:08.510 [] [main] WARN  o.a.s.c.l.EnhancedServiceLoader$InnerEnhancedServiceLoader - Load [org.apache.seata.integration.tx.api.interceptor.parser.TargetClassParser] class fail: no service files found in 'META-INF/seata/'.
-2026-02-21 21:39:08.630 [] [main] INFO  o.a.s.spring.annotation.GlobalTransactionScanner - Bean [org.rail.orderservice.orderservice.impl.OrderServiceImpl] with name [orderServiceImpl] would use interceptor [io.seata.integration.tx.api.interceptor.handler.GlobalTransactionalInterceptorHandler]
+2026-02-21 21:39:08.630 [] [main] INFO  o.a.s.spring.annotation.GlobalTransactionScanner - Bean [org.rail.orderservice.service.impl.OrderServiceImpl] with name [orderServiceImpl] would use interceptor [io.seata.integration.tx.api.interceptor.handler.GlobalTransactionalInterceptorHandler]
 2026-02-21 21:39:08.635 [] [main] DEBUG o.s.b.factory.support.DefaultListableBeanFactory - Creating shared instance of singleton bean 'snowflakeIdGenerator'
 2026-02-21 21:39:08.669 [] [main] DEBUG o.s.b.factory.support.DefaultListableBeanFactory - Creating shared instance of singleton bean 'sagaAsyncThreadPoolProperties'
 2026-02-21 21:39:08.672 [] [main] DEBUG o.s.b.factory.support.DefaultListableBeanFactory - Creating shared instance of singleton bean 'seataTccProperties'
@@ -5748,7 +5748,7 @@ ip=192.168.113.1
 2026-02-21 22:04:29.844 [] [main] DEBUG o.r.c.bloomfilter.DistributedBloomFilterManager - 布隆过滤器已存在，无需重复初始化 | BizType:agg_cache:order
 2026-02-21 22:04:29.846 [] [main] INFO  org.rail.common.redis.util.CacheClient - 聚合缓存布隆过滤器初始化完成 | BizType:agg_cache:order
 2026-02-21 22:04:29.861 [] [main] WARN  o.a.s.c.l.EnhancedServiceLoader$InnerEnhancedServiceLoader - Load [org.apache.seata.integration.tx.api.interceptor.parser.TargetClassParser] class fail: no service files found in 'META-INF/seata/'.
-2026-02-21 22:04:30.213 [] [main] INFO  o.a.s.spring.annotation.GlobalTransactionScanner - Bean [org.rail.orderservice.orderservice.impl.OrderServiceImpl] with name [orderServiceImpl] would use interceptor [io.seata.integration.tx.api.interceptor.handler.GlobalTransactionalInterceptorHandler]
+2026-02-21 22:04:30.213 [] [main] INFO  o.a.s.spring.annotation.GlobalTransactionScanner - Bean [org.rail.orderservice.service.impl.OrderServiceImpl] with name [orderServiceImpl] would use interceptor [io.seata.integration.tx.api.interceptor.handler.GlobalTransactionalInterceptorHandler]
 2026-02-21 22:04:30.235 [] [main] DEBUG o.s.b.factory.support.DefaultListableBeanFactory - Creating shared instance of singleton bean 'snowflakeIdGenerator'
 2026-02-21 22:04:30.275 [] [main] DEBUG o.s.b.factory.support.DefaultListableBeanFactory - Creating shared instance of singleton bean 'sagaAsyncThreadPoolProperties'
 2026-02-21 22:04:30.280 [] [main] DEBUG o.s.b.factory.support.DefaultListableBeanFactory - Creating shared instance of singleton bean 'seataTccProperties'
@@ -10376,7 +10376,7 @@ ip=192.168.113.1
 2026-02-21 22:14:24.724 [] [main] DEBUG o.r.c.bloomfilter.DistributedBloomFilterManager - 布隆过滤器已存在，无需重复初始化 | BizType:agg_cache:order
 2026-02-21 22:14:24.724 [] [main] INFO  org.rail.common.redis.util.CacheClient - 聚合缓存布隆过滤器初始化完成 | BizType:agg_cache:order
 2026-02-21 22:14:24.735 [] [main] WARN  o.a.s.c.l.EnhancedServiceLoader$InnerEnhancedServiceLoader - Load [org.apache.seata.integration.tx.api.interceptor.parser.TargetClassParser] class fail: no service files found in 'META-INF/seata/'.
-2026-02-21 22:14:24.924 [] [main] INFO  o.a.s.spring.annotation.GlobalTransactionScanner - Bean [org.rail.orderservice.orderservice.impl.OrderServiceImpl] with name [orderServiceImpl] would use interceptor [io.seata.integration.tx.api.interceptor.handler.GlobalTransactionalInterceptorHandler]
+2026-02-21 22:14:24.924 [] [main] INFO  o.a.s.spring.annotation.GlobalTransactionScanner - Bean [org.rail.orderservice.service.impl.OrderServiceImpl] with name [orderServiceImpl] would use interceptor [io.seata.integration.tx.api.interceptor.handler.GlobalTransactionalInterceptorHandler]
 2026-02-21 22:14:24.944 [] [main] DEBUG o.s.b.factory.support.DefaultListableBeanFactory - Creating shared instance of singleton bean 'snowflakeIdGenerator'
 2026-02-21 22:14:24.972 [] [main] DEBUG o.s.b.factory.support.DefaultListableBeanFactory - Creating shared instance of singleton bean 'sagaAsyncThreadPoolProperties'
 2026-02-21 22:14:24.977 [] [main] DEBUG o.s.b.factory.support.DefaultListableBeanFactory - Creating shared instance of singleton bean 'seataTccProperties'

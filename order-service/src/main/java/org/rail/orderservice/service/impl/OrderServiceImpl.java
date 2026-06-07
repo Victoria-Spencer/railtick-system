@@ -1,4 +1,4 @@
-package org.rail.orderservice.orderservice.impl;
+package org.rail.orderservice.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.bean.copier.CopyOptions;
@@ -30,7 +30,7 @@ import org.rail.orderservice.model.bo.PreOrderContext;
 import org.rail.orderservice.mq.producer.OrderCreateProducer;
 import org.rail.orderservice.mq.producer.OrderDelayProducer;
 import org.rail.orderservice.mq.producer.PreOrderDelayProducer;
-import org.rail.orderservice.orderservice.OrderService;
+import org.rail.orderservice.service.OrderService;
 import org.rail.orderservice.model.dto.*;
 import org.rail.orderservice.model.entity.Order;
 import org.rail.orderservice.model.entity.OrderDetails;
