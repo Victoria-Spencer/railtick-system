@@ -6,7 +6,7 @@
 	<parent>
 		<groupId>org.rail</groupId>
 		<artifactId>railtick-system</artifactId>
-		<version>0.0.1-SNAPSHOT</version>
+		<version>${revision}</version>
 		<relativePath>../pom.xml</relativePath> <!-- 父工程pom的相对路径 -->
 	</parent>
 
