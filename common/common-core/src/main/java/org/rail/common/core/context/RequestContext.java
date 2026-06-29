@@ -26,18 +26,15 @@ public class RequestContext implements Serializable {
     private long startTime;
 
     /** 请求唯一标识 */
-    @JsonProperty("request_id")
     private String requestId;
 
     /** 用户id */
-    @JsonProperty("user_id")
     private String userId;
 
     /** 用户名 */
     private String username;
 
     /** 调用方IP（风控/排查） */
-    @JsonProperty("caller_ip")
     private String callerIp;
 
     /** 请求来源：web/app/mini/system（默认网页端） */

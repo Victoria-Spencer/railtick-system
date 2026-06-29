@@ -1,5 +1,6 @@
 package org.rail.common.redis.config;
 
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -34,11 +35,17 @@ import java.util.*;
 public class RedissonJsonCodecConfig {
 
     private final SensitiveProperties properties;
-    private final ObjectMapper objectMapper;
+    private final ObjectMapper redisObjectMapper;
 
-    public RedissonJsonCodecConfig(SensitiveProperties properties, ObjectMapper objectMapper) {
+    public RedissonJsonCodecConfig(SensitiveProperties properties, ObjectMapper globalObjectMapper) {
         this.properties = properties;
-        this.objectMapper = objectMapper;
+        this.redisObjectMapper = globalObjectMapper.copy();
+
+        this.redisObjectMapper.activateDefaultTyping(
+                redisObjectMapper.getPolymorphicTypeValidator(),
+                ObjectMapper.DefaultTyping.NON_FINAL,
+                JsonTypeInfo.As.PROPERTY
+        );
     }
 
     /**
@@ -53,9 +60,9 @@ public class RedissonJsonCodecConfig {
         javaTimeModule.addSerializer(LocalDateTime.class, new LocalDateTimeSerializer(formatter));
         javaTimeModule.addDeserializer(LocalDateTime.class, new LocalDateTimeDeserializer(formatter));
 
-        objectMapper.registerModule(javaTimeModule);
+        redisObjectMapper.registerModule(javaTimeModule);
 
-        return new JsonJacksonCodec(objectMapper) {
+        return new JsonJacksonCodec(redisObjectMapper) {
             private static final Map<Class<?>, Field[]> FIELD_CACHE = new WeakHashMap<>();
 
             /**
@@ -298,9 +305,9 @@ public class RedissonJsonCodecConfig {
                 if (obj == null) {
                     return null;
                 }
-                JavaType javaType = objectMapper.getTypeFactory().constructType(obj.getClass());
-                String json = objectMapper.writeValueAsString(obj);
-                return objectMapper.readValue(json, javaType);
+                JavaType javaType = redisObjectMapper.getTypeFactory().constructType(obj.getClass());
+                String json = redisObjectMapper.writeValueAsString(obj);
+                return redisObjectMapper.readValue(json, javaType);
             }
         };
     }
