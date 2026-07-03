@@ -1,13 +1,12 @@
 package org.rail.gatewayservice.filters;
 
-import cn.hutool.json.JSONConfig;
-import cn.hutool.json.JSONUtil;
 import lombok.RequiredArgsConstructor;
 import org.rail.common.core.config.AuthProperties;
 import org.rail.common.core.constant.RequestHeaderConstants;
 import org.rail.common.core.exception.UnauthorizedException;
 import org.rail.common.core.model.UserAuthInfo;
 import org.rail.common.core.model.result.Result;
+import org.rail.common.core.util.JsonUtils;
 import org.rail.common.core.util.security.JwtTokenUtil;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
@@ -32,7 +31,6 @@ import java.util.List;
 public class AuthGlobalFilter implements GlobalFilter, Ordered {
 
     private final AuthProperties authProperties;
-    private final JSONConfig hutoolJsonConfig;
 
     private final AntPathMatcher pathMatcher = new AntPathMatcher();
 
@@ -77,7 +75,7 @@ public class AuthGlobalFilter implements GlobalFilter, Ordered {
                     org.springframework.http.HttpStatus.UNAUTHORIZED.value(),
                     "未授权访问，请先登录"
             );
-            String json = JSONUtil.toJsonStr(result, hutoolJsonConfig);
+            String json = JsonUtils.toJson(result);
             DataBuffer buffer = response.bufferFactory().wrap(json.getBytes(StandardCharsets.UTF_8));
             return response.writeWith(Mono.just(buffer));
         }

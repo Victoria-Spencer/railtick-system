@@ -5,7 +5,6 @@ import cn.hutool.core.lang.TypeReference;
 import cn.hutool.core.map.MapUtil;
 import cn.hutool.core.util.StrUtil;
 import lombok.extern.slf4j.Slf4j;
-import org.rail.common.redis.config.CacheThreadPoolConfig;
 import org.rail.common.redis.core.RedisCache;
 import org.rail.common.redis.core.RedisStrategyCache;
 import org.rail.common.redis.exception.CacheException;
@@ -13,11 +12,11 @@ import org.rail.common.redis.result.RedisData;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
@@ -38,7 +37,7 @@ public class RedissonStrategyCache implements RedisStrategyCache {
     @Autowired
     private RedissonClient redissonClient;
     @Autowired
-    private CacheThreadPoolConfig cacheThreadPoolConfig;
+    private ThreadPoolTaskExecutor cacheRebuildExecutor;
 
     private final Integer DEFAULT_RETRY_COUNT = 5; // 默认重试次数
     private final Integer RETRY_INTERVAL = 50; // 重试间隔（毫秒）
@@ -468,14 +467,14 @@ public class RedissonStrategyCache implements RedisStrategyCache {
         // 缓存过期，加锁，异步重建
         try {
             if(lock.tryLock(2, TimeUnit.SECONDS)) {
-                cacheThreadPoolConfig.submit(() -> {
+                cacheRebuildExecutor.submit(() -> {
                     try {
                         D dbData = dbFallback.apply(dto);
                         if (dbData != null) {
                             redisCache.setWithLogicalExpire(key, dbData, time, timeUnit);
                         }
                     } catch (Exception e) {
-                        throw new RuntimeException("逻辑过期策略-异步重建缓存失败", e);
+                        log.error("逻辑过期策略-异步重建缓存失败, key:{}", key, e);
                     } finally {
                         lock.unlock();
                     }
@@ -719,7 +718,7 @@ public class RedissonStrategyCache implements RedisStrategyCache {
     ) {
         try {
             // 线程池异步重建缓存
-            cacheThreadPoolConfig.submit(() -> {
+            cacheRebuildExecutor.submit(() -> {
                 String batchLockKey = REDIS_LOCK_PREFIX + "batch:logical:expire:" + expiredDtos.hashCode();
                 RLock globalLock = redissonClient.getLock(batchLockKey);
                 try {

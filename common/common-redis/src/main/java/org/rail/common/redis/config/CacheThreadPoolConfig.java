@@ -1,14 +1,13 @@
 package org.rail.common.redis.config;
 
-import jakarta.annotation.PreDestroy;
-import org.rail.common.core.util.LogUtils;
-import org.rail.common.core.util.thread.RequestContextTaskDecorator;
+import org.rail.common.core.config.ThreadPoolConfig;
+import org.rail.common.core.model.enums.RejectedPolicyEnum;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
-import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.time.Duration;
 
 /**
  * 缓存专用线程池配置
@@ -17,74 +16,38 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class CacheThreadPoolConfig {
 
     @Value("${thread.pool.cache.core-size:5}")
-    private Integer CACHE_CORE_SIZE;
+    private Integer cacheCoreSize;
     @Value("${thread.pool.cache.max-size:10}")
-    private Integer CACHE_MAX_SIZE;
+    private Integer cacheMaxSize;
+    @Value("${thread.pool.cache.keep-alive:60s}")
+    private Duration cacheKeepAlive;
     @Value("${thread.pool.cache.queue-size:100}")
-    private Integer CACHE_QUEUE_SIZE;
-    @Value("${thread.pool.cache.keep-alive:60}")
-    private Long CACHE_KEEP_ALIVE;
+    private Integer cacheQueueSize;
 
-    // 全局唯一线程计数器
-    private static final AtomicInteger THREAD_COUNTER = new AtomicInteger(1);
 
-    private final RequestContextTaskDecorator ctxTaskDecorator;
-    private ExecutorService cacheRebuildExecutor;
+    private final ThreadPoolConfig threadPoolConfig;
 
-    public CacheThreadPoolConfig(RequestContextTaskDecorator ctxTaskDecorator) {
-        this.ctxTaskDecorator = ctxTaskDecorator;
+    public CacheThreadPoolConfig(ThreadPoolConfig threadPoolConfig) {
+        this.threadPoolConfig = threadPoolConfig;
     }
 
     /**
-     * 缓存重建线程池
+     * 缓存重建线程池（核心任务，不丢任务）
+     * 适用场景：跨模块通用核心异步任务、非模块专属的通用业务逻辑
+     * 各模块核心场景请自建专有线程池，不要用公共线程池
      */
     @Bean
-    public ExecutorService cacheRebuildExecutor() {
-        ThreadFactory threadFactory = r -> {
-            Thread t = new Thread(r, "cache-rebuild-" + THREAD_COUNTER.getAndIncrement());
-            t.setDaemon(true);
-            return t;
-        };
-        this.cacheRebuildExecutor = new ThreadPoolExecutor(
-                CACHE_CORE_SIZE,
-                CACHE_MAX_SIZE,
-                CACHE_KEEP_ALIVE,
-                TimeUnit.SECONDS,
-                new ArrayBlockingQueue<>(CACHE_QUEUE_SIZE),
-                threadFactory,
-                new ThreadPoolExecutor.CallerRunsPolicy()
+    public ThreadPoolTaskExecutor cacheRebuildExecutor() {
+        ThreadPoolTaskExecutor executor = threadPoolConfig.buildCustomPool(
+                "cache-rebuild-",
+                cacheCoreSize,
+                cacheMaxSize,
+                cacheKeepAlive,
+                cacheQueueSize,
+                RejectedPolicyEnum.CALLER_RUNS.getHandler()
         );
-        return this.cacheRebuildExecutor;
+        executor.setDaemon(false);
+        return executor;
     }
 
-    /**
-     * 执行异步任务（不支持返回值，自动传递上下文）
-     */
-    public void submit(Runnable task) {
-        cacheRebuildExecutor.submit(ctxTaskDecorator.decorate(task));
-    }
-
-    /**
-     * 优雅关闭缓存线程池
-     */
-    @PreDestroy
-    public void destroy() {
-        if (cacheRebuildExecutor == null || cacheRebuildExecutor.isShutdown()) {
-            return;
-        }
-        try {
-            LogUtils.info("缓存重建线程池 开始优雅关闭...");
-            cacheRebuildExecutor.shutdown();
-            // 等待5秒关闭
-            if (!cacheRebuildExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
-                cacheRebuildExecutor.shutdownNow();
-                LogUtils.info("缓存重建线程池 超时未关闭，强制关闭！");
-            } else {
-                LogUtils.info("缓存重建线程池 优雅关闭成功");
-            }
-        } catch (InterruptedException e) {
-            cacheRebuildExecutor.shutdownNow();
-            Thread.currentThread().interrupt();
-        }
-    }
 }

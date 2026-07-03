@@ -1,10 +1,11 @@
 package org.rail.common.core.util;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.*;
-import lombok.Getter;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.ApplicationContextAware;
+import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -12,24 +13,23 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * JSON操作工具类。提供JSON序列化和反序列化方法。
+ * JSON操作工具类，提供JSON序列化和反序列化方法
+ * 复用Spring全局唯一的ObjectMapper，保证全链路格式统一
  */
-public class JsonUtils {
+@Component
+public class JsonUtils implements ApplicationContextAware {
 
 	/**
-	 * 配置了通用设置的Jackson ObjectMapper实例 -- GETTER -- 返回配置好的ObjectMapper实例
-	 *
+	 * 配置了通用设置的Jackson ObjectMapper实例
 	 */
-	@Getter
-	private static final ObjectMapper objectMapper = new ObjectMapper();
+	private static ObjectMapper mapper;
 
-	static {
-		objectMapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
-		objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
-		objectMapper.configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false);
-		objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-		// objectMapper.setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE);
-		objectMapper.findAndRegisterModules();
+	/**
+	 * Spring启动时自动注入上下文，赋值给静态字段
+	 */
+	@Override
+	public void setApplicationContext(ApplicationContext applicationContext) {
+		JsonUtils.mapper = applicationContext.getBean(ObjectMapper.class);
 	}
 
 	/**
@@ -37,7 +37,7 @@ public class JsonUtils {
 	 */
 	public static String toJson(Object obj) {
 		try {
-			return objectMapper.writeValueAsString(obj);
+			return mapper.writeValueAsString(obj);
 		}
 		catch (JsonProcessingException e) {
 			throw new RuntimeException(e);
@@ -49,7 +49,7 @@ public class JsonUtils {
 	 */
 	public static <T> T fromJson(String json, Class<T> clazz) {
 		try {
-			return objectMapper.readValue(json, clazz);
+			return mapper.readValue(json, clazz);
 		}
 		catch (JsonProcessingException e) {
 			throw new RuntimeException(e);
@@ -61,7 +61,7 @@ public class JsonUtils {
 	 */
 	public static JsonNode fromJson(String json) {
 		try {
-			return objectMapper.readTree(json);
+			return mapper.readTree(json);
 		}
 		catch (JsonProcessingException e) {
 			throw new RuntimeException(e);
@@ -73,7 +73,7 @@ public class JsonUtils {
 	 */
 	public static JsonNode fromJson(InputStream json) {
 		try {
-			return objectMapper.readTree(json);
+			return mapper.readTree(json);
 		}
 		catch (IOException e) {
 			throw new RuntimeException(e);
@@ -85,8 +85,8 @@ public class JsonUtils {
 	 */
 	public static <T> List<T> fromJsonToList(String json, Class<T> clazz) {
 		try {
-			JavaType javaType = objectMapper.getTypeFactory().constructCollectionType(List.class, clazz);
-			return objectMapper.readValue(json, javaType);
+			JavaType javaType = mapper.getTypeFactory().constructCollectionType(List.class, clazz);
+			return mapper.readValue(json, javaType);
 		}
 		catch (JsonProcessingException e) {
 			throw new RuntimeException(e);
@@ -98,7 +98,7 @@ public class JsonUtils {
 	 */
 	public static <K, V> Map<K, V> fromJsonToMap(String json) {
 		try {
-			return objectMapper.readValue(json, new TypeReference<>() {
+			return mapper.readValue(json, new TypeReference<>() {
 			});
 		}
 		catch (JsonProcessingException e) {
@@ -111,7 +111,7 @@ public class JsonUtils {
 	 */
 	public static <T> T fromJsonFile(String filePath, Class<T> clazz) {
 		try {
-			return objectMapper.readValue(filePath, clazz);
+			return mapper.readValue(filePath, clazz);
 		}
 		catch (JsonProcessingException e) {
 			throw new RuntimeException(e);
@@ -122,14 +122,14 @@ public class JsonUtils {
 	 * 将Map转换为指定类的对象
 	 */
 	public static <T> T fromMap(Map<String, Object> map, Class<T> clazz) {
-		return objectMapper.convertValue(map, clazz);
+		return mapper.convertValue(map, clazz);
 	}
 
 	/**
 	 * 将对象转换为Map
 	 */
 	public static Map<String, Object> fromObjectToMap(Object obj) {
-		return objectMapper.convertValue(obj, new TypeReference<>() {
+		return mapper.convertValue(obj, new TypeReference<>() {
 		});
 	}
 
@@ -137,8 +137,11 @@ public class JsonUtils {
 	 * 校验字符串是否为合法JSON
 	 */
 	public static boolean isValidJson(String json) {
+		if (json == null || json.trim().isEmpty()) {
+			return false;
+		}
+
 		try {
-			ObjectMapper mapper = new ObjectMapper();
 			JsonNode node = mapper.readTree(json);
 			return node != null;
 		}
@@ -151,8 +154,11 @@ public class JsonUtils {
 	 * 检查字符串是否为JSON数组
 	 */
 	public static boolean isJsonArray(String json) {
+		if (json == null || json.trim().isEmpty()) {
+			return false;
+		}
+
 		try {
-			ObjectMapper mapper = new ObjectMapper();
 			JsonNode node = mapper.readTree(json);
 			return node.isArray();
 		}

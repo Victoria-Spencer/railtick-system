@@ -1,141 +1,129 @@
 package org.rail.common.core.config;
 
-import jakarta.annotation.PreDestroy;
-import org.rail.common.core.util.LogUtils;
+import org.rail.common.core.model.enums.RejectedPolicyEnum;
 import org.rail.common.core.util.thread.RequestContextTaskDecorator;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
+import java.time.Duration;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicInteger;
 
+/**
+ * 线程池统一配置模板
+ * 1. 提供公共默认线程池（所有模块共享非核心场景）
+ * 2. 提供静态构建模板方法，各模块可快速自定义专有线程池
+ * 3. 内置RequestContext上下文传递、线程命名规范等通用能力
+ * 核心原则：核心场景独立线程池隔离，避免互相影响
+ */
 @Configuration
 public class ThreadPoolConfig {
 
-    // ====================== 核心业务线程池配置 ======================
-    @Value("${thread.pool.business.core-size:10}")
-    private Integer BUSINESS_CORE_SIZE;
-    @Value("${thread.pool.business.max-size:20}")
-    private Integer BUSINESS_MAX_SIZE;
-    @Value("${thread.pool.business.queue-size:200}")
-    private Integer BUSINESS_QUEUE_SIZE;
-    @Value("${thread.pool.business.keep-alive:60}")
-    private Long BUSINESS_KEEP_ALIVE;
+    public static final int DEFAULT_AWAIT_TERMINATION_SECONDS = 60;
 
-    // ====================== 低优先级线程池配置 ======================
-    @Value("${thread.pool.low.core-size:2}")
-    private Integer LOW_CORE_SIZE;
-    @Value("${thread.pool.low.max-size:5}")
-    private Integer LOW_MAX_SIZE;
-    @Value("${thread.pool.low.queue-size:500}")
-    private Integer LOW_QUEUE_SIZE;
-    @Value("${thread.pool.low.keep-alive:60}")
-    private Long LOW_KEEP_ALIVE;
+    // 核心业务池
+    @Value("${thread.pool.common.business.core-size:10}")
+    private Integer businessCoreSize;
+    @Value("${thread.pool.common.business.max-size:20}")
+    private Integer businessMaxSize;
+    @Value("${thread.pool.common.business.queue-size:200}")
+    private Integer businessQueueSize;
+    @Value("${thread.pool.common.business.keep-alive:60s}")
+    private Duration businessKeepAlive;
 
-    // 全局静态线程计数器
-    private static final AtomicInteger BUSINESS_THREAD_COUNTER = new AtomicInteger(1);
-    private static final AtomicInteger LOW_THREAD_COUNTER = new AtomicInteger(1);
+    // 低优先级池
+    @Value("${thread.pool.common.low.core-size:2}")
+    private Integer lowCoreSize;
+    @Value("${thread.pool.common.low.max-size:5}")
+    private Integer lowMaxSize;
+    @Value("${thread.pool.common.low.queue-size:500}")
+    private Integer lowQueueSize;
+    @Value("${thread.pool.common.low.keep-alive:60s}")
+    private Duration lowKeepAlive;
 
     private final RequestContextTaskDecorator ctxTaskDecorator;
-    private ExecutorService businessAsyncExecutor;
-    private ExecutorService lowPriorityExecutor;
 
     public ThreadPoolConfig(RequestContextTaskDecorator ctxTaskDecorator) {
         this.ctxTaskDecorator = ctxTaskDecorator;
     }
 
-
     /**
-     * 核心业务线程池（核心任务，不丢任务）
+     * 核心业务公共线程池（核心任务，不丢任务）
+     * 适用场景：跨模块通用核心异步任务、非模块专属的通用业务逻辑
+     * 各模块核心场景请自建专有线程池，不要用公共线程池
      */
     @Bean
-    public ExecutorService businessAsyncExecutor() {
-        ThreadFactory threadFactory = r -> {
-            Thread t = new Thread(r, "business-async-" + BUSINESS_THREAD_COUNTER.getAndIncrement());
-            t.setDaemon(true);
-            return t;
-        };
-        this.businessAsyncExecutor = new ThreadPoolExecutor(
-                BUSINESS_CORE_SIZE, BUSINESS_MAX_SIZE, BUSINESS_KEEP_ALIVE, TimeUnit.SECONDS,
-                new ArrayBlockingQueue<>(BUSINESS_QUEUE_SIZE),
-                threadFactory,
-                new ThreadPoolExecutor.CallerRunsPolicy()
+    public ThreadPoolTaskExecutor businessAsyncExecutor() {
+        ThreadPoolTaskExecutor executor = buildCustomPool(
+                "common-business-",
+                businessCoreSize,
+                businessMaxSize,
+                businessKeepAlive,
+                businessQueueSize,
+                RejectedPolicyEnum.CALLER_RUNS.getHandler()
         );
-        return this.businessAsyncExecutor;
+        executor.setDaemon(false);
+        return executor;
     }
 
     /**
-     * 低优先级线程池（非核心，可丢弃）
+     * 低优先级公共线程池（非核心，可丢弃）
+     * 适用场景：日志上报、Metrics统计、非核心回调等低优先级任务
      */
     @Bean
-    public ExecutorService lowPriorityExecutor() {
-        ThreadFactory threadFactory = r -> {
-            Thread t = new Thread(r, "low-priority-" + LOW_THREAD_COUNTER.getAndIncrement());
-            t.setDaemon(true);
-            return t;
-        };
-        this.lowPriorityExecutor = new ThreadPoolExecutor(
-                LOW_CORE_SIZE, LOW_MAX_SIZE, LOW_KEEP_ALIVE, TimeUnit.SECONDS,
-                new ArrayBlockingQueue<>(LOW_QUEUE_SIZE),
-                threadFactory,
-                new ThreadPoolExecutor.DiscardPolicy()
+    public ThreadPoolTaskExecutor lowPriorityExecutor() {
+        ThreadPoolTaskExecutor executor = buildCustomPool(
+                "common-low-",
+                lowCoreSize,
+                lowMaxSize,
+                lowKeepAlive,
+                lowQueueSize,
+                RejectedPolicyEnum.DISCARD.getHandler()
         );
-        return this.lowPriorityExecutor;
+        executor.setDaemon(true);
+        return executor;
     }
 
     /**
-     * 执行异步任务（不支持返回值，自动传递上下文）
+     * 完全自定义线程池构建
+     * 所有通过该方法创建的线程池，自动携带RequestContext上下文传递能力
      */
-    public void execute(ExecutorService executor, Runnable task) {
-        executor.execute(ctxTaskDecorator.decorate(task));
+    public ThreadPoolTaskExecutor buildCustomPool(String threadNamePrefix,
+                                                  int corePoolSize,
+                                                  int maxPoolSize,
+                                                  Duration keepAlive,
+                                                  int queueCapacity,
+                                                  RejectedExecutionHandler rejectedHandler) {
+        int keepAliveSeconds = (int) keepAlive.getSeconds();
+        return buildPool(threadNamePrefix, corePoolSize, maxPoolSize, keepAliveSeconds, queueCapacity, rejectedHandler);
     }
 
     /**
-     * 执行异步任务（不支持返回值，自动传递上下文）
+     * 通用构建逻辑，统一注入上下文装饰器
      */
-    public void submit(ExecutorService executor, Runnable task) {
-        executor.submit(ctxTaskDecorator.decorate(task));
+    private ThreadPoolTaskExecutor buildPool(String threadNamePrefix,
+                                             int corePoolSize,
+                                             int maxPoolSize,
+                                             int keepAliveSeconds,
+                                             int queueCapacity,
+                                             RejectedExecutionHandler rejectedHandler) {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setThreadNamePrefix(threadNamePrefix);
+        executor.setCorePoolSize(corePoolSize);
+        executor.setMaxPoolSize(maxPoolSize);
+        executor.setKeepAliveSeconds(keepAliveSeconds);
+        executor.setQueueCapacity(queueCapacity);
+        executor.setRejectedExecutionHandler(rejectedHandler);
+
+        // 自动设置上下文装饰器，所有提交的任务自动透传 RequestContext
+        executor.setTaskDecorator(ctxTaskDecorator);
+
+        executor.setAllowCoreThreadTimeOut(true);
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(DEFAULT_AWAIT_TERMINATION_SECONDS);
+        executor.initialize();
+        return executor;
     }
 
-    /**
-     * 提交异步任务（支持返回值，自动传递上下文）
-     */
-    public <T> Future<T> submit(ExecutorService executor, Callable<T> task) {
-        return executor.submit(ctxTaskDecorator.decorate(task));
-    }
-
-    /**
-     * 提交无返回值任务 + 自定义固定返回值 (Runnable + T result)
-     */
-    public <T> Future<T> submit(ExecutorService executor, Runnable task, T result) {
-        return executor.submit(ctxTaskDecorator.decorate(task), result);
-    }
-
-    /**
-     * 优雅关闭
-     */
-    @PreDestroy
-    public void destroy() {
-        LogUtils.info("Spring 容器关闭，开始优雅关闭所有线程池...");
-        shutdownThreadPool(businessAsyncExecutor, "businessAsyncExecutor");
-        shutdownThreadPool(lowPriorityExecutor, "lowPriorityExecutor");
-    }
-
-    private void shutdownThreadPool(ExecutorService executor, String poolName) {
-        if (executor == null || executor.isShutdown()) return;
-        try {
-            executor.shutdown();
-            if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
-                LogUtils.info(poolName + " 超时未关闭，强制关闭");
-                executor.shutdownNow();
-            } else {
-                LogUtils.info(poolName + " 优雅关闭成功");
-            }
-        } catch (InterruptedException e) {
-            LogUtils.info(poolName + " 关闭被中断，强制关闭");
-            executor.shutdownNow();
-            Thread.currentThread().interrupt();
-        }
-    }
 }
