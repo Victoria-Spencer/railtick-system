@@ -30,8 +30,8 @@ public interface SeatIntervalOccupyMapper {
      */
     List<SeatIntervalOccupy> selectValidAll();
 
-    @Select("SELECT COUNT(*) FROM seat_interval_occupy WHERE lock_id = #{lockId}")
-    Integer countByLockId(Long lockId);
+    @Select("SELECT COUNT(*) FROM seat_interval_occupy WHERE lock_id = #{lockId} FOR UPDATE")
+    Integer countByLockIdForUpdate(Long lockId);
 
     /**
      * 批量更新座位区间占用记录

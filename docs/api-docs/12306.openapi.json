@@ -1,0 +1,5479 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "12306",
+    "description": "SpringBoot3 + Java17 + SpringCloud Alibaba + Vue3 等技术架构，完成高仿铁路 12306 用户 + 抢票 + 订单 + 支付服务，帮助学生主打就业的项目。",
+    "version": "1.0.0"
+  },
+  "tags": [
+    {
+      "name": "用户服务/用户接口"
+    },
+    {
+      "name": "用户服务/乘车人接口"
+    },
+    {
+      "name": "站点查询"
+    },
+    {
+      "name": "购票服务"
+    },
+    {
+      "name": "订单服务"
+    },
+    {
+      "name": "支付服务"
+    },
+    {
+      "name": "定时任务"
+    },
+    {
+      "name": "工具服务"
+    }
+  ],
+  "paths": {
+    "/api/user-service/v1/login": {
+      "post": {
+        "summary": "用户登录",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "用户服务/用户接口"
+        ],
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "Bearer eyJhbGciOiJIUzUxMiJ9.eyJpYXQiOjE3MzY2NDk1MDMsImlzcyI6ImluZGV4MTIzMDYiLCJzdWIiOiJ7XCJyZWFsTmFtZVwiOlwi5b6Q5LiH6YeMXCIsXCJ1c2VySWRcIjpcIjE2ODMwMjU1NTIzNjQ1Njg1NzZcIixcInVzZXJuYW1lXCI6XCJhZG1pblwifSIsImV4cCI6MTczNjczNTkwNH0.Na-zVQoylKlXRm0ksKdGZYpL8CLCY02NpjTN8aPNDXnM4FSFv0GLRL0pCJ10py36I7KXsD9OdZOgoWfvF3D8Ow",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "token",
+            "in": "header",
+            "description": "",
+            "example": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc",
+            "schema": {
+              "type": "string",
+              "default": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "title": "",
+                "type": "object",
+                "properties": {
+                  "usernameOrMailOrPhone": {
+                    "type": "string",
+                    "title": "用户名/邮箱/手机号码"
+                  },
+                  "password": {
+                    "type": "string",
+                    "title": "密码"
+                  }
+                },
+                "required": [
+                  "usernameOrMailOrPhone",
+                  "password"
+                ]
+              },
+              "example": {
+                "usernameOrMailOrPhone": "machen",
+                "password": "doloreexcupidatat"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "null"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "username": {
+                          "type": "string"
+                        },
+                        "realName": {
+                          "type": "string"
+                        },
+                        "phone": {
+                          "type": "string"
+                        },
+                        "accessToken": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "username",
+                        "realName",
+                        "accessToken",
+                        "phone"
+                      ]
+                    },
+                    "requestId": {
+                      "type": "null"
+                    },
+                    "success": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data",
+                    "requestId",
+                    "success"
+                  ]
+                },
+                "example": {
+                  "code": "16",
+                  "message": null,
+                  "data": {
+                    "username": "乾伟",
+                    "realName": "夫乙萍",
+                    "phone": "15776393110",
+                    "accessToken": "dolore in"
+                  },
+                  "requestId": null,
+                  "success": true
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/user-service/logout": {
+      "get": {
+        "summary": "用户退出登录",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "用户服务/用户接口"
+        ],
+        "parameters": [
+          {
+            "name": "accessToken",
+            "in": "query",
+            "description": "用户登录凭证",
+            "required": false,
+            "example": "eyJhbGciOiJIUzUxMiJ9.eyJpYXQiOjE2ODYxMjMwNjUsImlzcyI6ImNvbmdvLW1hbGwiLCJzdWIiOiJ7XCJwYXNzd29yZFwiOlwiZG9sb3JlZXhjdXBpZGF0YXRcIixcInVzZXJuYW1lT3JNYWlsT3JQaG9uZVwiOlwibWFjaGVuXCJ9IiwiZXhwIjoxNjg2MjA5NDY1fQ.D8_y7nqUa4S8Z2YHMp2Dr4yeH0qkUZZ6paDszAZUbGMwgytorWGIpn3f1-D_fMM-uzOlOS6Y1Cy8Ce2WRyMMoA",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "Bearer eyJhbGciOiJIUzUxMiJ9.eyJpYXQiOjE3MzY2NDk1MDMsImlzcyI6ImluZGV4MTIzMDYiLCJzdWIiOiJ7XCJyZWFsTmFtZVwiOlwi5b6Q5LiH6YeMXCIsXCJ1c2VySWRcIjpcIjE2ODMwMjU1NTIzNjQ1Njg1NzZcIixcInVzZXJuYW1lXCI6XCJhZG1pblwifSIsImV4cCI6MTczNjczNTkwNH0.Na-zVQoylKlXRm0ksKdGZYpL8CLCY02NpjTN8aPNDXnM4FSFv0GLRL0pCJ10py36I7KXsD9OdZOgoWfvF3D8Ow",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "token",
+            "in": "header",
+            "description": "",
+            "example": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc",
+            "schema": {
+              "type": "string",
+              "default": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "null"
+                    },
+                    "data": {
+                      "type": "null"
+                    },
+                    "requestId": {
+                      "type": "null"
+                    },
+                    "success": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data",
+                    "requestId",
+                    "success"
+                  ]
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/user-service/register": {
+      "post": {
+        "summary": "注册用户",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "用户服务/用户接口"
+        ],
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "Bearer eyJhbGciOiJIUzUxMiJ9.eyJpYXQiOjE3MzY2NDk1MDMsImlzcyI6ImluZGV4MTIzMDYiLCJzdWIiOiJ7XCJyZWFsTmFtZVwiOlwi5b6Q5LiH6YeMXCIsXCJ1c2VySWRcIjpcIjE2ODMwMjU1NTIzNjQ1Njg1NzZcIixcInVzZXJuYW1lXCI6XCJhZG1pblwifSIsImV4cCI6MTczNjczNTkwNH0.Na-zVQoylKlXRm0ksKdGZYpL8CLCY02NpjTN8aPNDXnM4FSFv0GLRL0pCJ10py36I7KXsD9OdZOgoWfvF3D8Ow",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "token",
+            "in": "header",
+            "description": "",
+            "example": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc",
+            "schema": {
+              "type": "string",
+              "default": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "username": {
+                    "type": "string",
+                    "title": "用户名"
+                  },
+                  "password": {
+                    "type": "string",
+                    "title": "密码"
+                  },
+                  "realName": {
+                    "type": "string",
+                    "title": "真实姓名"
+                  },
+                  "idType": {
+                    "type": "integer",
+                    "title": "证件类型",
+                    "description": "0：身份证号"
+                  },
+                  "idCard": {
+                    "type": "string",
+                    "title": "证件号"
+                  },
+                  "phone": {
+                    "type": "string",
+                    "title": "手机号"
+                  },
+                  "email": {
+                    "type": "string",
+                    "title": "邮箱"
+                  }
+                },
+                "required": [
+                  "username",
+                  "password",
+                  "realName",
+                  "idType",
+                  "idCard",
+                  "phone",
+                  "email"
+                ]
+              },
+              "example": {
+                "username": "machen",
+                "password": "doloreexcupidatat",
+                "realName": "小等米",
+                "idType": 0,
+                "idCard": "110101199003078339",
+                "phone": "15601166692",
+                "email": "l.rxpqq@qq.com"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "null"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "username": {
+                          "type": "string"
+                        },
+                        "realName": {
+                          "type": "string"
+                        },
+                        "phone": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "username",
+                        "realName",
+                        "phone"
+                      ]
+                    },
+                    "requestId": {
+                      "type": "null"
+                    },
+                    "success": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data",
+                    "requestId",
+                    "success"
+                  ]
+                },
+                "example": {
+                  "code": "0",
+                  "message": null,
+                  "data": {
+                    "username": "machen",
+                    "realName": "小等米",
+                    "phone": "15601166692"
+                  },
+                  "requestId": null,
+                  "success": true
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/user-service/update": {
+      "put": {
+        "summary": "修改用户",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "用户服务/用户接口"
+        ],
+        "parameters": [
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "token",
+            "in": "header",
+            "description": "",
+            "example": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc",
+            "schema": {
+              "type": "string",
+              "default": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "username": {
+                    "type": "string",
+                    "title": "用户名"
+                  },
+                  "oldPassword": {
+                    "type": "string",
+                    "title": "旧密码"
+                  },
+                  "password": {
+                    "type": "string",
+                    "title": "新密码"
+                  },
+                  "phone": {
+                    "type": "string",
+                    "title": "手机号"
+                  },
+                  "email": {
+                    "type": "string",
+                    "title": "邮箱"
+                  },
+                  "userType": {
+                    "type": "integer",
+                    "title": "旅客类型"
+                  },
+                  "postCode": {
+                    "type": "string",
+                    "title": "邮编"
+                  },
+                  "address": {
+                    "type": "string",
+                    "title": "地址"
+                  }
+                },
+                "required": [
+                  "username",
+                  "email",
+                  "userType",
+                  "postCode",
+                  "address",
+                  "phone",
+                  "id",
+                  "oldPassword",
+                  "password"
+                ]
+              },
+              "example": {
+                "id": "88",
+                "username": "尉波",
+                "oldPassword": "x__67AtUlmMsOaZ",
+                "password": "8lY7fuaXjr5_VOF",
+                "phone": "19915504619",
+                "email": "v9rlnf_pun59@163.com",
+                "userType": 30,
+                "postCode": "237600",
+                "address": "邸栋6103号"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "null"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer"
+                        },
+                        "username": {
+                          "type": "string"
+                        },
+                        "phone": {
+                          "type": "string"
+                        },
+                        "email": {
+                          "type": "string"
+                        },
+                        "userType": {
+                          "type": "string"
+                        },
+                        "postCode": {
+                          "type": "string"
+                        },
+                        "address": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "username",
+                        "phone",
+                        "id",
+                        "email",
+                        "userType",
+                        "postCode",
+                        "address"
+                      ]
+                    },
+                    "requestId": {
+                      "type": "null"
+                    },
+                    "success": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data",
+                    "requestId",
+                    "success"
+                  ]
+                },
+                "example": {
+                  "code": "80",
+                  "message": null,
+                  "data": {
+                    "id": 54,
+                    "username": "五兰英",
+                    "phone": "052 9211 0685",
+                    "email": "hm1nuy.m2hgkw@hotmail.com",
+                    "userType": "ut id anim Lorem",
+                    "postCode": "405291",
+                    "address": "兆侬1号"
+                  },
+                  "requestId": null,
+                  "success": true
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/user-service/query": {
+      "get": {
+        "summary": "查询用户信息",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "用户服务/用户接口"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "description": "用户id",
+            "required": true,
+            "example": "machen",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "Bearer eyJhbGciOiJIUzUxMiJ9.eyJpYXQiOjE3MzY2NDk1MDMsImlzcyI6ImluZGV4MTIzMDYiLCJzdWIiOiJ7XCJyZWFsTmFtZVwiOlwi5b6Q5LiH6YeMXCIsXCJ1c2VySWRcIjpcIjE2ODMwMjU1NTIzNjQ1Njg1NzZcIixcInVzZXJuYW1lXCI6XCJhZG1pblwifSIsImV4cCI6MTczNjczNTkwNH0.Na-zVQoylKlXRm0ksKdGZYpL8CLCY02NpjTN8aPNDXnM4FSFv0GLRL0pCJ10py36I7KXsD9OdZOgoWfvF3D8Ow",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "token",
+            "in": "header",
+            "description": "",
+            "example": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc",
+            "schema": {
+              "type": "string",
+              "default": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "username": {
+                      "type": "string"
+                    },
+                    "realName": {
+                      "type": "string"
+                    },
+                    "address": {
+                      "type": "string"
+                    },
+                    "idType": {
+                      "type": "integer"
+                    },
+                    "idCard": {
+                      "type": "string"
+                    },
+                    "phone": {
+                      "type": "string"
+                    },
+                    "email": {
+                      "type": "string"
+                    },
+                    "userType": {
+                      "type": "integer"
+                    },
+                    "postCode": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "username",
+                    "realName",
+                    "address",
+                    "idType",
+                    "idCard",
+                    "phone",
+                    "email",
+                    "userType",
+                    "postCode"
+                  ]
+                },
+                "example": ""
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/user-service/delete": {
+      "post": {
+        "summary": "注销用户",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "用户服务/用户接口"
+        ],
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "Bearer eyJhbGciOiJIUzUxMiJ9.eyJpYXQiOjE3MzY2NDk1MDMsImlzcyI6ImluZGV4MTIzMDYiLCJzdWIiOiJ7XCJyZWFsTmFtZVwiOlwi5b6Q5LiH6YeMXCIsXCJ1c2VySWRcIjpcIjE2ODMwMjU1NTIzNjQ1Njg1NzZcIixcInVzZXJuYW1lXCI6XCJhZG1pblwifSIsImV4cCI6MTczNjczNTkwNH0.Na-zVQoylKlXRm0ksKdGZYpL8CLCY02NpjTN8aPNDXnM4FSFv0GLRL0pCJ10py36I7KXsD9OdZOgoWfvF3D8Ow",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "token",
+            "in": "header",
+            "description": "",
+            "example": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc",
+            "schema": {
+              "type": "string",
+              "default": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "username": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "username"
+                ]
+              },
+              "examples": {}
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {}
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/user-service/passenger/user/list": {
+      "get": {
+        "summary": "查询乘车人列表",
+        "deprecated": false,
+        "description": "",
+        "tags": [],
+        "parameters": [
+          {
+            "name": "token",
+            "in": "header",
+            "description": "",
+            "example": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc",
+            "schema": {
+              "type": "string",
+              "default": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "null"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "description": "ID 编号"
+                          },
+                          "realName": {
+                            "type": "string"
+                          },
+                          "idType": {
+                            "type": "integer"
+                          },
+                          "idCard": {
+                            "type": "string"
+                          },
+                          "discountType": {
+                            "type": "integer"
+                          },
+                          "phone": {
+                            "type": "string"
+                          },
+                          "verifyStatus": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "realName",
+                          "idType",
+                          "idCard",
+                          "discountType",
+                          "phone",
+                          "verifyStatus"
+                        ]
+                      }
+                    },
+                    "requestId": {
+                      "type": "null"
+                    },
+                    "success": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data",
+                    "requestId",
+                    "success"
+                  ]
+                },
+                "example": {
+                  "code": "89",
+                  "message": null,
+                  "data": [
+                    {
+                      "id": 84,
+                      "realName": "双建国",
+                      "idType": 51,
+                      "idCard": "610100195111145686",
+                      "discountType": 82,
+                      "phone": "019 5577 7128",
+                      "verifyStatus": 16
+                    }
+                  ],
+                  "requestId": null,
+                  "success": false
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/user-service/passenger/pageQuery": {
+      "post": {
+        "summary": "乘车人分页查询",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "用户服务/乘车人接口"
+        ],
+        "parameters": [
+          {
+            "name": "token",
+            "in": "header",
+            "description": "",
+            "example": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc",
+            "schema": {
+              "type": "string",
+              "default": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "userId": {
+                    "type": "integer",
+                    "description": "用户ID"
+                  },
+                  "pageNumber": {
+                    "type": "integer",
+                    "description": "页码"
+                  },
+                  "pageSize": {
+                    "type": "integer",
+                    "description": "每页条数"
+                  },
+                  "verifyStatus": {
+                    "type": "integer",
+                    "description": "审核状态"
+                  },
+                  "discountType": {
+                    "type": "integer",
+                    "description": "优惠类型，区分成人、儿童、学生"
+                  },
+                  "sortField": {
+                    "type": "string",
+                    "description": "排序字段"
+                  },
+                  "sortOrder": {
+                    "type": "integer",
+                    "description": "排序方式"
+                  },
+                  "realName": {
+                    "type": "string",
+                    "description": "真实姓名"
+                  }
+                },
+                "required": [
+                  "pageNumber",
+                  "pageSize",
+                  "verifyStatus",
+                  "sortField",
+                  "sortOrder",
+                  "discountType",
+                  "realName",
+                  "userId"
+                ]
+              },
+              "example": {
+                "userId": 1,
+                "pageNumber": 1,
+                "pageSize": 5,
+                "verifyStatus": 1,
+                "discountType": 1,
+                "sortField": "create_time",
+                "sortOrder": 1,
+                "realName": "三"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "null"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "title": "用户ID"
+                          },
+                          "realName": {
+                            "type": "string",
+                            "title": "真实姓名"
+                          },
+                          "idType": {
+                            "type": "integer",
+                            "title": "证件类型",
+                            "description": "0：身份证"
+                          },
+                          "idCard": {
+                            "type": "string",
+                            "title": "证件编号"
+                          },
+                          "discountType": {
+                            "type": "integer",
+                            "title": "优惠类型"
+                          },
+                          "phone": {
+                            "type": "string",
+                            "title": "手机号"
+                          },
+                          "createDate": {
+                            "type": "string",
+                            "title": "添加日期"
+                          },
+                          "verifyStatus": {
+                            "type": "integer",
+                            "title": "审核状态",
+                            "description": "0：通过 1：未通过"
+                          }
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "null"
+                    },
+                    "success": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data",
+                    "requestId",
+                    "success"
+                  ]
+                },
+                "example": {
+                  "code": "17",
+                  "message": null,
+                  "data": [
+                    {
+                      "id": "91",
+                      "realName": "貊沐宸",
+                      "idType": 15,
+                      "idCard": "610100199903170095",
+                      "discountType": 26,
+                      "phone": "15305047133",
+                      "createDate": "2026-11-04",
+                      "verifyStatus": 37
+                    },
+                    {
+                      "id": "23",
+                      "realName": "蒉芳",
+                      "idType": 40,
+                      "idCard": "230102193304277266",
+                      "discountType": 13,
+                      "phone": "029 9024 7012",
+                      "createDate": "2026-07-15",
+                      "verifyStatus": 33
+                    },
+                    {
+                      "id": "32",
+                      "realName": "侍俊凯",
+                      "idType": 99,
+                      "idCard": "420100196211297803",
+                      "discountType": 80,
+                      "phone": "020 6790 5177",
+                      "createDate": "2026-08-30",
+                      "verifyStatus": 12
+                    }
+                  ],
+                  "requestId": null,
+                  "success": false
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/user-service/passenger/{id}": {
+      "get": {
+        "summary": "乘车人详细信息查询",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "用户服务/乘车人接口"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": " 乘车人ID",
+            "required": true,
+            "example": 1,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "Bearer eyJhbGciOiJIUzUxMiJ9.eyJpYXQiOjE3MzY2NDk1MDMsImlzcyI6ImluZGV4MTIzMDYiLCJzdWIiOiJ7XCJyZWFsTmFtZVwiOlwi5b6Q5LiH6YeMXCIsXCJ1c2VySWRcIjpcIjE2ODMwMjU1NTIzNjQ1Njg1NzZcIixcInVzZXJuYW1lXCI6XCJhZG1pblwifSIsImV4cCI6MTczNjczNTkwNH0.Na-zVQoylKlXRm0ksKdGZYpL8CLCY02NpjTN8aPNDXnM4FSFv0GLRL0pCJ10py36I7KXsD9OdZOgoWfvF3D8Ow",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "token",
+            "in": "header",
+            "description": "",
+            "example": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc",
+            "schema": {
+              "type": "string",
+              "default": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "null"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer"
+                        },
+                        "realName": {
+                          "type": "string"
+                        },
+                        "idType": {
+                          "type": "integer"
+                        },
+                        "idCard": {
+                          "type": "string"
+                        },
+                        "discountType": {
+                          "type": "integer"
+                        },
+                        "phone": {
+                          "type": "string"
+                        },
+                        "createTime": {
+                          "type": "string"
+                        },
+                        "updateTime": {
+                          "type": "string"
+                        },
+                        "verifyStatus": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "realName",
+                        "idType",
+                        "idCard",
+                        "discountType",
+                        "phone",
+                        "verifyStatus"
+                      ]
+                    },
+                    "requestId": {
+                      "type": "null"
+                    },
+                    "success": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data",
+                    "requestId",
+                    "success"
+                  ]
+                },
+                "example": {
+                  "code": "15",
+                  "message": null,
+                  "data": {
+                    "id": 14,
+                    "realName": "夫阳",
+                    "idType": 72,
+                    "idCard": "620100197712282302",
+                    "discountType": 20,
+                    "phone": "71067853086",
+                    "createTime": "2026-06-15 18:24:51",
+                    "updateTime": "2026-01-30",
+                    "verifyStatus": 44
+                  },
+                  "requestId": null,
+                  "success": false
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/user-service/passenger/save": {
+      "post": {
+        "summary": "添加乘车人",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "用户服务/乘车人接口"
+        ],
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "Bearer eyJhbGciOiJIUzUxMiJ9.eyJpYXQiOjE3MzY2NDk1MDMsImlzcyI6ImluZGV4MTIzMDYiLCJzdWIiOiJ7XCJyZWFsTmFtZVwiOlwi5b6Q5LiH6YeMXCIsXCJ1c2VySWRcIjpcIjE2ODMwMjU1NTIzNjQ1Njg1NzZcIixcInVzZXJuYW1lXCI6XCJhZG1pblwifSIsImV4cCI6MTczNjczNTkwNH0.Na-zVQoylKlXRm0ksKdGZYpL8CLCY02NpjTN8aPNDXnM4FSFv0GLRL0pCJ10py36I7KXsD9OdZOgoWfvF3D8Ow",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "token",
+            "in": "header",
+            "description": "",
+            "example": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc",
+            "schema": {
+              "type": "string",
+              "default": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "realName": {
+                    "type": "string",
+                    "title": "真实姓名"
+                  },
+                  "idType": {
+                    "type": "integer",
+                    "title": "证件类型"
+                  },
+                  "idCard": {
+                    "type": "string",
+                    "title": "证件号"
+                  },
+                  "discountType": {
+                    "type": "integer",
+                    "title": "优惠类型"
+                  },
+                  "phone": {
+                    "type": "string",
+                    "title": "手机号"
+                  }
+                },
+                "required": [
+                  "realName",
+                  "idType",
+                  "idCard",
+                  "discountType",
+                  "phone"
+                ]
+              },
+              "example": {
+                "realName": "翦诗雨",
+                "idType": 0,
+                "idCard": "230100196211057986",
+                "discountType": 1,
+                "phone": "15133703218"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "null"
+                    },
+                    "data": {
+                      "type": "null"
+                    },
+                    "requestId": {
+                      "type": "null"
+                    },
+                    "success": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data",
+                    "requestId",
+                    "success"
+                  ]
+                },
+                "example": {
+                  "code": "0",
+                  "message": null,
+                  "data": null,
+                  "requestId": null,
+                  "success": true
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/user-service/passenger/update": {
+      "put": {
+        "summary": "修改乘车人",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "用户服务/乘车人接口"
+        ],
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "Bearer eyJhbGciOiJIUzUxMiJ9.eyJpYXQiOjE3MzY2NDk1MDMsImlzcyI6ImluZGV4MTIzMDYiLCJzdWIiOiJ7XCJyZWFsTmFtZVwiOlwi5b6Q5LiH6YeMXCIsXCJ1c2VySWRcIjpcIjE2ODMwMjU1NTIzNjQ1Njg1NzZcIixcInVzZXJuYW1lXCI6XCJhZG1pblwifSIsImV4cCI6MTczNjczNTkwNH0.Na-zVQoylKlXRm0ksKdGZYpL8CLCY02NpjTN8aPNDXnM4FSFv0GLRL0pCJ10py36I7KXsD9OdZOgoWfvF3D8Ow",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "token",
+            "in": "header",
+            "description": "",
+            "example": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc",
+            "schema": {
+              "type": "string",
+              "default": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "title": "乘车人ID"
+                  },
+                  "phone": {
+                    "type": "string",
+                    "title": "手机号"
+                  }
+                },
+                "required": [
+                  "phone",
+                  "id"
+                ]
+              },
+              "example": {
+                "id": 11,
+                "phone": "15651557829"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "null"
+                    },
+                    "data": {
+                      "type": "null"
+                    },
+                    "requestId": {
+                      "type": "null"
+                    },
+                    "success": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data",
+                    "requestId",
+                    "success"
+                  ]
+                },
+                "example": {
+                  "code": "0",
+                  "message": null,
+                  "data": null,
+                  "requestId": null,
+                  "success": true
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/user-service/passenger/delete": {
+      "delete": {
+        "summary": "移除乘车人",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "用户服务/乘车人接口"
+        ],
+        "parameters": [
+          {
+            "name": "ids",
+            "in": "query",
+            "description": "乘车人ID集合",
+            "required": false,
+            "example": [
+              "2,3,5"
+            ],
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "Bearer eyJhbGciOiJIUzUxMiJ9.eyJpYXQiOjE3MzY2NDk1MDMsImlzcyI6ImluZGV4MTIzMDYiLCJzdWIiOiJ7XCJyZWFsTmFtZVwiOlwi5b6Q5LiH6YeMXCIsXCJ1c2VySWRcIjpcIjE2ODMwMjU1NTIzNjQ1Njg1NzZcIixcInVzZXJuYW1lXCI6XCJhZG1pblwifSIsImV4cCI6MTczNjczNTkwNH0.Na-zVQoylKlXRm0ksKdGZYpL8CLCY02NpjTN8aPNDXnM4FSFv0GLRL0pCJ10py36I7KXsD9OdZOgoWfvF3D8Ow",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "token",
+            "in": "header",
+            "description": "",
+            "example": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc",
+            "schema": {
+              "type": "string",
+              "default": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {}
+              },
+              "examples": {}
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "null"
+                    },
+                    "data": {
+                      "type": "null"
+                    },
+                    "requestId": {
+                      "type": "null"
+                    },
+                    "success": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data",
+                    "requestId",
+                    "success"
+                  ]
+                },
+                "example": {
+                  "code": "0",
+                  "message": null,
+                  "data": null,
+                  "requestId": null,
+                  "success": true
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/ticket-service/stations/page": {
+      "post": {
+        "summary": "地区站点查询",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "站点查询"
+        ],
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "Bearer eyJhbGciOiJIUzUxMiJ9.eyJpYXQiOjE3MzY2NDk1MDMsImlzcyI6ImluZGV4MTIzMDYiLCJzdWIiOiJ7XCJyZWFsTmFtZVwiOlwi5b6Q5LiH6YeMXCIsXCJ1c2VySWRcIjpcIjE2ODMwMjU1NTIzNjQ1Njg1NzZcIixcInVzZXJuYW1lXCI6XCJhZG1pblwifSIsImV4cCI6MTczNjczNTkwNH0.Na-zVQoylKlXRm0ksKdGZYpL8CLCY02NpjTN8aPNDXnM4FSFv0GLRL0pCJ10py36I7KXsD9OdZOgoWfvF3D8Ow",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "token",
+            "in": "header",
+            "description": "",
+            "example": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc",
+            "schema": {
+              "type": "string",
+              "default": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "queryType": {
+                    "type": "integer",
+                    "description": "查询类型 0：热门 1：A-E 2：F-J 3：K-O 4：P-T 5：U-Z",
+                    "title": "查询类型"
+                  },
+                  "keyword": {
+                    "type": "string",
+                    "title": "关键字",
+                    "description": "关键字，可输入城市、站点以及拼音"
+                  },
+                  "pageNumber": {
+                    "type": "integer",
+                    "title": "页码",
+                    "description": "页码"
+                  },
+                  "pageSize": {
+                    "type": "integer",
+                    "title": "页数",
+                    "description": "每页记录数"
+                  }
+                },
+                "required": [
+                  "queryType",
+                  "keyword",
+                  "pageNumber",
+                  "pageSize"
+                ]
+              },
+              "example": {
+                "queryType": 0,
+                "keyword": "beijing",
+                "pageNumber": 1,
+                "pageSize": 5
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "null"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "total": {
+                            "type": "integer",
+                            "title": "总条数"
+                          },
+                          "records": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "name": {
+                                  "type": "string",
+                                  "title": "站名"
+                                },
+                                "code": {
+                                  "type": "string",
+                                  "title": "编码"
+                                },
+                                "spell": {
+                                  "type": "string",
+                                  "title": "拼音"
+                                }
+                              },
+                              "required": [
+                                "name",
+                                "code",
+                                "spell"
+                              ]
+                            }
+                          },
+                          "pages": {
+                            "type": "integer",
+                            "title": "总页数"
+                          }
+                        },
+                        "required": [
+                          "total",
+                          "records",
+                          "pages"
+                        ]
+                      }
+                    },
+                    "requestId": {
+                      "type": "null"
+                    },
+                    "success": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data",
+                    "requestId",
+                    "success"
+                  ]
+                },
+                "example": {
+                  "code": "10",
+                  "message": null,
+                  "data": [
+                    {
+                      "total": 13,
+                      "records": [
+                        {
+                          "name": "贯艺涵",
+                          "code": "3",
+                          "spell": "cillum irure ut"
+                        },
+                        {
+                          "name": "扬伟",
+                          "code": "49",
+                          "spell": "id magna nostrud"
+                        }
+                      ],
+                      "pages": 99
+                    },
+                    {
+                      "total": 26,
+                      "records": [
+                        {
+                          "name": "官丽",
+                          "code": "66",
+                          "spell": "id sed officia cupidatat"
+                        }
+                      ],
+                      "pages": 47
+                    },
+                    {
+                      "total": 94,
+                      "records": [
+                        {
+                          "name": "范姜凤英",
+                          "code": "66",
+                          "spell": "elit exercitation consequat reprehenderit sint"
+                        },
+                        {
+                          "name": "宝梓萱",
+                          "code": "46",
+                          "spell": "adipisicing dolore consequat"
+                        },
+                        {
+                          "name": "宓雪",
+                          "code": "90",
+                          "spell": "nostrud"
+                        }
+                      ],
+                      "pages": 90
+                    }
+                  ],
+                  "requestId": null,
+                  "success": false
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/ticket-service/train/{trainId}/stops": {
+      "get": {
+        "summary": "列车经停站查询",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "站点查询"
+        ],
+        "parameters": [
+          {
+            "name": "trainId",
+            "in": "path",
+            "description": "列车id",
+            "required": true,
+            "example": 1,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "Bearer eyJhbGciOiJIUzUxMiJ9.eyJpYXQiOjE3MzY2NDk1MDMsImlzcyI6ImluZGV4MTIzMDYiLCJzdWIiOiJ7XCJyZWFsTmFtZVwiOlwi5b6Q5LiH6YeMXCIsXCJ1c2VySWRcIjpcIjE2ODMwMjU1NTIzNjQ1Njg1NzZcIixcInVzZXJuYW1lXCI6XCJhZG1pblwifSIsImV4cCI6MTczNjczNTkwNH0.Na-zVQoylKlXRm0ksKdGZYpL8CLCY02NpjTN8aPNDXnM4FSFv0GLRL0pCJ10py36I7KXsD9OdZOgoWfvF3D8Ow",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "token",
+            "in": "header",
+            "description": "",
+            "example": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc",
+            "schema": {
+              "type": "string",
+              "default": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "null"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "sequence": {
+                            "type": "integer",
+                            "title": "站序"
+                          },
+                          "stationName": {
+                            "type": "string",
+                            "title": "站名"
+                          },
+                          "arrivalTime": {
+                            "type": "string",
+                            "title": "到站时间"
+                          },
+                          "departureTime": {
+                            "type": "string",
+                            "title": "出发时间"
+                          },
+                          "stopoverTime": {
+                            "type": "integer",
+                            "title": "停留时间",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "sequence",
+                          "stationName",
+                          "arrivalTime",
+                          "departureTime",
+                          "stopoverTime"
+                        ]
+                      }
+                    },
+                    "requestId": {
+                      "type": "null"
+                    },
+                    "success": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data",
+                    "requestId",
+                    "success"
+                  ]
+                },
+                "example": {
+                  "code": "77",
+                  "message": null,
+                  "data": [
+                    {
+                      "sequence": 87,
+                      "station": "in occaecat dolore dolore ex",
+                      "arrivalTime": "2025-03-07 23:08:37",
+                      "departureTime": "2025-08-09 23:07:08",
+                      "stopoverTime": 1768701623300
+                    },
+                    {
+                      "sequence": 64,
+                      "station": "occaecat consequat",
+                      "arrivalTime": "2025-04-20 07:34:18",
+                      "departureTime": "2025-04-08 19:04:43",
+                      "stopoverTime": 1745105306543
+                    }
+                  ],
+                  "requestId": null,
+                  "success": true
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/ticket-service/ticket/query": {
+      "post": {
+        "summary": "查询购票列表",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "购票服务"
+        ],
+        "parameters": [
+          {
+            "name": "token",
+            "in": "header",
+            "description": "",
+            "example": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc",
+            "schema": {
+              "type": "string",
+              "default": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "departureCodes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "title": "出发站编码"
+                  },
+                  "arrivalCodes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "title": "到达站编码"
+                  },
+                  "trainTypeIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    },
+                    "title": "列车类型"
+                  },
+                  "seatTypes": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    },
+                    "title": "席别类型"
+                  },
+                  "departureDate": {
+                    "type": "string",
+                    "title": "出发日期"
+                  }
+                },
+                "required": [
+                  "trainTypeIds",
+                  "seatTypes",
+                  "departureDate",
+                  "departureCodes",
+                  "arrivalCodes"
+                ]
+              },
+              "example": {
+                "departureCodes": [
+                  "BJP",
+                  "BJFT",
+                  "BJ"
+                ],
+                "arrivalCodes": [
+                  "XAB"
+                ],
+                "trainTypeIds": [
+                  1,
+                  2
+                ],
+                "seatTypes": [
+                  1,
+                  2
+                ],
+                "departureDate": "2024-12-04"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "null"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "trainList": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "train": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "integer",
+                                      "title": "列车ID"
+                                    },
+                                    "trainNumber": {
+                                      "type": "string",
+                                      "title": "列车车次"
+                                    },
+                                    "daysArrived": {
+                                      "type": "integer",
+                                      "title": "跨越天数"
+                                    },
+                                    "saleTime": {
+                                      "type": "string",
+                                      "title": "可售时间"
+                                    },
+                                    "saleStatus": {
+                                      "type": "integer",
+                                      "title": "可售状态"
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "trainNumber",
+                                    "daysArrived",
+                                    "saleTime",
+                                    "saleStatus"
+                                  ]
+                                },
+                                "title": "列车属性"
+                              },
+                              "departureTime": {
+                                "type": "string",
+                                "title": "出发时间"
+                              },
+                              "arrivalTime": {
+                                "type": "string",
+                                "title": "到达时间"
+                              },
+                              "duration": {
+                                "type": "string",
+                                "title": "历时"
+                              },
+                              "departure": {
+                                "type": "string",
+                                "title": "出发站点"
+                              },
+                              "arrival": {
+                                "type": "string",
+                                "title": "到达站点"
+                              },
+                              "departureCode": {
+                                "type": "string",
+                                "title": "出发站编码"
+                              },
+                              "arrivalCode": {
+                                "type": "string",
+                                "title": "到达站编码"
+                              },
+                              "departureFlag": {
+                                "type": "boolean",
+                                "title": "始发站标识"
+                              },
+                              "arrivalFlag": {
+                                "type": "boolean",
+                                "title": "终点站标识"
+                              },
+                              "seatClassList": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "seatClassId": {
+                                      "type": "integer",
+                                      "title": "席别ID"
+                                    },
+                                    "type": {
+                                      "type": "integer",
+                                      "title": "席别类型"
+                                    },
+                                    "seatName": {
+                                      "type": "string",
+                                      "title": "席别名称"
+                                    },
+                                    "seatNumber": {
+                                      "type": "integer",
+                                      "title": "座位数量"
+                                    },
+                                    "price": {
+                                      "type": "integer",
+                                      "title": "席别价格"
+                                    },
+                                    "candidate": {
+                                      "type": "boolean",
+                                      "title": "席别候补标识"
+                                    }
+                                  },
+                                  "required": [
+                                    "type",
+                                    "seatNumber",
+                                    "price",
+                                    "candidate",
+                                    "seatName",
+                                    "seatClassId"
+                                  ]
+                                },
+                                "title": "席别实体集合"
+                              },
+                              "trainTypeVOList": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "typeId": {
+                                      "type": "integer",
+                                      "title": "类型ID"
+                                    },
+                                    "typeName": {
+                                      "type": "string",
+                                      "title": "类型名称"
+                                    },
+                                    "typeCode": {
+                                      "type": "string",
+                                      "title": "类型编码"
+                                    }
+                                  },
+                                  "required": [
+                                    "typeId",
+                                    "typeName",
+                                    "typeCode"
+                                  ]
+                                },
+                                "title": "列车类型"
+                              }
+                            },
+                            "required": [
+                              "duration",
+                              "departure",
+                              "arrival",
+                              "seatClassList",
+                              "departureCode",
+                              "arrivalCode",
+                              "train",
+                              "departureTime",
+                              "arrivalTime",
+                              "trainTypeVOList"
+                            ]
+                          },
+                          "title": "车次数据"
+                        },
+                        "trainBrandList": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "title": "车次类型"
+                        },
+                        "departureStationList": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "title": "出发车站"
+                        },
+                        "arrivalStationList": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "title": "到达车站"
+                        },
+                        "seatClassTypeList": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "title": "车次席别"
+                        }
+                      },
+                      "required": [
+                        "trainList",
+                        "trainBrandList",
+                        "departureStationList",
+                        "arrivalStationList",
+                        "seatClassTypeList"
+                      ]
+                    },
+                    "requestId": {
+                      "type": "null"
+                    },
+                    "success": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data",
+                    "requestId",
+                    "success"
+                  ]
+                },
+                "example": {
+                  "code": "24",
+                  "message": null,
+                  "data": {
+                    "trainList": [
+                      {
+                        "trainNumber": "65",
+                        "trainType": 62,
+                        "departureTime": "2025-03-06 18:34:41",
+                        "arrivalTime": "2025-09-22 19:27:25",
+                        "duration": "est mollit Lorem qui",
+                        "departure": "voluptate ullamco cillum",
+                        "arrival": "qui",
+                        "departureCode": "61",
+                        "arrivalCode": "72",
+                        "departureFlag": false,
+                        "arrivalFlag": true,
+                        "highSpeedTrain": {
+                          "businessClassQuantity": 3,
+                          "businessClassCandidate": true,
+                          "businessClassPrice": 949,
+                          "firstClassQuantity": 53,
+                          "firstClassCandidate": true,
+                          "firstClassPrice": 746,
+                          "secondClassQuantity": 12,
+                          "secondClassCandidate": true,
+                          "secondClassPrice": 753
+                        },
+                        "bulletTrain": {
+                          "sleeperQuantity": 38,
+                          "sleeperCandidate": true,
+                          "sleeperPrice": 901,
+                          "firstSleeperQuantity": 27,
+                          "firstSleeperCandidate": false,
+                          "firstSleeperPrice": 705,
+                          "secondSleeperQuantity": 68,
+                          "secondSleeperCandidate": true,
+                          "secondSleeperPrice": 944,
+                          "secondClassQuantity": 89,
+                          "secondClassCandidate": false,
+                          "secondClassPrice": 216
+                        },
+                        "regularTrain": {
+                          "softSleeperQuantity": 32,
+                          "softSleeperCandidate": true,
+                          "softSleeperPrice": 428,
+                          "deluxeSoftSleeperQuantity": 45,
+                          "deluxeSoftSleeperCandidate": false,
+                          "deluxeSoftSleeperPrice": 201,
+                          "hardSleeperQuantity": 63,
+                          "hardSleeperCandidate": true,
+                          "hardSleeperPrice": 162,
+                          "hardSeatQuantity": 28,
+                          "hardSeatCandidate": false,
+                          "hardSeatPrice": 921
+                        },
+                        "id": "85",
+                        "daysArrived": 27,
+                        "saleTime": "2025-11-25 13:26:00",
+                        "saleStatus": 86,
+                        "trainTags": [
+                          "sed enim sit ad incididunt",
+                          "sit elit enim",
+                          "magna occaecat qui eu"
+                        ],
+                        "seatClassList": [
+                          {
+                            "type": 55,
+                            "seatNumber": 100,
+                            "price": 526,
+                            "candidate": true
+                          }
+                        ]
+                      },
+                      {
+                        "trainNumber": "73",
+                        "trainType": 38,
+                        "departureTime": "2025-04-22 22:07:19",
+                        "arrivalTime": "2025-08-01 10:48:14",
+                        "duration": "exercitation Duis",
+                        "departure": "ut fugiat eu cillum culpa",
+                        "arrival": "tempor ex",
+                        "departureCode": "62",
+                        "arrivalCode": "11",
+                        "departureFlag": false,
+                        "arrivalFlag": true,
+                        "highSpeedTrain": {
+                          "businessClassQuantity": 18,
+                          "businessClassCandidate": true,
+                          "businessClassPrice": 850,
+                          "firstClassQuantity": 9,
+                          "firstClassCandidate": false,
+                          "firstClassPrice": 747,
+                          "secondClassQuantity": 81,
+                          "secondClassCandidate": false,
+                          "secondClassPrice": 214
+                        },
+                        "bulletTrain": {
+                          "sleeperQuantity": 82,
+                          "sleeperCandidate": false,
+                          "sleeperPrice": 673,
+                          "firstSleeperQuantity": 65,
+                          "firstSleeperCandidate": false,
+                          "firstSleeperPrice": 52,
+                          "secondSleeperQuantity": 50,
+                          "secondSleeperCandidate": true,
+                          "secondSleeperPrice": 785,
+                          "secondClassQuantity": 50,
+                          "secondClassCandidate": true,
+                          "secondClassPrice": 415
+                        },
+                        "regularTrain": {
+                          "softSleeperQuantity": 66,
+                          "softSleeperCandidate": false,
+                          "softSleeperPrice": 488,
+                          "deluxeSoftSleeperQuantity": 60,
+                          "deluxeSoftSleeperCandidate": true,
+                          "deluxeSoftSleeperPrice": 994,
+                          "hardSleeperQuantity": 2,
+                          "hardSleeperCandidate": false,
+                          "hardSleeperPrice": 825,
+                          "hardSeatQuantity": 30,
+                          "hardSeatCandidate": false,
+                          "hardSeatPrice": 398
+                        },
+                        "id": "95",
+                        "daysArrived": 25,
+                        "saleTime": "2024-11-21 04:31:46",
+                        "saleStatus": 5,
+                        "trainTags": [
+                          "ullamco ea"
+                        ],
+                        "seatClassList": [
+                          {
+                            "type": 83,
+                            "seatNumber": 81,
+                            "price": 532,
+                            "candidate": false
+                          },
+                          {
+                            "type": 21,
+                            "seatNumber": 74,
+                            "price": 571,
+                            "candidate": true
+                          },
+                          {
+                            "type": 29,
+                            "seatNumber": 26,
+                            "price": 166,
+                            "candidate": false
+                          }
+                        ]
+                      }
+                    ],
+                    "trainBrandList": [
+                      "commodo"
+                    ],
+                    "departureStationList": [
+                      "consequat",
+                      "proident"
+                    ],
+                    "arrivalStationList": [
+                      "est aliqua non",
+                      "incididunt minim nisi",
+                      "ut"
+                    ],
+                    "seatClassTypeList": [
+                      "dolor"
+                    ]
+                  },
+                  "requestId": null,
+                  "success": false
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/ticket-service/ticket/purchase/v2": {
+      "post": {
+        "summary": "购票接口v2",
+        "deprecated": true,
+        "description": "",
+        "tags": [
+          "购票服务"
+        ],
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "Bearer eyJhbGciOiJIUzUxMiJ9.eyJpYXQiOjE2ODk0MzQyNzQsImlzcyI6ImluZGV4MTIzMDYiLCJzdWIiOiJ7XCJyZWFsTmFtZVwiOlwi5bCP562J57GzXCIsXCJ1c2VySWRcIjpcIjE2NjYzNDc1NjA5MzM4NTExMzZcIixcInVzZXJuYW1lXCI6XCJtYWNoZW5cIn0iLCJleHAiOjE2ODk1MjA2NzR9.5BglexP_0fEUvc21stWZj6-2oGdkWCITP3uSokx_3eeLlmFgpFfdlAkWDrVdCoFBMHPa7PZ4bOdZ1lp4AeeTLQ",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "token",
+            "in": "header",
+            "description": "",
+            "example": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc",
+            "schema": {
+              "type": "string",
+              "default": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "trainId": {
+                    "type": "string",
+                    "title": "车次ID"
+                  },
+                  "passengers": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "passengerId": {
+                          "type": "string",
+                          "title": "乘车人ID"
+                        },
+                        "seatType": {
+                          "type": "string",
+                          "title": "座位类型",
+                          "description": "0：商务座 1：一等座 2：二等座 3：二等包座 4：一等卧 5：二等卧 6：软卧 7：硬卧 8：硬座 10：无座"
+                        }
+                      },
+                      "required": [
+                        "passengerId",
+                        "seatType"
+                      ]
+                    },
+                    "title": "乘车人ID集合"
+                  },
+                  "seatType": {
+                    "type": "string",
+                    "title": "座位类型"
+                  },
+                  "chooseSeats": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "title": "选择座位集合"
+                  },
+                  "departure": {
+                    "type": "string",
+                    "title": "出发站点"
+                  },
+                  "arrival": {
+                    "type": "string",
+                    "title": "到达站点"
+                  }
+                },
+                "required": [
+                  "trainId",
+                  "passengers",
+                  "chooseSeats",
+                  "departure",
+                  "arrival",
+                  "seatType"
+                ]
+              },
+              "example": {
+                "trainId": "2",
+                "passengers": [
+                  {
+                    "passengerId": "1666343851196878848",
+                    "seatType": "0"
+                  },
+                  {
+                    "passengerId": "1666343166634420046496153651196878848",
+                    "seatType": "0"
+                  }
+                ],
+                "chooseSeats": [],
+                "departure": "北京南",
+                "arrival": "杭州东"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "null"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "orderSn": {
+                          "type": "string",
+                          "title": "订单号"
+                        },
+                        "ticketOrderDetails": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "seatType": {
+                                "type": "null"
+                              },
+                              "carriageNumber": {
+                                "type": "string"
+                              },
+                              "seatNumber": {
+                                "type": "string"
+                              },
+                              "realName": {
+                                "type": "string"
+                              },
+                              "idType": {
+                                "type": "integer"
+                              },
+                              "idCard": {
+                                "type": "string"
+                              },
+                              "ticketType": {
+                                "type": "null"
+                              },
+                              "amount": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "seatType",
+                              "carriageNumber",
+                              "seatNumber",
+                              "realName",
+                              "idType",
+                              "idCard",
+                              "ticketType",
+                              "amount"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "orderSn",
+                        "ticketOrderDetails"
+                      ]
+                    },
+                    "requestId": {
+                      "type": "null"
+                    },
+                    "success": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data",
+                    "requestId",
+                    "success"
+                  ]
+                },
+                "example": {
+                  "code": "0",
+                  "message": null,
+                  "data": {
+                    "orderSn": "1677929762971848704",
+                    "ticketOrderDetails": [
+                      {
+                        "seatType": 0,
+                        "carriageNumber": "01",
+                        "seatNumber": "01A",
+                        "realName": "马百万",
+                        "idType": 0,
+                        "idCard": "1234567890",
+                        "ticketType": 0,
+                        "amount": 231300
+                      },
+                      {
+                        "seatType": 0,
+                        "carriageNumber": "01",
+                        "seatNumber": "01F",
+                        "realName": "花花",
+                        "idType": 0,
+                        "idCard": "1234567890",
+                        "ticketType": 0,
+                        "amount": 231300
+                      }
+                    ]
+                  },
+                  "requestId": null,
+                  "success": true
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/ticket-service/temp/seat/reset": {
+      "post": {
+        "summary": "重置座位状态",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "购票服务"
+        ],
+        "parameters": [
+          {
+            "name": "trainId",
+            "in": "query",
+            "description": "列车ID",
+            "required": false,
+            "example": "",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "Bearer eyJhbGciOiJIUzUxMiJ9.eyJpYXQiOjE3MzY2NDk1MDMsImlzcyI6ImluZGV4MTIzMDYiLCJzdWIiOiJ7XCJyZWFsTmFtZVwiOlwi5b6Q5LiH6YeMXCIsXCJ1c2VySWRcIjpcIjE2ODMwMjU1NTIzNjQ1Njg1NzZcIixcInVzZXJuYW1lXCI6XCJhZG1pblwifSIsImV4cCI6MTczNjczNTkwNH0.Na-zVQoylKlXRm0ksKdGZYpL8CLCY02NpjTN8aPNDXnM4FSFv0GLRL0pCJ10py36I7KXsD9OdZOgoWfvF3D8Ow",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "token",
+            "in": "header",
+            "description": "",
+            "example": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc",
+            "schema": {
+              "type": "string",
+              "default": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {}
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/ticket-service/ticket/purchase/v3": {
+      "post": {
+        "summary": "购票接口v3",
+        "deprecated": true,
+        "description": "",
+        "tags": [
+          "购票服务"
+        ],
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "Bearer eyJhbGciOiJIUzUxMiJ9.eyJpYXQiOjE3MzY2NDk1MDMsImlzcyI6ImluZGV4MTIzMDYiLCJzdWIiOiJ7XCJyZWFsTmFtZVwiOlwi5b6Q5LiH6YeMXCIsXCJ1c2VySWRcIjpcIjE2ODMwMjU1NTIzNjQ1Njg1NzZcIixcInVzZXJuYW1lXCI6XCJhZG1pblwifSIsImV4cCI6MTczNjczNTkwNH0.Na-zVQoylKlXRm0ksKdGZYpL8CLCY02NpjTN8aPNDXnM4FSFv0GLRL0pCJ10py36I7KXsD9OdZOgoWfvF3D8Ow",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "token",
+            "in": "header",
+            "description": "",
+            "example": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc",
+            "schema": {
+              "type": "string",
+              "default": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "trainId": {
+                    "type": "string"
+                  },
+                  "passengers": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "passengerId": {
+                          "type": "string"
+                        },
+                        "seatType": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "passengerId",
+                        "seatType"
+                      ]
+                    }
+                  },
+                  "chooseSeats": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "departure": {
+                    "type": "string"
+                  },
+                  "arrival": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "trainId",
+                  "passengers",
+                  "chooseSeats",
+                  "departure",
+                  "arrival"
+                ]
+              },
+              "example": {
+                "trainId": "1",
+                "passengers": [
+                  {
+                    "passengerId": "1683029289099362304",
+                    "seatType": 0
+                  },
+                  {
+                    "passengerId": "1683029597561061376",
+                    "seatType": 1
+                  }
+                ],
+                "chooseSeats": [],
+                "departure": "北京南",
+                "arrival": "杭州东"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {}
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/ticket-service/ticket/planned-tickets/query": {
+      "post": {
+        "summary": "查询拟购票信息",
+        "deprecated": false,
+        "description": "",
+        "tags": [],
+        "parameters": [
+          {
+            "name": "token",
+            "in": "header",
+            "description": "",
+            "example": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc",
+            "schema": {
+              "type": "string",
+              "default": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "trainId": {
+                    "type": "integer",
+                    "description": "列车id"
+                  },
+                  "departureCode": {
+                    "type": "string",
+                    "description": "出发站编码"
+                  },
+                  "arrivalCode": {
+                    "type": "string",
+                    "description": "到达站编码"
+                  }
+                },
+                "required": [
+                  "trainId",
+                  "departureCode",
+                  "arrivalCode"
+                ]
+              },
+              "example": {
+                "trainId": 101,
+                "departure": "BJP",
+                "arrival": "XAB"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "train": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "trainNumber": {
+                                "type": "string"
+                              },
+                              "daysArrived": {
+                                "type": "string"
+                              },
+                              "saleTime": {
+                                "type": "string"
+                              },
+                              "saleStatus": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "trainNumber",
+                              "daysArrived",
+                              "saleTime",
+                              "saleStatus"
+                            ]
+                          }
+                        },
+                        "departureTime": {
+                          "type": "string"
+                        },
+                        "arrivalTime": {
+                          "type": "string"
+                        },
+                        "duration": {
+                          "type": "integer"
+                        },
+                        "departure": {
+                          "type": "string"
+                        },
+                        "arrival": {
+                          "type": "string"
+                        },
+                        "departureCode": {
+                          "type": "string"
+                        },
+                        "arrivalCode": {
+                          "type": "string"
+                        },
+                        "depatureFlag": {
+                          "type": "boolean"
+                        },
+                        "arrivalFlag": {
+                          "type": "boolean"
+                        },
+                        "seatClassList": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "seatClassId": {
+                                "type": "integer"
+                              },
+                              "type": {
+                                "type": "integer"
+                              },
+                              "seatName": {
+                                "type": "string"
+                              },
+                              "seatNumber": {
+                                "type": "integer"
+                              },
+                              "price": {
+                                "type": "integer"
+                              },
+                              "candidate": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "seatClassId",
+                              "type",
+                              "seatName",
+                              "seatNumber",
+                              "price",
+                              "candidate"
+                            ]
+                          }
+                        },
+                        "trainTypeVOList": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "typeId": {
+                                "type": "integer"
+                              },
+                              "typeName": {
+                                "type": "string"
+                              },
+                              "typeCode": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "typeId",
+                              "typeName",
+                              "typeCode"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "train",
+                        "departureTime",
+                        "arrivalTime",
+                        "duration",
+                        "departure",
+                        "arrival",
+                        "departureCode",
+                        "arrivalCode",
+                        "depatureFlag",
+                        "arrivalFlag",
+                        "seatClassList",
+                        "trainTypeVOList"
+                      ]
+                    },
+                    "requestId": {
+                      "type": "null"
+                    },
+                    "success": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data",
+                    "requestId",
+                    "success"
+                  ]
+                },
+                "example": {
+                  "code": "98",
+                  "message": "fugiat cillum dolore aliqua culpa",
+                  "data": {
+                    "train": [
+                      {
+                        "id": "98",
+                        "trainNumber": "22",
+                        "daysArrived": "2025-11-24",
+                        "saleTime": "2026-06-21 09:53:34",
+                        "saleStatus": "qui in Excepteur deserunt id"
+                      },
+                      {
+                        "id": "16",
+                        "trainNumber": "63",
+                        "daysArrived": "2026-09-20",
+                        "saleTime": "2026-09-13 19:42:52",
+                        "saleStatus": "dolor"
+                      }
+                    ],
+                    "departureTime": "2026-08-20 22:05:44",
+                    "arrivalTime": "2026-08-21 03:20:55",
+                    "duration": 21,
+                    "departure": "Lorem",
+                    "arrival": "magna adipisicing ullamco incididunt Excepteur",
+                    "departureCode": "62",
+                    "arrivalCode": "69",
+                    "depatureFlag": false,
+                    "arrivalFlag": true,
+                    "seatClassList": [
+                      {
+                        "seatClassId": 25,
+                        "type": 20,
+                        "seatName": "吕政君",
+                        "seatNumber": 71,
+                        "price": 468,
+                        "candidate": false
+                      },
+                      {
+                        "seatClassId": 19,
+                        "type": 28,
+                        "seatName": "池建军",
+                        "seatNumber": 58,
+                        "price": 573,
+                        "candidate": false
+                      },
+                      {
+                        "seatClassId": 35,
+                        "type": 94,
+                        "seatName": "蓝秀英",
+                        "seatNumber": 98,
+                        "price": 273,
+                        "candidate": false
+                      }
+                    ],
+                    "trainTypeVOList": [
+                      {
+                        "typeId": 33,
+                        "typeName": "盈明",
+                        "typeCode": "54"
+                      },
+                      {
+                        "typeId": 82,
+                        "typeName": "游思佳",
+                        "typeCode": "78"
+                      }
+                    ]
+                  },
+                  "requestId": null,
+                  "success": true
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/ticket-service/ticket/seats/available": {
+      "post": {
+        "summary": "获取空座位",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "购票服务"
+        ],
+        "parameters": [
+          {
+            "name": "token",
+            "in": "header",
+            "description": "",
+            "example": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc",
+            "schema": {
+              "type": "string",
+              "default": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "trainId": {
+                    "type": "integer",
+                    "title": "列车ID"
+                  },
+                  "seatType": {
+                    "type": "integer",
+                    "title": "席别类型"
+                  },
+                  "departureCode": {
+                    "type": "string",
+                    "title": "出发站编码"
+                  },
+                  "arrivalCode": {
+                    "type": "string",
+                    "title": "到达站编码"
+                  },
+                  "passengerCount": {
+                    "type": "integer",
+                    "title": "乘客数量"
+                  },
+                  "preferredSeatSymbols": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "title": "用户偏好的座位序号组"
+                  },
+                  "orderId": {
+                    "type": "integer",
+                    "title": "订单id"
+                  },
+                  "status": {
+                    "type": "integer",
+                    "title": "订单状态"
+                  }
+                },
+                "required": [
+                  "trainId",
+                  "seatType",
+                  "departureCode",
+                  "arrivalCode",
+                  "passengerCount",
+                  "preferredSeatSymbols",
+                  "status"
+                ]
+              },
+              "example": {
+                "trainId": 1,
+                "seatType": 5,
+                "departureCode": "ST1104",
+                "arrivalCode": "ST1073",
+                "passengerCount": 2,
+                "preferredSeatSymbols": [
+                  "A",
+                  "A"
+                ],
+                "orderId": 1000001,
+                "status": 0
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "availableSeats": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "seatType": {
+                                "type": "integer",
+                                "title": "席别类型"
+                              },
+                              "carriageNumber": {
+                                "type": "string",
+                                "title": "车厢号"
+                              },
+                              "seatsNo": {
+                                "type": "string",
+                                "title": "座位号"
+                              }
+                            },
+                            "required": [
+                              "carriageNumber",
+                              "seatsNo",
+                              "seatType"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "availableSeats"
+                      ]
+                    },
+                    "requestld": {
+                      "type": "null"
+                    },
+                    "success": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data",
+                    "requestld",
+                    "success"
+                  ]
+                },
+                "example": {
+                  "code": "25",
+                  "message": "sint est adipisicing dolor cupidatat",
+                  "data": {
+                    "availableSeats": [
+                      {
+                        "seatType": 55,
+                        "carriageNumber": "货车",
+                        "seatsNo": "reprehenderit dolore laborum incididunt"
+                      },
+                      {
+                        "seatType": 46,
+                        "carriageNumber": "面包车",
+                        "seatsNo": "fugiat aliquip laborum"
+                      }
+                    ]
+                  },
+                  "requestld": null,
+                  "success": false
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/ticket-service/ticket/seat-status/update": {
+      "put": {
+        "summary": "批量更新座位状态",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "购票服务"
+        ],
+        "parameters": [
+          {
+            "name": "token",
+            "in": "header",
+            "description": "",
+            "example": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc",
+            "schema": {
+              "type": "string",
+              "default": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "trainId": {
+                    "type": "integer"
+                  },
+                  "orderId": {
+                    "type": "integer"
+                  },
+                  "status": {
+                    "type": "integer"
+                  },
+                  "departureCode": {
+                    "type": "string"
+                  },
+                  "arrivalCode": {
+                    "type": "string"
+                  },
+                  "expireTime": {
+                    "type": "string"
+                  },
+                  "seatList": {
+                    "type": "object",
+                    "properties": {
+                      "seatType": {
+                        "type": "integer"
+                      },
+                      "carriageNumber": {
+                        "type": "string"
+                      },
+                      "seatNo": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "seatType",
+                      "carriageNumber",
+                      "seatNo"
+                    ]
+                  }
+                },
+                "required": [
+                  "trainId",
+                  "status",
+                  "departureCode",
+                  "arrivalCode",
+                  "expireTime",
+                  "seatList"
+                ]
+              },
+              "example": {
+                "trainId": 75,
+                "orderId": 29,
+                "status": 25,
+                "departureCode": "34",
+                "arrivalCode": "97",
+                "expireTime": "2026-06-03 02:15:02",
+                "seatList": {
+                  "seatType": 22,
+                  "carriageNumber": "轿车",
+                  "seatNo": "in pariatur"
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "null"
+                    },
+                    "requestld": {
+                      "type": "null"
+                    },
+                    "success": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data",
+                    "requestld",
+                    "success"
+                  ]
+                },
+                "example": {
+                  "code": "200",
+                  "message": "aliqua eiusmod sint ex",
+                  "data": null,
+                  "requestld": null,
+                  "success": true
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/order-service/order/ticket/query": {
+      "get": {
+        "summary": "订单号查询订单",
+        "deprecated": true,
+        "description": "",
+        "tags": [
+          "订单服务"
+        ],
+        "parameters": [
+          {
+            "name": "orderSn",
+            "in": "query",
+            "description": "",
+            "required": false,
+            "example": "",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "Bearer eyJhbGciOiJIUzUxMiJ9.eyJpYXQiOjE3MzY2NDk1MDMsImlzcyI6ImluZGV4MTIzMDYiLCJzdWIiOiJ7XCJyZWFsTmFtZVwiOlwi5b6Q5LiH6YeMXCIsXCJ1c2VySWRcIjpcIjE2ODMwMjU1NTIzNjQ1Njg1NzZcIixcInVzZXJuYW1lXCI6XCJhZG1pblwifSIsImV4cCI6MTczNjczNTkwNH0.Na-zVQoylKlXRm0ksKdGZYpL8CLCY02NpjTN8aPNDXnM4FSFv0GLRL0pCJ10py36I7KXsD9OdZOgoWfvF3D8Ow",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "token",
+            "in": "header",
+            "description": "",
+            "example": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc",
+            "schema": {
+              "type": "string",
+              "default": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "null"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "ridingDate": {
+                          "type": "string"
+                        },
+                        "trainNumber": {
+                          "type": "string"
+                        },
+                        "departureTime": {
+                          "type": "string"
+                        },
+                        "arrivalTime": {
+                          "type": "string"
+                        },
+                        "passengerDetails": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "seatType": {
+                                "type": "integer"
+                              },
+                              "carriageNumber": {
+                                "type": "string"
+                              },
+                              "seatNumber": {
+                                "type": "string"
+                              },
+                              "realName": {
+                                "type": "string"
+                              },
+                              "idType": {
+                                "type": "integer"
+                              },
+                              "idCard": {
+                                "type": "string"
+                              },
+                              "ticketType": {
+                                "type": "integer"
+                              },
+                              "amount": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "seatType",
+                              "carriageNumber",
+                              "seatNumber",
+                              "realName",
+                              "idType",
+                              "idCard",
+                              "ticketType",
+                              "amount"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "ridingDate",
+                        "trainNumber",
+                        "departureTime",
+                        "arrivalTime",
+                        "passengerDetails"
+                      ]
+                    },
+                    "requestId": {
+                      "type": "null"
+                    },
+                    "success": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data",
+                    "requestId",
+                    "success"
+                  ]
+                },
+                "example": {
+                  "code": "0",
+                  "message": null,
+                  "data": {
+                    "ridingDate": "2023-06-01",
+                    "trainNumber": "G35",
+                    "departureTime": "09:56",
+                    "arrivalTime": "14:26",
+                    "passengerDetails": [
+                      {
+                        "seatType": 0,
+                        "carriageNumber": "01",
+                        "seatNumber": "01A",
+                        "realName": "马百万",
+                        "idType": 0,
+                        "idCard": "1234567890",
+                        "ticketType": 0,
+                        "amount": 231300
+                      },
+                      {
+                        "seatType": 0,
+                        "carriageNumber": "01",
+                        "seatNumber": "01F",
+                        "realName": "花花",
+                        "idType": 0,
+                        "idCard": "1234567890",
+                        "ticketType": 0,
+                        "amount": 231300
+                      }
+                    ]
+                  },
+                  "requestId": null,
+                  "success": true
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/order-service/order/page": {
+      "post": {
+        "summary": "分页查询订单",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "订单服务"
+        ],
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "Bearer eyJhbGciOiJIUzUxMiJ9.eyJpYXQiOjE3MzY2NDk1MDMsImlzcyI6ImluZGV4MTIzMDYiLCJzdWIiOiJ7XCJyZWFsTmFtZVwiOlwi5b6Q5LiH6YeMXCIsXCJ1c2VySWRcIjpcIjE2ODMwMjU1NTIzNjQ1Njg1NzZcIixcInVzZXJuYW1lXCI6XCJhZG1pblwifSIsImV4cCI6MTczNjczNTkwNH0.Na-zVQoylKlXRm0ksKdGZYpL8CLCY02NpjTN8aPNDXnM4FSFv0GLRL0pCJ10py36I7KXsD9OdZOgoWfvF3D8Ow",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "token",
+            "in": "header",
+            "description": "",
+            "example": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc",
+            "schema": {
+              "type": "string",
+              "default": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "userId": {
+                    "type": "integer",
+                    "description": "用户标识（当前用户的订单）",
+                    "title": "用户ID"
+                  },
+                  "pageNumber": {
+                    "type": "integer",
+                    "description": "当前页",
+                    "title": "页码"
+                  },
+                  "pageSize": {
+                    "type": "integer",
+                    "title": "页数",
+                    "description": "每页大小"
+                  },
+                  "orderStatus": {
+                    "type": "integer",
+                    "title": "状态",
+                    "description": "状态类型 0：未完成 1：未出行 2：历史订单"
+                  },
+                  "orderType": {
+                    "type": "integer",
+                    "title": "排序条件",
+                    "description": "包括0：出行日期、1：订票日期"
+                  },
+                  "startDate": {
+                    "type": "string",
+                    "title": "开始日期",
+                    "description": "出行或订票"
+                  },
+                  "endDate": {
+                    "type": "string",
+                    "title": "结束日期",
+                    "description": "出行或订票"
+                  },
+                  "orderSn": {
+                    "type": "string",
+                    "title": "订单号"
+                  },
+                  "trainNumber": {
+                    "type": "string",
+                    "title": "列车车次"
+                  },
+                  "realName": {
+                    "type": "string",
+                    "title": "真实姓名"
+                  }
+                },
+                "required": [
+                  "userId",
+                  "pageNumber",
+                  "pageSize",
+                  "orderStatus",
+                  "orderType",
+                  "endDate",
+                  "startDate"
+                ]
+              },
+              "example": {
+                "userId": 1,
+                "pageNumber": 1,
+                "pageSize": 10,
+                "orderStatus": 0,
+                "orderType": 0,
+                "startDate": "2025-01-01",
+                "endDate": "2025-11-20",
+                "orderSn": "",
+                "trainNumber": "101",
+                "realName": ""
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "null"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer",
+                          "title": "总条数"
+                        },
+                        "records": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "integer",
+                                "title": "订单ID"
+                              },
+                              "orderSn": {
+                                "type": "string",
+                                "title": "订单号"
+                              },
+                              "departure": {
+                                "type": "string",
+                                "title": "出发站点"
+                              },
+                              "arrival": {
+                                "type": "string",
+                                "title": "到达站点"
+                              },
+                              "departureCode": {
+                                "type": "string",
+                                "title": "出发站编码"
+                              },
+                              "arrivalCode": {
+                                "type": "string",
+                                "title": "到达站编码"
+                              },
+                              "ridingDate": {
+                                "type": "string",
+                                "title": "乘车日期"
+                              },
+                              "trainNumber": {
+                                "type": "string",
+                                "title": "列车车次"
+                              },
+                              "departureTime": {
+                                "type": "string",
+                                "title": "出发时间"
+                              },
+                              "arrivalTime": {
+                                "type": "string",
+                                "title": "到达时间"
+                              },
+                              "status": {
+                                "type": "integer",
+                                "title": "订单状态",
+                                "description": "订单状态（0-待支付，1-已支付，2-已取消，3-部分退票，4-全部退票）"
+                              },
+                              "orderDate": {
+                                "type": "string",
+                                "title": "订票日期",
+                                "description": "订票日期"
+                              },
+                              "passengerDetails": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "integer",
+                                      "title": "订单明细ID"
+                                    },
+                                    "seatType": {
+                                      "type": "integer",
+                                      "title": "席别类型"
+                                    },
+                                    "carriageNumber": {
+                                      "type": "string",
+                                      "title": "车厢号"
+                                    },
+                                    "seatNo": {
+                                      "type": "string",
+                                      "title": "座位号"
+                                    },
+                                    "realName": {
+                                      "type": "string",
+                                      "title": "真实姓名"
+                                    },
+                                    "idType": {
+                                      "type": "integer",
+                                      "title": "证件类型"
+                                    },
+                                    "idCard": {
+                                      "type": "string",
+                                      "title": "证件号"
+                                    },
+                                    "ticketType": {
+                                      "type": "integer",
+                                      "title": "车票类型",
+                                      "description": "0：成人 1：儿童 2：学生 3：残疾军人"
+                                    },
+                                    "amount": {
+                                      "type": "integer",
+                                      "title": "订单金额"
+                                    },
+                                    "refundStatus": {
+                                      "type": "boolean",
+                                      "title": "退票状态",
+                                      "description": "0-未退票，1-已退票"
+                                    }
+                                  },
+                                  "required": [
+                                    "seatType",
+                                    "carriageNumber",
+                                    "seatNo",
+                                    "realName",
+                                    "idType",
+                                    "idCard",
+                                    "ticketType",
+                                    "amount",
+                                    "refundStatus",
+                                    "id"
+                                  ]
+                                },
+                                "title": "乘车人订单详情"
+                              }
+                            },
+                            "required": [
+                              "departure",
+                              "arrival",
+                              "ridingDate",
+                              "trainNumber",
+                              "departureTime",
+                              "arrivalTime",
+                              "passengerDetails",
+                              "orderDate",
+                              "status",
+                              "orderSn",
+                              "departureCode",
+                              "arrivalCode",
+                              "id"
+                            ]
+                          },
+                          "title": "记录数"
+                        },
+                        "pages": {
+                          "type": "integer",
+                          "title": "总页数"
+                        }
+                      },
+                      "required": [
+                        "total",
+                        "records",
+                        "pages"
+                      ]
+                    },
+                    "requestId": {
+                      "type": "null"
+                    },
+                    "success": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data",
+                    "requestId",
+                    "success"
+                  ]
+                },
+                "example": {
+                  "code": "18",
+                  "message": null,
+                  "data": {
+                    "total": 92,
+                    "records": [
+                      {
+                        "id": 1,
+                        "orderSn": "voluptate",
+                        "departure": "irure dolor",
+                        "arrival": "reprehenderit non aute",
+                        "departureCode": "69",
+                        "arrivalCode": "39",
+                        "ridingDate": "2026-08-29",
+                        "trainNumber": "89",
+                        "departureTime": "2025-08-18 19:55:45",
+                        "arrivalTime": "2025-09-20 01:03:42",
+                        "status": 68,
+                        "orderDate": "2026-07-29",
+                        "passengerDetails": [
+                          {
+                            "id": 93,
+                            "seatType": 79,
+                            "carriageNumber": "货车",
+                            "seatNo": "id exercitation",
+                            "realName": "问雨涵",
+                            "idType": 88,
+                            "idCard": "530102199006165985",
+                            "ticketType": 34,
+                            "amount": 245,
+                            "refundStatus": false
+                          },
+                          {
+                            "id": 57,
+                            "seatType": 17,
+                            "carriageNumber": "面包车",
+                            "seatNo": "pariatur do aliqua proident ullamco",
+                            "realName": "花政君",
+                            "idType": 82,
+                            "idCard": "510104201505298765",
+                            "ticketType": 12,
+                            "amount": 19,
+                            "refundStatus": true
+                          }
+                        ]
+                      },
+                      {
+                        "orderSn": "non",
+                        "departure": "consequat fugiat sint",
+                        "arrival": "quis Ut Lorem in velit",
+                        "departureCode": "26",
+                        "arrivalCode": "19",
+                        "ridingDate": "2025-04-18",
+                        "trainNumber": "9",
+                        "departureTime": "2026-07-12 18:19:11",
+                        "arrivalTime": "2025-10-14 07:42:45",
+                        "status": 91,
+                        "orderDate": "2025-11-03",
+                        "passengerDetails": [
+                          {
+                            "id": 30,
+                            "seatType": 94,
+                            "carriageNumber": "旅行车",
+                            "seatNo": "et",
+                            "realName": "恭婷",
+                            "idType": 96,
+                            "idCard": "230102195907184359",
+                            "ticketType": 80,
+                            "amount": 176,
+                            "refundStatus": true
+                          },
+                          {
+                            "id": 10,
+                            "seatType": 100,
+                            "carriageNumber": "掀背车",
+                            "seatNo": "sunt deserunt",
+                            "realName": "忻梓妍",
+                            "idType": 7,
+                            "idCard": "610100195502137405",
+                            "ticketType": 58,
+                            "amount": 238,
+                            "refundStatus": true
+                          }
+                        ]
+                      },
+                      {
+                        "orderSn": "sint dolor aliquip mollit occaecat",
+                        "departure": "adipisicing",
+                        "arrival": "eiusmod nisi sint",
+                        "departureCode": "46",
+                        "arrivalCode": "72",
+                        "ridingDate": "2026-03-22",
+                        "trainNumber": "92",
+                        "departureTime": "2025-05-01 02:25:30",
+                        "arrivalTime": "2026-02-09 15:12:54",
+                        "status": 75,
+                        "orderDate": "2026-02-22",
+                        "passengerDetails": [
+                          {
+                            "id": 79,
+                            "seatType": 52,
+                            "carriageNumber": "客车",
+                            "seatNo": "quis eiusmod qui Excepteur voluptate",
+                            "realName": "衷玉珍",
+                            "idType": 94,
+                            "idCard": "500100197103284655",
+                            "ticketType": 6,
+                            "amount": 576,
+                            "refundStatus": true
+                          },
+                          {
+                            "id": 33,
+                            "seatType": 38,
+                            "carriageNumber": "客车",
+                            "seatNo": "in",
+                            "realName": "储文韬",
+                            "idType": 82,
+                            "idCard": "370102193505281270",
+                            "ticketType": 68,
+                            "amount": 620,
+                            "refundStatus": false
+                          }
+                        ]
+                      }
+                    ],
+                    "pages": 84
+                  },
+                  "requestId": null,
+                  "success": false
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/order-service/order/ticket/self/page": {
+      "post": {
+        "summary": "本人车票",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "订单服务"
+        ],
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "Bearer eyJhbGciOiJIUzUxMiJ9.eyJpYXQiOjE3MzY2NDk1MDMsImlzcyI6ImluZGV4MTIzMDYiLCJzdWIiOiJ7XCJyZWFsTmFtZVwiOlwi5b6Q5LiH6YeMXCIsXCJ1c2VySWRcIjpcIjE2ODMwMjU1NTIzNjQ1Njg1NzZcIixcInVzZXJuYW1lXCI6XCJhZG1pblwifSIsImV4cCI6MTczNjczNTkwNH0.Na-zVQoylKlXRm0ksKdGZYpL8CLCY02NpjTN8aPNDXnM4FSFv0GLRL0pCJ10py36I7KXsD9OdZOgoWfvF3D8Ow",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "token",
+            "in": "header",
+            "description": "",
+            "example": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc",
+            "schema": {
+              "type": "string",
+              "default": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "userId": {
+                    "type": "integer",
+                    "title": "用户ID",
+                    "description": "唯一标识"
+                  },
+                  "ticketType": {
+                    "type": "integer",
+                    "title": "车票类型"
+                  },
+                  "pageNumber": {
+                    "type": "integer"
+                  },
+                  "pageSize": {
+                    "type": "integer"
+                  },
+                  "startDate": {
+                    "type": "string",
+                    "title": "开始日期"
+                  },
+                  "endDate": {
+                    "type": "string",
+                    "title": "结束日期"
+                  },
+                  "trainNumber": {
+                    "type": "string",
+                    "title": "列车车次"
+                  }
+                },
+                "required": [
+                  "pageNumber",
+                  "pageSize",
+                  "startDate",
+                  "endDate",
+                  "userId",
+                  "ticketType"
+                ]
+              },
+              "example": {
+                "userId": 1,
+                "ticketType": 0,
+                "pageNumber": 1,
+                "pageSize": 5,
+                "startDate": "2025-01-01",
+                "endDate": "2027-10-18"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "null"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer",
+                          "title": "总条数"
+                        },
+                        "records": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "integer",
+                                "title": "订单明细ID"
+                              },
+                              "departure": {
+                                "type": "string",
+                                "title": "出发站点"
+                              },
+                              "arrival": {
+                                "type": "string",
+                                "title": "到达站点"
+                              },
+                              "departureCode": {
+                                "type": "string",
+                                "title": "出发站编码"
+                              },
+                              "arrivalCode": {
+                                "type": "string",
+                                "title": "到达站编码"
+                              },
+                              "ridingDate": {
+                                "type": "string",
+                                "title": "乘车日期"
+                              },
+                              "trainNumber": {
+                                "type": "string",
+                                "title": "列车车次"
+                              },
+                              "departureTime": {
+                                "type": "string",
+                                "title": "出发时间"
+                              },
+                              "arrivalTime": {
+                                "type": "string",
+                                "title": "到达时间"
+                              },
+                              "seatType": {
+                                "type": "integer",
+                                "title": "席别类型"
+                              },
+                              "carriageNumber": {
+                                "type": "string",
+                                "title": "车厢号"
+                              },
+                              "seatNo": {
+                                "type": "string",
+                                "title": "座位号"
+                              },
+                              "realName": {
+                                "type": "string",
+                                "title": "真实姓名"
+                              },
+                              "ticketType": {
+                                "type": "integer",
+                                "title": "车票类型",
+                                "description": "0：成人 1：儿童 2：学生 3：残疾军人"
+                              },
+                              "amount": {
+                                "type": "integer",
+                                "title": "订单金额"
+                              },
+                              "idType": {
+                                "type": "integer",
+                                "title": "证件类型"
+                              },
+                              "idCard": {
+                                "type": "string",
+                                "title": "证件号"
+                              },
+                              "refundStatus": {
+                                "type": "boolean",
+                                "title": "退票状态",
+                                "description": "0-未退票，1-已退票"
+                              }
+                            },
+                            "required": [
+                              "departure",
+                              "arrival",
+                              "ridingDate",
+                              "trainNumber",
+                              "departureTime",
+                              "arrivalTime",
+                              "seatType",
+                              "carriageNumber",
+                              "seatNo",
+                              "realName",
+                              "ticketType",
+                              "amount",
+                              "idType",
+                              "idCard",
+                              "refundStatus",
+                              "id",
+                              "departureCode",
+                              "arrivalCode"
+                            ]
+                          },
+                          "title": "记录数"
+                        },
+                        "pages": {
+                          "type": "string",
+                          "title": "总页数"
+                        }
+                      },
+                      "required": [
+                        "total",
+                        "records",
+                        "pages"
+                      ]
+                    },
+                    "requestId": {
+                      "type": "null"
+                    },
+                    "success": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data",
+                    "requestId",
+                    "success"
+                  ]
+                },
+                "example": {
+                  "code": "78",
+                  "message": null,
+                  "data": {
+                    "total": 28,
+                    "records": [
+                      {
+                        "id": 15,
+                        "departure": "in",
+                        "arrival": "consectetur est",
+                        "departureCode": "97",
+                        "arrivalCode": "49",
+                        "ridingDate": "2025-02-19",
+                        "trainNumber": "40",
+                        "departureTime": "2026-06-26 01:10:12",
+                        "arrivalTime": "2026-10-24 09:00:06",
+                        "seatType": 29,
+                        "carriageNumber": "旅行车",
+                        "seatNo": "sit nulla",
+                        "realName": "魏萍",
+                        "ticketType": 55,
+                        "amount": 853,
+                        "idType": 50,
+                        "idCard": "220102193401156157",
+                        "refundStatus": true
+                      }
+                    ],
+                    "pages": "Excepteur nostrud id"
+                  },
+                  "requestId": null,
+                  "success": true
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/order-service/order/cancel": {
+      "put": {
+        "summary": "取消订单",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "购票服务"
+        ],
+        "parameters": [
+          {
+            "name": "orderSn",
+            "in": "query",
+            "description": "订单号",
+            "required": false,
+            "example": "ORD_202606032062081882572591105",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "Bearer eyJhbGciOiJIUzUxMiJ9.eyJpYXQiOjE3MzY2NDk1MDMsImlzcyI6ImluZGV4MTIzMDYiLCJzdWIiOiJ7XCJyZWFsTmFtZVwiOlwi5b6Q5LiH6YeMXCIsXCJ1c2VySWRcIjpcIjE2ODMwMjU1NTIzNjQ1Njg1NzZcIixcInVzZXJuYW1lXCI6XCJhZG1pblwifSIsImV4cCI6MTczNjczNTkwNH0.Na-zVQoylKlXRm0ksKdGZYpL8CLCY02NpjTN8aPNDXnM4FSFv0GLRL0pCJ10py36I7KXsD9OdZOgoWfvF3D8Ow",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "token",
+            "in": "header",
+            "description": "",
+            "example": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc",
+            "schema": {
+              "type": "string",
+              "default": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {}
+              },
+              "examples": {}
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {}
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/order-service/pre-order/create": {
+      "post": {
+        "summary": "创建预订单接口",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "购票服务"
+        ],
+        "parameters": [
+          {
+            "name": "token",
+            "in": "header",
+            "description": "",
+            "example": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc",
+            "schema": {
+              "type": "string",
+              "default": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "trainId": {
+                    "type": "integer",
+                    "title": "列车ID"
+                  },
+                  "userId": {
+                    "type": "integer",
+                    "title": "用户ID"
+                  },
+                  "departureCode": {
+                    "type": "string",
+                    "title": "出发站编码"
+                  },
+                  "arrivalCode": {
+                    "type": "string",
+                    "title": "到达站编码"
+                  },
+                  "passengerOrderDetailDTOList": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer",
+                          "title": "乘车人ID"
+                        },
+                        "ticketType": {
+                          "type": "integer",
+                          "title": "车票类型"
+                        },
+                        "seatType": {
+                          "type": "integer",
+                          "title": "席别类型",
+                          "description": "0：商务座 1：一等座 2：二等座 3：二等包座 4：一等卧 5：二等卧 6：软卧 7：硬卧 8：硬座 10：无座"
+                        },
+                        "amount": {
+                          "type": "integer",
+                          "title": "金额"
+                        }
+                      },
+                      "required": [
+                        "seatType",
+                        "ticketType",
+                        "amount",
+                        "id"
+                      ]
+                    },
+                    "title": "乘车人集合"
+                  },
+                  "preferredSeatSymbols": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "title": "用户偏好的座位序号组"
+                  }
+                },
+                "required": [
+                  "trainId",
+                  "passengerOrderDetailDTOList",
+                  "preferredSeatSymbols",
+                  "userId",
+                  "departureCode",
+                  "arrivalCode"
+                ]
+              },
+              "example": {
+                "trainId": 1,
+                "userId": 1,
+                "departureCode": "ST1104",
+                "arrivalCode": "ST1073",
+                "passengerOrderDetailDTOList": [
+                  {
+                    "id": 1,
+                    "ticketType": 0,
+                    "seatType": 5,
+                    "amount": 857
+                  },
+                  {
+                    "id": 2,
+                    "ticketType": 0,
+                    "seatType": 5,
+                    "amount": 857
+                  }
+                ],
+                "preferredSeatSymbols": [
+                  "A",
+                  "F"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "null"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "preOrderSn": {
+                          "type": "string",
+                          "title": "订单号"
+                        }
+                      },
+                      "required": [
+                        "preOrderSn"
+                      ]
+                    },
+                    "requestId": {
+                      "type": "null"
+                    },
+                    "success": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data",
+                    "requestId",
+                    "success"
+                  ]
+                },
+                "example": {
+                  "code": "74",
+                  "message": null,
+                  "data": {
+                    "preOrderSn": "12131341"
+                  },
+                  "requestId": null,
+                  "success": true
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/order-service/order/create": {
+      "post": {
+        "summary": "创建订单接口 ",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "购票服务"
+        ],
+        "parameters": [
+          {
+            "name": "Repeat-Token",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "REPEAT_2060536447529865216",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "token",
+            "in": "header",
+            "description": "",
+            "example": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc",
+            "schema": {
+              "type": "string",
+              "default": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "preOrderSn": {
+                    "type": "string",
+                    "title": "预订单号（唯一标识）"
+                  },
+                  "departure": {
+                    "type": "string",
+                    "title": "出发站点"
+                  },
+                  "arrival": {
+                    "type": "string",
+                    "title": "到达站点"
+                  },
+                  "departureCode": {
+                    "type": "string",
+                    "title": "出发站编码"
+                  },
+                  "arrivalCode": {
+                    "type": "string",
+                    "title": "到达站编码"
+                  },
+                  "ridingDate": {
+                    "type": "string",
+                    "title": " 乘车日期"
+                  },
+                  "trainId": {
+                    "type": "integer",
+                    "title": "列车车次"
+                  },
+                  "departureTime": {
+                    "type": "string",
+                    "title": "出发时间"
+                  },
+                  "arrivalTime": {
+                    "type": "string",
+                    "title": "到达时间"
+                  }
+                },
+                "required": [
+                  "preOrderSn",
+                  "departure",
+                  "arrival",
+                  "trainId",
+                  "ridingDate",
+                  "departureTime",
+                  "arrivalTime",
+                  "departureCode",
+                  "arrivalCode"
+                ]
+              },
+              "example": {
+                "preOrderSn": "PRE_ORD_202605252058842654082551809",
+                "departure": "站点1104",
+                "arrival": "站点1073",
+                "departureCode": "ST1104",
+                "arrivalCode": "ST1073",
+                "ridingDate": "2025-10-25",
+                "trainId": 1,
+                "departureTime": "2026-10-07 14:00:00",
+                "arrivalTime": "2026-10-07 15:00:00"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "null"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "orderSn": {
+                          "type": "string",
+                          "title": "订单号"
+                        },
+                        "ticketOrderDetails": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "seatType": {
+                                "type": "integer",
+                                "title": "席别类型"
+                              },
+                              "carriageNumber": {
+                                "type": "string",
+                                "title": "车厢号"
+                              },
+                              "seatNo": {
+                                "type": "string",
+                                "title": "座位号"
+                              },
+                              "realName": {
+                                "type": "string",
+                                "title": "真实姓名"
+                              },
+                              "idType": {
+                                "type": "integer",
+                                "title": "证件类型"
+                              },
+                              "idCard": {
+                                "type": "string",
+                                "title": "证件号码"
+                              },
+                              "ticketType": {
+                                "type": "integer",
+                                "title": "票种"
+                              },
+                              "amount": {
+                                "type": "integer",
+                                "title": "票价"
+                              }
+                            },
+                            "required": [
+                              "seatType",
+                              "carriageNumber",
+                              "seatNo",
+                              "realName",
+                              "idType",
+                              "idCard",
+                              "ticketType",
+                              "amount"
+                            ]
+                          },
+                          "title": "订单详情"
+                        },
+                        "ridingDate": {
+                          "type": "string",
+                          "title": "乘车日期"
+                        },
+                        "trainNumber": {
+                          "type": "string",
+                          "title": "列车车次"
+                        },
+                        "departure": {
+                          "type": "string",
+                          "title": "出发站点"
+                        },
+                        "arrival": {
+                          "type": "string",
+                          "title": "到达站点"
+                        },
+                        "departureCode": {
+                          "type": "string",
+                          "title": "出发站编码"
+                        },
+                        "arrivalCode": {
+                          "type": "string",
+                          "title": "到达站编码"
+                        },
+                        "departureTime": {
+                          "type": "string",
+                          "title": "出发时间"
+                        },
+                        "arrivalTime": {
+                          "type": "string",
+                          "title": "到达时间"
+                        }
+                      },
+                      "required": [
+                        "orderSn",
+                        "ticketOrderDetails",
+                        "ridingDate",
+                        "trainNumber",
+                        "departure",
+                        "arrival",
+                        "departureTime",
+                        "arrivalTime",
+                        "departureCode",
+                        "arrivalCode"
+                      ]
+                    },
+                    "requestId": {
+                      "type": "null"
+                    },
+                    "success": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data",
+                    "requestId",
+                    "success"
+                  ]
+                },
+                "example": {
+                  "code": "32",
+                  "message": null,
+                  "data": {
+                    "orderSn": "sed dolor",
+                    "ticketOrderDetails": [
+                      {
+                        "seatType": 31,
+                        "carriageNumber": "面包车",
+                        "seatNo": "esse",
+                        "realName": "凤熙瑶",
+                        "idType": 90,
+                        "idCard": "140100197606014027",
+                        "ticketType": 1,
+                        "amount": 104
+                      },
+                      {
+                        "seatType": 15,
+                        "carriageNumber": "旅行车",
+                        "seatNo": "dolore fugiat mollit",
+                        "realName": "抗浩辰",
+                        "idType": 19,
+                        "idCard": "620100197105192858",
+                        "ticketType": 28,
+                        "amount": 439
+                      },
+                      {
+                        "seatType": 80,
+                        "carriageNumber": "轿车",
+                        "seatNo": "aute commodo velit veniam",
+                        "realName": "越浩宇",
+                        "idType": 60,
+                        "idCard": "210100198301021560",
+                        "ticketType": 48,
+                        "amount": 577
+                      }
+                    ],
+                    "ridingDate": "2025-09-28",
+                    "trainNumber": "29",
+                    "departure": "eu commodo velit",
+                    "arrival": "in sunt",
+                    "departureCode": "90",
+                    "arrivalCode": "70",
+                    "departureTime": "2025-07-06 14:40:12",
+                    "arrivalTime": "2024-12-27 15:31:26"
+                  },
+                  "requestId": null,
+                  "success": true
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/pay-service/pay/create": {
+      "post": {
+        "summary": "支付接口",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "支付服务"
+        ],
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "Bearer eyJhbGciOiJIUzUxMiJ9.eyJpYXQiOjE3MzY2NDk1MDMsImlzcyI6ImluZGV4MTIzMDYiLCJzdWIiOiJ7XCJyZWFsTmFtZVwiOlwi5b6Q5LiH6YeMXCIsXCJ1c2VySWRcIjpcIjE2ODMwMjU1NTIzNjQ1Njg1NzZcIixcInVzZXJuYW1lXCI6XCJhZG1pblwifSIsImV4cCI6MTczNjczNTkwNH0.Na-zVQoylKlXRm0ksKdGZYpL8CLCY02NpjTN8aPNDXnM4FSFv0GLRL0pCJ10py36I7KXsD9OdZOgoWfvF3D8Ow",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "token",
+            "in": "header",
+            "description": "",
+            "example": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc",
+            "schema": {
+              "type": "string",
+              "default": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "channel": {
+                    "type": "string",
+                    "title": "支付渠道",
+                    "description": " 0：支付宝"
+                  },
+                  "tradeType": {
+                    "type": "string",
+                    "title": "支付环境",
+                    "description": " 0：网页支付"
+                  },
+                  "orderSn": {
+                    "type": "string"
+                  },
+                  "outOrderSn": {
+                    "type": "string"
+                  },
+                  "subject": {
+                    "type": "string"
+                  },
+                  "totalAmount": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "channel",
+                  "tradeType",
+                  "orderSn",
+                  "outOrderSn",
+                  "subject",
+                  "totalAmount"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "null"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "body": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "body"
+                      ]
+                    },
+                    "requestId": {
+                      "type": "string"
+                    },
+                    "success": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data",
+                    "requestId",
+                    "success"
+                  ]
+                },
+                "example": {
+                  "code": "0",
+                  "message": null,
+                  "data": {
+                    "body": "<form name=\"punchout_form\" method=\"post\" action=\"https://openapi.alipaydev.com/gateway.do?charset=UTF8&method=alipay.trade.page.pay&sign=fMwbcX0NUel6psIIS9JPrLEXH66Qm%2BsLmRGoeNyEnAHE5Vl%2BX2RX26YgvmA8SmdTFW7859Vl%2BlOtPF79RSwbE1zIxfLlE3Ew1Ek%2BF%2BQpbyxHqSV6nrC63aI8QIq1BawTk8LjqmrYgFNRvWnCwsg2jxghoMq11kC%2Bi%2BLm2BRZxxHD97hPRrpcNfBx9s%2BKbxlPHm82l5SosLzeM3d3EMuGns3kwcPfBOm0shckikk7RtMV7W%2BsCRH9LGKV7KG%2BeZt484%2Btvho08JIQ%2Br70jH%2FFtypAZGfsGI2LrBvbDcVTSLNfL7c4%2FTAD2y1lK8%2BVDv26cEMq9u%2B0XfuawBc4LNF0lg%3D%3D&notify_url=http%3A%2F%2Fems8b7.natappfree.cc%2Fapi%2Fpay-service%2Fcallback%2Falipay&version=1.0&app_id=2021000122600170&sign_type=RSA2&timestamp=2023-06-29+12%3A14%3A22&alipay_sdk=alipay-sdk-java-dynamicVersionNo&format=json\">\n<input type=\"hidden\" name=\"biz_content\" value=\"{&quot;out_trade_no&quot;:&quot;1674270057357307904&quot;,&quot;product_code&quot;:&quot;FAST_INSTANT_TRADE_PAY&quot;,&quot;subject&quot;:&quot;iPhone 14 Pro&quot;,&quot;total_amount&quot;:&quot;6499.99&quot;}\">\n<input type=\"submit\" value=\"立即支付\" style=\"display:none\" >\n</form>\n<script>document.forms[0].submit();</script>"
+                  },
+                  "requestId": "",
+                  "success": true
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/pay-service/pay/query/order-sn": {
+      "get": {
+        "summary": "订单号查询支付单",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "支付服务"
+        ],
+        "parameters": [
+          {
+            "name": "orderSn",
+            "in": "query",
+            "description": "",
+            "required": false,
+            "example": "",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "Bearer eyJhbGciOiJIUzUxMiJ9.eyJpYXQiOjE3MzY2NDk1MDMsImlzcyI6ImluZGV4MTIzMDYiLCJzdWIiOiJ7XCJyZWFsTmFtZVwiOlwi5b6Q5LiH6YeMXCIsXCJ1c2VySWRcIjpcIjE2ODMwMjU1NTIzNjQ1Njg1NzZcIixcInVzZXJuYW1lXCI6XCJhZG1pblwifSIsImV4cCI6MTczNjczNTkwNH0.Na-zVQoylKlXRm0ksKdGZYpL8CLCY02NpjTN8aPNDXnM4FSFv0GLRL0pCJ10py36I7KXsD9OdZOgoWfvF3D8Ow",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "token",
+            "in": "header",
+            "description": "",
+            "example": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc",
+            "schema": {
+              "type": "string",
+              "default": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {}
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/pay-service/pay/query/pay-sn": {
+      "get": {
+        "summary": "支付单号查询支付单",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "支付服务"
+        ],
+        "parameters": [
+          {
+            "name": "orderSn",
+            "in": "query",
+            "description": "",
+            "required": false,
+            "example": "",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "Bearer eyJhbGciOiJIUzUxMiJ9.eyJpYXQiOjE3MzY2NDk1MDMsImlzcyI6ImluZGV4MTIzMDYiLCJzdWIiOiJ7XCJyZWFsTmFtZVwiOlwi5b6Q5LiH6YeMXCIsXCJ1c2VySWRcIjpcIjE2ODMwMjU1NTIzNjQ1Njg1NzZcIixcInVzZXJuYW1lXCI6XCJhZG1pblwifSIsImV4cCI6MTczNjczNTkwNH0.Na-zVQoylKlXRm0ksKdGZYpL8CLCY02NpjTN8aPNDXnM4FSFv0GLRL0pCJ10py36I7KXsD9OdZOgoWfvF3D8Ow",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "token",
+            "in": "header",
+            "description": "",
+            "example": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc",
+            "schema": {
+              "type": "string",
+              "default": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {}
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/ticket-service/ticket/pay/query": {
+      "get": {
+        "summary": "查询支付单",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "购票服务"
+        ],
+        "parameters": [
+          {
+            "name": "orderSn",
+            "in": "query",
+            "description": "",
+            "required": false,
+            "example": "",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "Bearer eyJhbGciOiJIUzUxMiJ9.eyJpYXQiOjE3MzY2NDk1MDMsImlzcyI6ImluZGV4MTIzMDYiLCJzdWIiOiJ7XCJyZWFsTmFtZVwiOlwi5b6Q5LiH6YeMXCIsXCJ1c2VySWRcIjpcIjE2ODMwMjU1NTIzNjQ1Njg1NzZcIixcInVzZXJuYW1lXCI6XCJhZG1pblwifSIsImV4cCI6MTczNjczNTkwNH0.Na-zVQoylKlXRm0ksKdGZYpL8CLCY02NpjTN8aPNDXnM4FSFv0GLRL0pCJ10py36I7KXsD9OdZOgoWfvF3D8Ow",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "token",
+            "in": "header",
+            "description": "",
+            "example": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc",
+            "schema": {
+              "type": "string",
+              "default": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {}
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/ticket-service/ticket/refund": {
+      "post": {
+        "summary": "车票订单退款",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "购票服务"
+        ],
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "Bearer eyJhbGciOiJIUzUxMiJ9.eyJpYXQiOjE3MzY2NDk1MDMsImlzcyI6ImluZGV4MTIzMDYiLCJzdWIiOiJ7XCJyZWFsTmFtZVwiOlwi5b6Q5LiH6YeMXCIsXCJ1c2VySWRcIjpcIjE2ODMwMjU1NTIzNjQ1Njg1NzZcIixcInVzZXJuYW1lXCI6XCJhZG1pblwifSIsImV4cCI6MTczNjczNTkwNH0.Na-zVQoylKlXRm0ksKdGZYpL8CLCY02NpjTN8aPNDXnM4FSFv0GLRL0pCJ10py36I7KXsD9OdZOgoWfvF3D8Ow",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "token",
+            "in": "header",
+            "description": "",
+            "example": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc",
+            "schema": {
+              "type": "string",
+              "default": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "orderSn": {
+                    "type": "string",
+                    "title": "订单号"
+                  },
+                  "type": {
+                    "type": "integer",
+                    "title": "退款类型",
+                    "description": "0 部分退款 1 全部退款"
+                  },
+                  "subOrderRecordIdReqList": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "title": "部分退款子订单记录id集合"
+                  }
+                },
+                "required": [
+                  "orderSn",
+                  "type",
+                  "subOrderRecordIdReqList"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {}
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/ticket-service/train-station-remaining-ticket/job/cache-init/execute": {
+      "get": {
+        "summary": "列车余量缓存初始化",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "定时任务"
+        ],
+        "parameters": [
+          {
+            "name": "requestParam",
+            "in": "header",
+            "description": "时间",
+            "required": false,
+            "example": "2023-06-01",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "Bearer eyJhbGciOiJIUzUxMiJ9.eyJpYXQiOjE3MzY2NDk1MDMsImlzcyI6ImluZGV4MTIzMDYiLCJzdWIiOiJ7XCJyZWFsTmFtZVwiOlwi5b6Q5LiH6YeMXCIsXCJ1c2VySWRcIjpcIjE2ODMwMjU1NTIzNjQ1Njg1NzZcIixcInVzZXJuYW1lXCI6XCJhZG1pblwifSIsImV4cCI6MTczNjczNTkwNH0.Na-zVQoylKlXRm0ksKdGZYpL8CLCY02NpjTN8aPNDXnM4FSFv0GLRL0pCJ10py36I7KXsD9OdZOgoWfvF3D8Ow",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "token",
+            "in": "header",
+            "description": "",
+            "example": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc",
+            "schema": {
+              "type": "string",
+              "default": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {}
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/ticket-service/train-station/job/cache-init/execute": {
+      "get": {
+        "summary": "列车路线缓存初始化",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "定时任务"
+        ],
+        "parameters": [
+          {
+            "name": "requestParam",
+            "in": "header",
+            "description": "时间",
+            "required": false,
+            "example": "2023-06-01",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "Bearer eyJhbGciOiJIUzUxMiJ9.eyJpYXQiOjE3MzY2NDk1MDMsImlzcyI6ImluZGV4MTIzMDYiLCJzdWIiOiJ7XCJyZWFsTmFtZVwiOlwi5b6Q5LiH6YeMXCIsXCJ1c2VySWRcIjpcIjE2ODMwMjU1NTIzNjQ1Njg1NzZcIixcInVzZXJuYW1lXCI6XCJhZG1pblwifSIsImV4cCI6MTczNjczNTkwNH0.Na-zVQoylKlXRm0ksKdGZYpL8CLCY02NpjTN8aPNDXnM4FSFv0GLRL0pCJ10py36I7KXsD9OdZOgoWfvF3D8Ow",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "token",
+            "in": "header",
+            "description": "",
+            "example": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc",
+            "schema": {
+              "type": "string",
+              "default": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {}
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/ticket-service/train-station-detail/job/cache-init/execute": {
+      "get": {
+        "summary": "列车站点详缓存初始化",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "定时任务"
+        ],
+        "parameters": [
+          {
+            "name": "requestParam",
+            "in": "header",
+            "description": "时间",
+            "required": false,
+            "example": "2023-06-01",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "Bearer eyJhbGciOiJIUzUxMiJ9.eyJpYXQiOjE3MzY2NDk1MDMsImlzcyI6ImluZGV4MTIzMDYiLCJzdWIiOiJ7XCJyZWFsTmFtZVwiOlwi5b6Q5LiH6YeMXCIsXCJ1c2VySWRcIjpcIjE2ODMwMjU1NTIzNjQ1Njg1NzZcIixcInVzZXJuYW1lXCI6XCJhZG1pblwifSIsImV4cCI6MTczNjczNTkwNH0.Na-zVQoylKlXRm0ksKdGZYpL8CLCY02NpjTN8aPNDXnM4FSFv0GLRL0pCJ10py36I7KXsD9OdZOgoWfvF3D8Ow",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "token",
+            "in": "header",
+            "description": "",
+            "example": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc",
+            "schema": {
+              "type": "string",
+              "default": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {}
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/ticket-service/region-train-station/job/cache-init/execute": {
+      "get": {
+        "summary": "地区站点查询缓存初始化",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "定时任务"
+        ],
+        "parameters": [
+          {
+            "name": "requestParam",
+            "in": "header",
+            "description": "时间",
+            "required": false,
+            "example": "2023-06-01",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "Bearer eyJhbGciOiJIUzUxMiJ9.eyJpYXQiOjE3MzY2NDk1MDMsImlzcyI6ImluZGV4MTIzMDYiLCJzdWIiOiJ7XCJyZWFsTmFtZVwiOlwi5b6Q5LiH6YeMXCIsXCJ1c2VySWRcIjpcIjE2ODMwMjU1NTIzNjQ1Njg1NzZcIixcInVzZXJuYW1lXCI6XCJhZG1pblwifSIsImV4cCI6MTczNjczNTkwNH0.Na-zVQoylKlXRm0ksKdGZYpL8CLCY02NpjTN8aPNDXnM4FSFv0GLRL0pCJ10py36I7KXsD9OdZOgoWfvF3D8Ow",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "token",
+            "in": "header",
+            "description": "",
+            "example": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc",
+            "schema": {
+              "type": "string",
+              "default": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {}
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/tool-service/repeat/token": {
+      "get": {
+        "summary": "获取防重复提交令牌",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "工具服务"
+        ],
+        "parameters": [
+          {
+            "name": "token",
+            "in": "header",
+            "description": "",
+            "example": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc",
+            "schema": {
+              "type": "string",
+              "default": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoi5byg5LiJIiwiaWF0IjoxNzgwNzI5ODc1LCJleHAiOjE3ODE0NDk4NzV9.yEs4auuQPgpQO7CM_Q8LOQdWu1kOP4KbNwHJJvkReHc"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    },
+                    "success": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data",
+                    "requestId",
+                    "success"
+                  ]
+                },
+                "example": {
+                  "code": "8",
+                  "message": "eu in Duis Excepteur reprehenderit",
+                  "data": "officia anim est",
+                  "requestId": "32",
+                  "success": true
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": []
+      }
+    }
+  },
+  "components": {
+    "schemas": {},
+    "responses": {},
+    "securitySchemes": {}
+  },
+  "servers": [],
+  "security": []
+}

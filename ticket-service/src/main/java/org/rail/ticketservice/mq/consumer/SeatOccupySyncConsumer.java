@@ -28,7 +28,7 @@ public class SeatOccupySyncConsumer {
         List<SeatIntervalOccupy> occupyList = message.getOccupyList();
         Long lockId = occupyList.getFirst().getLockId();
         try {
-            Integer count = seatIntervalOccupyMapper.countByLockId(lockId);
+            Integer count = seatIntervalOccupyMapper.countByLockIdForUpdate(lockId);
             if (count > 0) {
                 return;
             }
