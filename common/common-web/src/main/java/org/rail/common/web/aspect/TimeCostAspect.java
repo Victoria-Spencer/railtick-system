@@ -1,4 +1,4 @@
-package org.rail.common.core.aspect;
+package org.rail.common.web.aspect;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

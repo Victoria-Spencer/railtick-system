@@ -1,4 +1,4 @@
-package org.rail.common.core.aspect;
+package org.rail.common.web.aspect;
 
 import cn.hutool.json.JSONUtil;
 import jakarta.servlet.http.HttpServletRequest;
