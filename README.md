@@ -143,7 +143,7 @@ chmod +x docker_service_controller.sh
 ## 📚 目录说明
 ```
 docs/
-├── docker-start/             # Docker部署相关脚本和配置
+├── docker-start/       # Docker部署相关脚本和配置
 ├── init-sql/           # 数据库初始化SQL文件
 ├── api-docs/           # 接口文档（OpenAPI格式）
 └── ecosystem/          # 扩展生态模块文档（压测、智能助手、缓存中台等）
